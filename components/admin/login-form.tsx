@@ -67,7 +67,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="flex flex-col items-center mb-8"
         >
-          <div className="relative mb-4">
+          <Link href="/" aria-label="Go to homepage" className="relative mb-4 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-4">
             <div className="absolute inset-0 brand-gradient rounded-3xl blur-2xl opacity-30 animate-breathe" />
             <div className="relative w-20 h-20 rounded-3xl glass-card flex items-center justify-center shadow-xl overflow-hidden">
               <Image
@@ -79,7 +79,7 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                 priority
               />
             </div>
-          </div>
+          </Link>
           <p className="text-xs text-muted-foreground/60 uppercase tracking-widest font-medium">
             Streams of Joy International
           </p>
@@ -116,6 +116,12 @@ export function LoginForm({ onLogin }: LoginFormProps) {
                 {loading ? "Authenticating..." : "Access Dashboard"}
               </Button>
             </form>
+            <div className="mt-5 border-t border-border/60 pt-5 text-center">
+              <p className="text-xs text-muted-foreground">Authorized member administrator?</p>
+              <Button asChild variant="outline" className="mt-3 w-full">
+                <Link href="/member/login?next=/admin/dashboard">Sign in with member account</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </motion.div>

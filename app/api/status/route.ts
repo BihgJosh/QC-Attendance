@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { getConfig, updateConfig } from "@/lib/google-sheets";
+import { getAttendanceStatus, updateAttendanceStatus } from "@/lib/attendance-store";
 import { isAdminAuthenticated } from "@/lib/auth";
 
 export async function GET() {
   try {
-    const config = await getConfig();
-    return NextResponse.json({ isOpen: config.isOpen === "true" });
+    return NextResponse.json({ isOpen: await getAttendanceStatus() });
   } catch (error) {
     console.error("Failed to fetch attendance status:", error);
     return NextResponse.json({ error: "Failed to fetch status" }, { status: 500 });
@@ -19,10 +18,8 @@ export async function POST(req: Request) {
 
   try {
     const { isOpen } = await req.json();
-    const config = await getConfig();
-    config.isOpen = isOpen ? "true" : "false";
-    await updateConfig(config);
-    return NextResponse.json({ success: true, isOpen: config.isOpen === "true" });
+    const result = await updateAttendanceStatus(Boolean(isOpen));
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to update attendance status:", error);
     return NextResponse.json({ error: "Failed to update status" }, { status: 500 });

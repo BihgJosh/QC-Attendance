@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getWhitelist } from "@/lib/google-sheets";
+import { getWhitelist } from "@/lib/attendance-store";
 
 export async function GET() {
   try {

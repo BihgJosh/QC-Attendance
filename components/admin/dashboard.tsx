@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,8 +21,11 @@ import {
   Search, Loader2, ShieldCheck, Clock, MapPin, Users,
   TrendingUp, ChevronLeft, ChevronRight, ArrowUp, ArrowDown,
   Download, CalendarIcon, SlidersHorizontal,
+  KeyRound, LayoutDashboard,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ContentManager } from "@/components/admin/content-manager";
+import { MemberPasswordManager } from "@/components/admin/member-password-manager";
 
 interface DashboardProps {
   onLogout?: () => void;
@@ -63,6 +67,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
   const [togglingStatus, setTogglingStatus] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [confirmToggle, setConfirmToggle] = useState(false);
+  const [adminView, setAdminView] = useState<"operations" | "passwords">("operations");
 
   /* ---------- Sort state ---------- */
   const [sortField, setSortField] = useState<SortField>("time");
@@ -301,7 +306,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
       {/* Top Navigation */}
       <header className="sticky top-0 z-50 glass border-b border-border/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <Link href="/" aria-label="Go to homepage" className="flex items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             <div className="w-9 h-9 rounded-xl glass-card flex items-center justify-center overflow-hidden dark:bg-white/10">
               <Image
                 src="/soja-logo.jpeg"
@@ -315,7 +320,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
               <h1 className="text-sm font-bold font-display leading-tight">QCU Dashboard</h1>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Streams of Joy</p>
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline text-[10px] text-muted-foreground/50 uppercase tracking-wider mr-1">
               <kbd className="px-1 py-0.5 rounded bg-muted/50 text-[9px] font-mono">O</kbd> toggle&nbsp;
@@ -329,7 +334,15 @@ export function Dashboard({ onLogout }: DashboardProps) {
         </div>
       </header>
 
+      <div className="border-b border-border/40 bg-background/75 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8" role="tablist" aria-label="Admin sections">
+          <Button type="button" size="sm" variant={adminView === "operations" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "operations"} onClick={() => setAdminView("operations")}><LayoutDashboard className="mr-2 h-4 w-4" />Operations</Button>
+          <Button type="button" size="sm" variant={adminView === "passwords" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "passwords"} onClick={() => setAdminView("passwords")}><KeyRound className="mr-2 h-4 w-4" />Password resets</Button>
+        </div>
+      </div>
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {adminView === "passwords" ? <MemberPasswordManager /> : <>
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
@@ -481,13 +494,13 @@ export function Dashboard({ onLogout }: DashboardProps) {
                 <Settings className="w-5 h-5 text-accent" />
                 Geofence Configuration
               </CardTitle>
-              <CardDescription>Configure church location coordinates and allowed radius.</CardDescription>
+              <CardDescription>Configure the Abuja church coordinates and allowed radius. Attendance dates use Abuja WAT.</CardDescription>
             </CardHeader>
             <CardContent>
               {settings && (
                 <form onSubmit={saveSettings} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="lat" className="text-xs uppercase tracking-wide text-muted-foreground">Church Latitude</Label>
+                    <Label htmlFor="lat" className="text-xs uppercase tracking-wide text-muted-foreground">Abuja Church Latitude</Label>
                     <Input
                       id="lat"
                       value={settings.churchLat}
@@ -497,7 +510,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lng" className="text-xs uppercase tracking-wide text-muted-foreground">Church Longitude</Label>
+                    <Label htmlFor="lng" className="text-xs uppercase tracking-wide text-muted-foreground">Abuja Church Longitude</Label>
                     <Input
                       id="lng"
                       value={settings.churchLng}
@@ -532,6 +545,8 @@ export function Dashboard({ onLogout }: DashboardProps) {
             </CardContent>
           </Card>
         </div>
+
+        <ContentManager />
 
         {/* Filters — Service + Date Range */}
         <Card variant="glass">
@@ -771,6 +786,7 @@ export function Dashboard({ onLogout }: DashboardProps) {
             </CardContent>
           </Card>
         </div>
+        </>}
       </main>
     </div>
   );

@@ -27,6 +27,13 @@ export function getGoogleEnv() {
   };
 }
 
+export function getSupabaseEnv() {
+  return {
+    url: getEnv("SUPABASE_URL"),
+    anonKey: getEnv("SUPABASE_ANON_KEY"),
+  };
+}
+
 export function getAttendanceEnvConfig() {
   return {
     adminPassword: getEnv("ADMIN_PASSWORD"),

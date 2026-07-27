@@ -9,7 +9,7 @@ import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 
 export const metadata: Metadata = {
   title: "Quality Control Unit | Streams of Joy International",
-  description: "Secure geofenced attendance platform ensuring authenticity, accountability and excellence.",
+  description: "The home of the Streams of Joy Quality Control Unit — announcements, postings, uniform guidance and attendance.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

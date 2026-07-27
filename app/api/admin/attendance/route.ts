@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAttendanceRecords } from "@/lib/google-sheets";
+import { getAttendanceRecords } from "@/lib/attendance-store";
 import { isAdminAuthenticated } from "@/lib/auth";
 
 export async function GET() {

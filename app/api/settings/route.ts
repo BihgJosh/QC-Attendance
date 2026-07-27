@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getConfig, updateConfig } from "@/lib/google-sheets";
+import { getAttendanceSettings, updateAttendanceSettings } from "@/lib/attendance-store";
 import { isAdminAuthenticated } from "@/lib/auth";
 import { getLocationEnvConfig } from "@/lib/env";
 
@@ -9,13 +9,15 @@ export async function GET() {
   }
   
   try {
-    const config = await getConfig();
+    const config = await getAttendanceSettings();
     const envConfig = getLocationEnvConfig();
 
     return NextResponse.json({
       churchLat: config.churchLat || envConfig.churchLat || "",
       churchLng: config.churchLng || envConfig.churchLng || "",
       allowedRadius: config.allowedRadius || envConfig.allowedRadius || "",
+      locationName: config.locationName || "Abuja",
+      timezoneLabel: config.timezoneLabel || "WAT",
     });
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });
@@ -29,13 +31,12 @@ export async function POST(req: Request) {
 
   try {
     const newSettings = await req.json();
-    const config = await getConfig();
-
-    config.churchLat = newSettings.churchLat || config.churchLat;
-    config.churchLng = newSettings.churchLng || config.churchLng;
-    config.allowedRadius = newSettings.allowedRadius || config.allowedRadius;
-
-    await updateConfig(config);
+    const current = await getAttendanceSettings();
+    await updateAttendanceSettings({
+      churchLat: newSettings.churchLat || current.churchLat,
+      churchLng: newSettings.churchLng || current.churchLng,
+      allowedRadius: newSettings.allowedRadius || current.allowedRadius,
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: "Failed to update settings" }, { status: 500 });

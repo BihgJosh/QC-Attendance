@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { toast } from "sonner";
-import { formatLagosTime } from "@/lib/timezone";
+import { formatAbujaTime } from "@/lib/timezone";
 import { getDeviceId } from "@/lib/device-id";
 import {
   Loader2, MapPin, User, KeyRound, CheckCircle2, Sparkles,
@@ -219,7 +219,7 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
           const now = new Date();
           setSuccessData({
             name: name,
-            time: formatLagosTime(now),
+            time: formatAbujaTime(now),
           });
           setSuccess(true);
           toast.success("Attendance signed successfully!");
