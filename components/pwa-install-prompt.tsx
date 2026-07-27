@@ -78,7 +78,12 @@ export function PWAInstallPrompt() {
             <Button size="sm" variant="gradient" className="flex-shrink-0" onClick={handleInstall}>
               Install
             </Button>
-            <button onClick={dismissAll} className="flex-shrink-0 p-1 text-muted-foreground/50 hover:text-foreground">
+            <button
+              type="button"
+              aria-label="Dismiss install prompt"
+              onClick={dismissAll}
+              className="grid h-11 w-11 flex-shrink-0 place-items-center text-muted-foreground/50 hover:text-foreground"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
