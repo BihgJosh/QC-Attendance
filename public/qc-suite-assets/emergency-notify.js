@@ -1,133 +1,172 @@
 /**
- * SOJ QC — Emergency notification watcher.
- * Included on every page except /emergency/ itself via:
- *   <script src="/emergency-notify.js" defer></script>
- *
- * HONEST LIMITATION: this only works while the app is OPEN (foreground or
- * backgrounded tab/installed app). It cannot wake up a fully closed app —
- * that requires a real push server (e.g. Web Push + a push provider), which
- * is a separate, bigger upgrade. This polls every 45 seconds while running.
+ * SOJ QC emergency watcher.
+ * Polls while the app is open and renders a shared top-of-page alert strip.
  */
 (function () {
   'use strict';
 
-  // ====== CONFIG — paste your Emergency Apps Script Web App URL here ======
   var EMERGENCY_API_URL = 'https://script.google.com/macros/s/AKfycbzZJ5LEnQGUAC8ChcZ--oxUfUkJMYG8jg-IRUu2i_KcqFD6GByKk5ahTIrbMXz8sjDNMQ/exec';
-  // ==========================================================================
-
   var POLL_INTERVAL_MS = 45000;
   var SINCE_KEY = 'soj-qc-emergency-since';
-  var PERM_ASKED_KEY = 'soj-qc-emergency-perm-asked';
-
-  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-
-  // ---------- Permission opt-in banner (shown once, low-key) ----------
-  function maybeAskPermission() {
-    if (!('Notification' in window)) return;
-    if (Notification.permission !== 'default') return;
-    if (localStorage.getItem(PERM_ASKED_KEY)) return;
-
-    var style = document.createElement('style');
-    style.textContent =
-      '#soj-emg-permban{position:fixed;left:16px;right:16px;top:16px;z-index:99998;max-width:480px;margin:0 auto;' +
-      'background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);border:1.5px solid rgba(220,38,38,0.25);' +
-      'border-radius:16px;box-shadow:0 10px 30px rgba(220,38,38,0.18);padding:14px 16px;' +
-      'font-family:-apple-system,Inter,"Segoe UI",sans-serif;display:flex;gap:10px;align-items:center;}' +
-      '#soj-emg-permban p{margin:0;font-size:12.5px;color:#1E2233;font-weight:600;flex:1;}' +
-      '#soj-emg-permban button{border:none;border-radius:9px;font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer;font-family:inherit;}' +
-      '#soj-emg-permban .yes{background:linear-gradient(135deg,#DC2626,#F97316);color:#fff;}' +
-      '#soj-emg-permban .no{background:#fff;border:1.5px solid #E4E1F5 !important;color:#6B7280;}';
-    document.head.appendChild(style);
-
-    var el = document.createElement('div');
-    el.id = 'soj-emg-permban';
-    el.innerHTML =
-      '<p>🚨 Enable emergency alerts on this device?</p>' +
-      '<button class="yes">Enable</button>' +
-      '<button class="no">Not now</button>';
-    document.body.appendChild(el);
-
-    el.querySelector('.yes').addEventListener('click', function () {
-      Notification.requestPermission().finally(function () {
-        localStorage.setItem(PERM_ASKED_KEY, '1');
-        el.remove();
-      });
-    });
-    el.querySelector('.no').addEventListener('click', function () {
-      localStorage.setItem(PERM_ASKED_KEY, '1');
-      el.remove();
-    });
-  }
-
-  // ---------- In-page red banner: single carousel, not a stack ----------
   var emergencyQueue = [];
   var currentIdx = 0;
   var autoAdvanceTimer = null;
+  var pointerStartX = 0;
+  var pointerDeltaX = 0;
+  var pointerTracking = false;
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
 
   function ensureStyles() {
     if (document.getElementById('soj-emg-style')) return;
     var style = document.createElement('style');
     style.id = 'soj-emg-style';
     style.textContent =
-      '#soj-emg-alert-container{position:fixed;left:16px;right:16px;bottom:16px;z-index:99999;max-width:480px;margin:0 auto;' +
-      'background:linear-gradient(135deg,#DC2626,#F97316);color:#fff;border-radius:16px;' +
-      'box-shadow:0 14px 36px rgba(220,38,38,0.4);padding:16px 18px;overflow:hidden;' +
-      'font-family:-apple-system,Inter,"Segoe UI",sans-serif;}' +
-      '.soj-emg-inner{animation:soj-emg-slide .35s ease;}' +
-      '@keyframes soj-emg-slide{from{transform:translateX(24px);opacity:0}to{transform:translateX(0);opacity:1}}' +
-      '#soj-emg-alert-container .pager{font-size:11px;font-weight:800;letter-spacing:0.5px;opacity:0.85;margin:0 0 6px;}' +
-      '#soj-emg-alert-container .t{font-size:13.5px;font-weight:800;margin:0 0 4px;}' +
-      '#soj-emg-alert-container .b{font-size:13px;line-height:1.5;margin:0 0 12px;opacity:0.95;}' +
-      '#soj-emg-alert-container .actions{display:flex;gap:8px;}' +
-      '#soj-emg-alert-container button{background:rgba(255,255,255,0.2);border:none;color:#fff;border-radius:9px;' +
-      'font-size:12px;font-weight:700;padding:7px 14px;cursor:pointer;}' +
-      '#soj-emg-alert-container button.next{background:rgba(255,255,255,0.9);color:#B91C1C;}' +
-      '@media (min-width:640px){#soj-emg-alert-container{left:auto;right:24px;width:380px;}}';
+      '#soj-emg-alert-container{position:fixed;top:12px;left:12px;right:12px;z-index:99999;max-width:720px;margin:0 auto;' +
+      'font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;touch-action:pan-y;user-select:none;' +
+      'background:#FFF1DF;color:#442713;border:1px solid #F3B26B;border-left:5px solid #E97716;border-radius:14px;' +
+      'box-shadow:0 12px 30px rgba(116,61,12,.18);overflow:hidden;cursor:pointer;transform:translateX(0);' +
+      'transition:transform .2s ease,opacity .2s ease,box-shadow .2s ease}' +
+      '#soj-emg-alert-container:focus-visible{outline:3px solid rgba(233,119,22,.35);outline-offset:3px}' +
+      '#soj-emg-alert-container:hover{box-shadow:0 15px 34px rgba(116,61,12,.23)}' +
+      '#soj-emg-alert-container .summary{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 14px}' +
+      '#soj-emg-alert-container .signal{width:36px;height:36px;border-radius:11px;background:#FFD7A8;display:grid;place-items:center;color:#A94808;font-size:18px;font-weight:900}' +
+      '#soj-emg-alert-container .copy{min-width:0}' +
+      '#soj-emg-alert-container .eyebrow{margin:0 0 2px;color:#A94808;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}' +
+      '#soj-emg-alert-container .headline{margin:0;font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+      '#soj-emg-alert-container .open-hint{color:#9A5A22;font-size:11px;font-weight:800;white-space:nowrap}' +
+      '#soj-emg-alert-container .detail{display:none;border-top:1px solid rgba(194,104,28,.2);padding:12px 14px 14px 62px}' +
+      '#soj-emg-alert-container.is-open .detail{display:block}' +
+      '#soj-emg-alert-container .description{margin:0 0 7px;font-size:13px;line-height:1.5;color:#5A3218;white-space:pre-wrap}' +
+      '#soj-emg-alert-container .meta{margin:0;color:#8A5328;font-size:11.5px;font-weight:700}' +
+      '#soj-emg-alert-container .controls{display:flex;gap:8px;align-items:center;margin-top:12px}' +
+      '#soj-emg-alert-container button{border:1px solid rgba(169,72,8,.22);background:rgba(255,255,255,.58);color:#773B11;' +
+      'border-radius:9px;padding:7px 11px;font:800 11.5px/1 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}' +
+      '#soj-emg-alert-container button.dismiss{background:#C9570E;color:#fff;border-color:#C9570E}' +
+      '#soj-emg-alert-container .swipe-note{margin-left:auto;color:#9A6A43;font-size:10.5px;font-weight:700}' +
+      '#soj-emg-alert-container.is-entering{animation:soj-emg-drop .28s ease-out}' +
+      '@keyframes soj-emg-drop{from{transform:translateY(-18px);opacity:0}to{transform:translateY(0);opacity:1}}' +
+      '@media(max-width:520px){#soj-emg-alert-container .open-hint{display:none}#soj-emg-alert-container .detail{padding-left:14px}}' +
+      '@media(prefers-reduced-motion:reduce){#soj-emg-alert-container{transition:none}#soj-emg-alert-container.is-entering{animation:none}}';
     document.head.appendChild(style);
+  }
+
+  function toggleDetails(container) {
+    var isOpen = container.classList.toggle('is-open');
+    container.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    var hint = container.querySelector('.open-hint');
+    if (hint) hint.textContent = isOpen ? 'Tap to close' : 'Tap to open';
+  }
+
+  function removeCurrent(direction) {
+    var container = document.getElementById('soj-emg-alert-container');
+    if (!container || !emergencyQueue.length) return;
+    container.style.transform = 'translateX(' + (direction < 0 ? '-110%' : '110%') + ')';
+    container.style.opacity = '0';
+    window.setTimeout(function () {
+      emergencyQueue.splice(currentIdx, 1);
+      if (currentIdx >= emergencyQueue.length) currentIdx = 0;
+      renderCurrent();
+      startAutoAdvance();
+    }, 190);
+  }
+
+  function bindGestures(container) {
+    container.addEventListener('pointerdown', function (event) {
+      if (event.target.closest('button')) return;
+      pointerTracking = true;
+      pointerStartX = event.clientX;
+      pointerDeltaX = 0;
+      container.setPointerCapture(event.pointerId);
+      container.style.transition = 'none';
+    });
+    container.addEventListener('pointermove', function (event) {
+      if (!pointerTracking) return;
+      pointerDeltaX = event.clientX - pointerStartX;
+      container.style.transform = 'translateX(' + pointerDeltaX + 'px)';
+      container.style.opacity = String(Math.max(.35, 1 - Math.abs(pointerDeltaX) / 320));
+    });
+    container.addEventListener('pointerup', function () {
+      if (!pointerTracking) return;
+      pointerTracking = false;
+      container.style.transition = '';
+      if (Math.abs(pointerDeltaX) >= 80) {
+        removeCurrent(pointerDeltaX);
+        return;
+      }
+      container.style.transform = '';
+      container.style.opacity = '';
+      if (Math.abs(pointerDeltaX) < 8) toggleDetails(container);
+    });
+    container.addEventListener('pointercancel', function () {
+      pointerTracking = false;
+      container.style.transition = '';
+      container.style.transform = '';
+      container.style.opacity = '';
+    });
+    container.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleDetails(container);
+      }
+      if (event.key === 'Escape') removeCurrent(1);
+    });
   }
 
   function renderCurrent() {
     var container = document.getElementById('soj-emg-alert-container');
-
-    if (emergencyQueue.length === 0) {
+    if (!emergencyQueue.length) {
       if (container) container.remove();
       clearInterval(autoAdvanceTimer);
       autoAdvanceTimer = null;
       return;
     }
-
     ensureStyles();
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'soj-emg-alert-container';
-      document.body.appendChild(container);
-    }
     if (currentIdx >= emergencyQueue.length) currentIdx = 0;
     var em = emergencyQueue[currentIdx];
     var total = emergencyQueue.length;
-
-    container.innerHTML =
-      '<div class="soj-emg-inner">' +
-      (total > 1 ? '<p class="pager">🚨 ALERT ' + (currentIdx + 1) + ' OF ' + total + '</p>' : '') +
-      '<p class="t">EMERGENCY — ' + esc(em.location) + '</p>' +
-      '<p class="b">' + esc(em.description) + '<br><span style="opacity:0.8;">Reported by ' + esc(em.reportedBy) + '</span></p>' +
-      '<div class="actions">' +
-      (total > 1 ? '<button class="next">Next →</button>' : '') +
-      '<button class="dismiss">Dismiss</button>' +
-      '</div></div>';
-
-    var nextBtn = container.querySelector('.next');
-    if (nextBtn) {
-      nextBtn.addEventListener('click', function () {
-        currentIdx = (currentIdx + 1) % emergencyQueue.length;
-        renderCurrent();
-        startAutoAdvance(); // reset the timer so it doesn't jump right after a manual click
-      });
+    if (!container) {
+      container = document.createElement('section');
+      container.id = 'soj-emg-alert-container';
+      container.tabIndex = 0;
+      container.setAttribute('role', 'alert');
+      document.body.appendChild(container);
+      bindGestures(container);
     }
-    container.querySelector('.dismiss').addEventListener('click', function () {
-      emergencyQueue.splice(currentIdx, 1);
-      if (currentIdx >= emergencyQueue.length) currentIdx = 0;
+    container.className = 'is-entering';
+    container.setAttribute('aria-expanded', 'false');
+    container.style.transform = '';
+    container.style.opacity = '';
+    container.innerHTML =
+      '<div class="summary">' +
+        '<span class="signal" aria-hidden="true">!</span>' +
+        '<div class="copy"><p class="eyebrow">Emergency alert' + (total > 1 ? ' · ' + (currentIdx + 1) + ' of ' + total : '') + '</p>' +
+        '<p class="headline">' + esc(em.location) + '</p></div>' +
+        '<span class="open-hint">Tap to open</span>' +
+      '</div>' +
+      '<div class="detail">' +
+        '<p class="description">' + esc(em.description) + '</p>' +
+        '<p class="meta">Reported by ' + esc(em.reportedBy) + '</p>' +
+        '<div class="controls">' +
+          (total > 1 ? '<button type="button" class="next">Next alert</button>' : '') +
+          '<button type="button" class="dismiss">Dismiss</button>' +
+          '<span class="swipe-note">Swipe to remove</span>' +
+        '</div>' +
+      '</div>';
+    var nextButton = container.querySelector('.next');
+    if (nextButton) nextButton.addEventListener('click', function (event) {
+      event.stopPropagation();
+      currentIdx = (currentIdx + 1) % emergencyQueue.length;
       renderCurrent();
+      startAutoAdvance();
+    });
+    container.querySelector('.dismiss').addEventListener('click', function (event) {
+      event.stopPropagation();
+      removeCurrent(1);
     });
   }
 
@@ -135,6 +174,8 @@
     clearInterval(autoAdvanceTimer);
     if (emergencyQueue.length <= 1) return;
     autoAdvanceTimer = setInterval(function () {
+      var container = document.getElementById('soj-emg-alert-container');
+      if (container && container.classList.contains('is-open')) return;
       currentIdx = (currentIdx + 1) % emergencyQueue.length;
       renderCurrent();
     }, 6000);
@@ -147,56 +188,53 @@
     startAutoAdvance();
   }
 
-  // ---------- OS-level notification, if permission granted ----------
   function showOsNotification(emergency) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     var body = emergency.description + ' — reported by ' + emergency.reportedBy;
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.ready.then(function (reg) {
-        reg.showNotification('🚨 Emergency — ' + emergency.location, {
+      navigator.serviceWorker.ready.then(function (registration) {
+        registration.showNotification('Emergency — ' + emergency.location, {
           body: body,
           icon: '/qc-suite-assets/icons/icon-192.png',
           badge: '/qc-suite-assets/icons/icon-192.png',
           tag: 'soj-qc-emergency',
-          requireInteraction: true
+          requireInteraction: true,
         });
       });
     } else {
-      new Notification('🚨 Emergency — ' + emergency.location, { body: body });
+      new Notification('Emergency — ' + emergency.location, { body: body });
     }
   }
 
-  // ---------- Polling loop ----------
   function poll() {
-    if (EMERGENCY_API_URL.indexOf('PASTE_YOUR') === 0) return; // not configured yet
     var since = localStorage.getItem(SINCE_KEY) || '0';
     fetch(EMERGENCY_API_URL + '?action=checkEmergency&since=' + since)
-      .then(function (res) { return res.json(); })
+      .then(function (response) { return response.json(); })
       .then(function (result) {
         if (!result || !result.ok) return;
         if (result.emergencies && result.emergencies.length) {
-          result.emergencies.forEach(function (em) { showOsNotification(em); });
+          result.emergencies.forEach(showOsNotification);
           addEmergencies(result.emergencies);
         }
         localStorage.setItem(SINCE_KEY, String(result.serverNow || Date.now()));
       })
-      .catch(function () { /* silent — don't nag the user about a failed poll */ });
+      .catch(function () {});
   }
 
-  // First poll just establishes the "since" baseline without alerting on
-  // pre-existing history; skip alerting on the very first run.
   function primeBaseline() {
-    if (EMERGENCY_API_URL.indexOf('PASTE_YOUR') === 0) return;
-    if (localStorage.getItem(SINCE_KEY)) { poll(); return; }
+    if (localStorage.getItem(SINCE_KEY)) {
+      poll();
+      return;
+    }
     fetch(EMERGENCY_API_URL + '?action=checkEmergency&since=0')
-      .then(function (res) { return res.json(); })
+      .then(function (response) { return response.json(); })
       .then(function (result) {
         localStorage.setItem(SINCE_KEY, String((result && result.serverNow) || Date.now()));
       })
       .catch(function () {});
   }
 
-  maybeAskPermission();
+  window.__qcuEmergencyAlerts = { add: addEmergencies };
   primeBaseline();
   setInterval(poll, POLL_INTERVAL_MS);
 })();

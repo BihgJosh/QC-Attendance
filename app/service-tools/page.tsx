@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ServiceToolsHub } from "@/components/public/service-tools-hub";
+import { EmergencyAlertLoader } from "@/components/emergency-alert-loader";
 
 export const metadata: Metadata = {
   title: "Service Tools | Quality Control Unit",
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function ServiceToolsPage() {
-  return <ServiceToolsHub />;
+  return (
+    <>
+      <EmergencyAlertLoader />
+      <ServiceToolsHub />
+    </>
+  );
 }

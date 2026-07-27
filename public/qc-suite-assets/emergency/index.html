@@ -87,6 +87,7 @@
 
 <script>
   const API_URL = 'https://script.google.com/macros/s/AKfycbzZJ5LEnQGUAC8ChcZ--oxUfUkJMYG8jg-IRUu2i_KcqFD6GByKk5ahTIrbMXz8sjDNMQ/exec';
+  const EMERGENCY_API_URL = '/api/emergency-flag';
 
   async function submit() {
     const msg = document.getElementById('msg');
@@ -104,7 +105,7 @@
     btn.disabled = true; btn.textContent = 'Sending…';
 
     try {
-      const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ reportedBy, location, description }) });
+      const res = await fetch(EMERGENCY_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reportedBy, location, description }) });
       const result = await res.json();
       msg.className = 'msg ' + (result.ok ? 'ok' : 'err');
       msg.textContent = result.message;
@@ -124,6 +125,7 @@
 
   document.getElementById('submitBtn').addEventListener('click', submit);
 </script>
+<script src="/qc-suite-assets/emergency-notify.js" defer></script>
 <script src="/qc-suite-assets/pwa.js" defer></script>
 <script src="/qc-suite-assets/shared-shell.js" defer></script>
 </body>

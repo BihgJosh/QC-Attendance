@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ClipboardCheck } from "lucide-react";
 import { AttendanceCard } from "@/components/public/attendance-card";
+import { EmergencyAlertLoader } from "@/components/emergency-alert-loader";
 import { Button } from "@/components/ui/button";
 
 export default function AttendancePage() {
@@ -41,6 +42,7 @@ export default function AttendancePage() {
 
   return (
     <main className="relative z-10 min-h-screen overflow-x-hidden px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <EmergencyAlertLoader />
       <div className="mx-auto max-w-7xl">
         <Button asChild variant="ghost" className="mb-8 rounded-full">
           <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to homepage</Link>

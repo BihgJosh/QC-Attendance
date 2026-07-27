@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MemberLogoutButton } from "@/components/member/logout-button";
+import { EmergencyAlertLoader } from "@/components/emergency-alert-loader";
 import { formatAbujaDateLong, formatAbujaTimeWithSeconds } from "@/lib/timezone";
 import { DEFAULT_HOMEPAGE_CONTENT, SERVICE_DAYS, type HomepageContent, type ServiceDay } from "@/lib/homepage-content";
 import type { BirthdayNoticeEntry } from "@/lib/birthday-types";
@@ -89,6 +90,7 @@ export default function HomePage() {
 
   return (
     <main className="relative z-10 min-h-screen overflow-x-hidden">
+      <EmergencyAlertLoader />
       <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
         <nav className="mx-auto flex max-w-7xl items-center justify-between gap-2 rounded-2xl border border-cyan-200/10 bg-[linear-gradient(110deg,rgba(2,12,32,0.96),rgba(26,20,69,0.95)_58%,rgba(74,20,96,0.94))] px-3 py-2.5 text-white shadow-2xl shadow-slate-950/20 backdrop-blur-xl sm:px-5" aria-label="Main navigation">
           <Link href="/" aria-label="Go to homepage" className="flex min-w-0 items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:gap-3">

@@ -86,6 +86,7 @@
 
 <script>
   const API_URL = 'https://script.google.com/macros/s/AKfycbxML18eWnhaTihUfNTtPCCr0mtWWj5XG_Piy7qzl21yEDvoeE_-NJO7mK9ZKSVmxiiWYQ/exec';
+  const OBSERVER_API_URL = '/api/service-observer';
 
   let ctx = null;
   let selectedUnits = [];
@@ -173,7 +174,7 @@
     btn.disabled = true; btn.textContent = 'Submitting…';
 
     try {
-      const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
+      const res = await fetch(OBSERVER_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await res.json();
       msg.className = 'msg ' + (result.ok ? 'ok' : 'err');
       msg.textContent = result.message;
