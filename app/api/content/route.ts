@@ -42,6 +42,7 @@ export async function POST(request: Request) {
         ...currentContent,
         uniformItems: body.uniformItems,
         uniformNote: body.uniformNote,
+        uniformImageUrl: body.uniformImageUrl,
       });
     } else {
       content = normalizeHomepageContent(body);

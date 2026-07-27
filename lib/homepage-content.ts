@@ -32,6 +32,7 @@ export interface HomepageContent {
   postings: Posting[];
   uniformItems: string[];
   uniformNote: string;
+  uniformImageUrl: string;
   updatedAt?: string;
 }
 
@@ -67,7 +68,7 @@ function createDayPostings(day: ServiceDay): Posting[] {
 }
 
 export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
-  version: 4,
+  version: 5,
   announcements: [
     { id: "briefing", date: "This Sunday", title: "Pre-service briefing", copy: "All QC members are expected at the main auditorium 45 minutes before the first service.", accent: "primary" },
     { id: "assigned-post", date: "Unit notice", title: "Stay at your assigned post", copy: "Confirm your post with your team lead before service and remain available until handover.", accent: "accent" },
@@ -76,6 +77,7 @@ export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
   postings: [...createDayPostings("Sunday"), ...createDayPostings("Thursday")],
   uniformItems: ["Crisp white long-sleeve shirt", "Black tailored trousers", "Plain black covered shoes", "QC identification tag"],
   uniformNote: "Team leads may communicate special uniform instructions for specific services.",
+  uniformImageUrl: "",
 };
 
 function isString(value: unknown): value is string {
@@ -86,6 +88,16 @@ function cleanNames(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter(isString).map((name) => name.trim().slice(0, 100)).filter(Boolean).slice(0, 20)
     : [];
+}
+
+function cleanImageUrl(value: unknown) {
+  if (!isString(value) || value.length > 1_000) return "";
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
 }
 
 function cleanMatrixPostings(items: unknown[], fallbackDay: ServiceDay, prefixIds: boolean): Posting[] {
@@ -161,7 +173,7 @@ export function normalizeHomepageContent(value: unknown): HomepageContent {
     : [];
 
   let postings: Posting[];
-  if (Array.isArray(candidate.postings) && candidate.version === 4) {
+  if (Array.isArray(candidate.postings) && (candidate.version === 4 || candidate.version === 5)) {
     postings = cleanMatrixPostings(candidate.postings, "Sunday", false);
   } else if (Array.isArray(candidate.postings) && candidate.version === 3) {
     postings = [...cleanMatrixPostings(candidate.postings, "Sunday", true), ...createDayPostings("Thursday")];
@@ -174,11 +186,12 @@ export function normalizeHomepageContent(value: unknown): HomepageContent {
     : [];
 
   return {
-    version: 4,
+    version: 5,
     announcements: Array.isArray(candidate.announcements) ? announcements : DEFAULT_HOMEPAGE_CONTENT.announcements,
     postings: Array.isArray(candidate.postings) ? postings : DEFAULT_HOMEPAGE_CONTENT.postings,
     uniformItems: Array.isArray(candidate.uniformItems) ? uniformItems : DEFAULT_HOMEPAGE_CONTENT.uniformItems,
     uniformNote: isString(candidate.uniformNote) && candidate.uniformNote.trim() ? candidate.uniformNote.trim().slice(0, 300) : DEFAULT_HOMEPAGE_CONTENT.uniformNote,
+    uniformImageUrl: cleanImageUrl(candidate.uniformImageUrl),
     updatedAt: isString(candidate.updatedAt) ? candidate.updatedAt : undefined,
   };
 }

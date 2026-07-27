@@ -21,23 +21,24 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
     assert tools_link.get_attribute("href") == "/service-tools"
     assert page.get_by_role("heading", name="Know the brief before you take your post.").is_visible()
     assert page.get_by_role("heading", name="Simple. Sharp. Service-ready.").is_visible()
-    assert page.get_by_role("heading", name="Present, prepared and in position.").is_visible()
+    assert page.get_by_role("heading", name="Every member. Every post. One clear view.").is_visible()
 
-    posting_button = page.get_by_role("button", name="Main auditorium Order & service flow")
-    posting_button.scroll_into_view_if_needed()
-    posting_button.click()
+    posting_panel = page.get_by_test_id("posting-panel")
+    posting_panel.scroll_into_view_if_needed()
     assert page.get_by_text("Members posted here").is_visible()
-    assert posting_button.get_attribute("aria-expanded") == "true"
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 
     if width >= 1024:
-        posting_box = page.get_by_test_id("posting-panel").bounding_box()
+        posting_box = posting_panel.bounding_box()
         uniform_box = page.get_by_test_id("uniform-panel").bounding_box()
         assert posting_box and uniform_box
         assert abs(posting_box["width"] - uniform_box["width"]) < 2
-        assert abs(posting_box["height"] - uniform_box["height"]) < 2
+        assert uniform_box["y"] > posting_box["y"] + posting_box["height"]
 
-    for section_id in ("announcements", "postings", "attendance"):
+    assert page.locator("#attendance").count() == 0
+    assert page.get_by_role("link", name="Attendance", exact=True).count() == 0
+
+    for section_id in ("announcements", "postings", "uniform"):
         page.locator(f"#{section_id}").scroll_into_view_if_needed()
         page.wait_for_timeout(400)
 
@@ -45,19 +46,6 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
     page.wait_for_timeout(300)
     page.screenshot(path=str(OUTPUT / f"qc-home-{label}.png"), full_page=True)
 
-    attendance_link = page.get_by_role("link", name="Attendance", exact=True)
-    if width < 768:
-        page.get_by_role("button", name="Open menu").click()
-        if not page.get_by_role("button", name="Close menu").is_visible():
-            print(f"mobile_console_before_failure={console_errors}")
-            print(page.locator("header").inner_text())
-            raise AssertionError("Mobile menu did not open")
-        page.locator('header a[href="#attendance"]').nth(1).click()
-    else:
-        attendance_link.first.click()
-    page.wait_for_timeout(500)
-    attendance = page.locator("#attendance")
-    assert attendance.is_visible()
     print(f"{label}_title={page.title()}")
     for failure in failed_responses:
         print(f"{label}_failed_response={failure}")

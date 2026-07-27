@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronUp, Loader2, Megaphone, Plus, Save, Shirt, Table2, Trash2, Users } from "lucide-react";
+import { ChevronDown, ChevronUp, ImagePlus, Loader2, Megaphone, Plus, Save, Shirt, Table2, Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,7 @@ export function ContentManager() {
   const [savingSection, setSavingSection] = useState<"announcements" | "postings" | "uniform" | null>(null);
   const [openPanel, setOpenPanel] = useState<"announcements" | "postings" | "uniform">("announcements");
   const [postingDay, setPostingDay] = useState<ServiceDay>("Sunday");
+  const [uploadingUniformImage, setUploadingUniformImage] = useState(false);
 
   useEffect(() => {
     fetch("/api/content")
@@ -52,7 +53,7 @@ export function ContentManager() {
         ? { section, announcements: content.announcements }
         : section === "postings"
           ? { section, day: postingDay, postings: content.postings.filter((posting) => posting.day === postingDay) }
-          : { section, uniformItems: content.uniformItems, uniformNote: content.uniformNote };
+          : { section, uniformItems: content.uniformItems, uniformNote: content.uniformNote, uniformImageUrl: content.uniformImageUrl };
       const response = await fetch("/api/content", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -74,6 +75,40 @@ export function ContentManager() {
     { id: "postings" as const, label: "Postings", icon: Users, count: content.postings.filter((posting) => posting.day === postingDay).length },
     { id: "uniform" as const, label: "Uniform", icon: Shirt, count: content.uniformItems.length },
   ];
+
+  const uploadImage = async (file: File) => {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return toast.error("Use a JPG, PNG or WebP image.");
+    if (file.size > 3 * 1024 * 1024) return toast.error("The image must be smaller than 3 MB.");
+    setUploadingUniformImage(true);
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      const response = await fetch("/api/admin/uniform-image", { method: "POST", body: form });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Upload failed.");
+      setContent((current) => ({ ...current, uniformImageUrl: data.url }));
+      toast.success("Image uploaded. Save the uniform section to publish it.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The image could not be uploaded.");
+    } finally {
+      setUploadingUniformImage(false);
+    }
+  };
+
+  const removeImage = async () => {
+    setUploadingUniformImage(true);
+    try {
+      const response = await fetch("/api/admin/uniform-image", { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Removal failed.");
+      setContent((current) => ({ ...current, uniformImageUrl: "" }));
+      toast.success("Image removed. Save the uniform section to update the homepage.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The image could not be removed.");
+    } finally {
+      setUploadingUniformImage(false);
+    }
+  };
 
   if (loading) {
     return <Card variant="glass"><CardContent className="flex min-h-48 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></CardContent></Card>;
@@ -143,6 +178,21 @@ export function ContentManager() {
 
           {openPanel === "uniform" && (
             <div className="space-y-5">
+              <div className="grid gap-4 rounded-2xl border border-primary/20 bg-primary/[0.05] p-4 lg:grid-cols-[16rem_1fr] lg:items-center">
+                <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl border border-border bg-background/70">
+                  {content.uniformImageUrl ? <img src={content.uniformImageUrl} alt="Uniform upload preview" className="h-full w-full object-cover" /> : <ImagePlus className="h-10 w-10 text-muted-foreground" />}
+                </div>
+                <div>
+                  <p className="font-semibold">Uniform reference picture</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Upload a clear JPG, PNG or WebP image up to 3 MB. Members will see it in the uniform section.</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button asChild type="button" variant="outline" disabled={uploadingUniformImage}>
+                      <label className="cursor-pointer"><Upload className="mr-2 h-4 w-4" /> {uploadingUniformImage ? "Working…" : "Choose image"}<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={uploadingUniformImage} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadImage(file); event.target.value = ""; }} /></label>
+                    </Button>
+                    {content.uniformImageUrl && <Button type="button" variant="ghost" className="text-destructive" disabled={uploadingUniformImage} onClick={() => void removeImage()}><Trash2 className="mr-2 h-4 w-4" /> Remove image</Button>}
+                  </div>
+                </div>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {content.uniformItems.map((item, index) => (
                   <div key={`${index}-${item}`} className="flex items-end gap-2 rounded-2xl border border-border/70 bg-background/50 p-4">

@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ArrowDown,
   ArrowRight,
   CalendarDays,
   Check,
-  ChevronDown,
   ChevronRight,
   ClipboardCheck,
   Clock,
@@ -17,14 +16,11 @@ import {
   Megaphone,
   Menu,
   PanelsTopLeft,
-  ShieldAlert,
-  ShieldCheck,
   Shirt,
   Sparkles,
   Users,
   X,
 } from "lucide-react";
-import { AttendanceCard } from "@/components/public/attendance-card";
 import { BirthdayNotice } from "@/components/public/birthday-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,8 +32,8 @@ import type { BirthdayNoticeEntry } from "@/lib/birthday-types";
 
 const navigation = [
   { label: "Home", href: "#home" },
-  { label: "Postings / Uniform", href: "#postings" },
-  { label: "Attendance", href: "#attendance" },
+  { label: "Postings", href: "#postings" },
+  { label: "Uniform", href: "#uniform" },
   { label: "Service Tools", href: "/service-tools" },
 ];
 
@@ -50,10 +46,8 @@ const accentClasses = {
 export default function HomePage() {
   const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState("");
-  const [isOpen, setIsOpen] = useState<boolean | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [content, setContent] = useState<HomepageContent>(DEFAULT_HOMEPAGE_CONTENT);
-  const [openPosting, setOpenPosting] = useState<string | null>(null);
   const [postingDay, setPostingDay] = useState<ServiceDay>("Sunday");
   const [birthdays, setBirthdays] = useState<BirthdayNoticeEntry[]>([]);
 
@@ -62,18 +56,6 @@ export default function HomePage() {
       const now = new Date();
       setCurrentTime(formatAbujaTimeWithSeconds(now));
       setCurrentDate(formatAbujaDateLong(now));
-    };
-
-    const fetchStatus = async () => {
-      try {
-        const res = await fetch("/api/admin/status");
-        if (res.ok) {
-          const data = await res.json();
-          setIsOpen(data.isOpen);
-        }
-      } catch {
-        // The attendance card remains safely unavailable when status cannot be confirmed.
-      }
     };
 
     const fetchContent = async () => {
@@ -95,20 +77,12 @@ export default function HomePage() {
     };
 
     updateTime();
-    fetchStatus();
     fetchContent();
     fetchBirthdays();
     const clockInterval = setInterval(updateTime, 1000);
-    const refreshVisibleStatus = () => {
-      if (!document.hidden) fetchStatus();
-    };
-    const statusInterval = setInterval(refreshVisibleStatus, 15000);
-    document.addEventListener("visibilitychange", refreshVisibleStatus);
 
     return () => {
       clearInterval(clockInterval);
-      clearInterval(statusInterval);
-      document.removeEventListener("visibilitychange", refreshVisibleStatus);
     };
   }, []);
 
@@ -190,7 +164,7 @@ export default function HomePage() {
                 <a href="#announcements">View unit brief <ArrowDown className="ml-2 h-4 w-4" /></a>
               </Button>
               <Button asChild variant="outline" size="lg" className="h-12 rounded-full px-6 glass-card">
-                <a href="#attendance">Sign attendance <ArrowRight className="ml-2 h-4 w-4" /></a>
+                <a href="#postings">View postings <ArrowRight className="ml-2 h-4 w-4" /></a>
               </Button>
             </div>
             <Link
@@ -236,13 +210,13 @@ export default function HomePage() {
 
               <div className="flex items-center justify-between gap-4 rounded-2xl bg-white p-4 text-slate-950">
                 <div className="flex items-center gap-3">
-                  <span className={`h-2.5 w-2.5 rounded-full ${isOpen ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500" />
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Attendance desk</p>
-                    <p className="text-sm font-bold">{isOpen === null ? "Checking status" : isOpen ? "Open for check-in" : "Currently closed"}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Service brief</p>
+                    <p className="text-sm font-bold">Postings and uniform ready</p>
                   </div>
                 </div>
-                {isOpen ? <ShieldCheck className="h-5 w-5 text-emerald-500" /> : <ShieldAlert className="h-5 w-5 text-rose-500" />}
+                <ClipboardCheck className="h-5 w-5 text-emerald-500" />
               </div>
 
               <div className="pointer-events-none absolute -bottom-8 -right-10 rotate-[-10deg] text-[5.5rem] font-black uppercase leading-none tracking-[-0.08em] text-white/[0.035] sm:text-[7rem]">
@@ -284,78 +258,80 @@ export default function HomePage() {
       </section>
 
       <section id="postings" className="scroll-mt-24 px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
-        <div className="mx-auto grid max-w-7xl items-stretch gap-5 lg:grid-cols-2">
-          <div data-testid="posting-panel" className="relative flex overflow-hidden rounded-[2rem] bg-slate-950 p-6 text-white shadow-2xl sm:p-8 lg:h-[42rem] lg:p-10">
-            <div className="relative z-10 flex min-h-0 w-full flex-col">
-            <div className="absolute right-0 top-0 h-64 w-64 translate-x-1/3 -translate-y-1/3 rounded-full bg-primary/30 blur-3xl" />
-            <p className="relative text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Current posting</p>
-            <h2 className="relative mt-5 max-w-md text-4xl font-bold tracking-[-0.045em] sm:text-5xl">Take your place. Hold the standard.</h2>
-            <div className="relative mt-6 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.07] p-3">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <div data-testid="posting-panel" className="relative overflow-hidden rounded-[2rem] bg-slate-950 p-6 text-white shadow-2xl sm:p-8 lg:p-10">
+            <div className="absolute right-0 top-0 h-80 w-80 translate-x-1/3 -translate-y-1/3 rounded-full bg-primary/30 blur-3xl" />
+            <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
               <div>
-                <label htmlFor="public-posting-day" className="text-[9px] font-bold uppercase tracking-[0.16em] text-cyan-200">Service day</label>
-                <p className="text-xs text-white/50">Choose a schedule</p>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Current posting</p>
+                <h2 className="mt-5 max-w-3xl text-4xl font-bold tracking-[-0.045em] sm:text-5xl">Every member. Every post. One clear view.</h2>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-white/55">All published assignments are shown below—no opening cards or scrolling inside the board.</p>
               </div>
-              <select id="public-posting-day" value={postingDay} onChange={(event) => { setPostingDay(event.target.value as ServiceDay); setOpenPosting(null); }} className="h-10 min-w-36 rounded-xl border border-white/15 bg-slate-900 px-3 text-sm font-semibold text-white outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/20">
-                {SERVICE_DAYS.map((day) => <option key={day} value={day}>{day}</option>)}
-              </select>
+              <div className="flex min-w-64 items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.07] p-3">
+                <div>
+                  <label htmlFor="public-posting-day" className="text-[9px] font-bold uppercase tracking-[0.16em] text-cyan-200">Service day</label>
+                  <p className="text-xs text-white/50">Choose a schedule</p>
+                </div>
+                <select id="public-posting-day" value={postingDay} onChange={(event) => setPostingDay(event.target.value as ServiceDay)} className="h-10 min-w-32 rounded-xl border border-white/15 bg-slate-900 px-3 text-sm font-semibold text-white outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/20">
+                  {SERVICE_DAYS.map((day) => <option key={day} value={day}>{day}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="relative mt-8 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 scrollbar-thin sm:mt-10">
+            <div className="relative mt-8 grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
               {content.postings.filter((posting) => posting.day === postingDay).map((posting, index) => {
-                const expanded = openPosting === posting.id;
-                const hasAssignments = posting.rows.some((row) => row.assignments.some((names) => names.length > 0));
+                const assignedRows = posting.rows.filter((row) => row.assignments.some((names) => names.length > 0));
                 return (
-                  <div key={posting.id} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06]">
-                    <button type="button" aria-expanded={expanded} aria-controls={`posting-members-${posting.id}`} onClick={() => setOpenPosting(expanded ? null : posting.id)} className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-cyan-300">
+                  <article key={posting.id} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06]">
+                    <div className="flex items-center gap-4 border-b border-white/10 p-4">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-xs font-black text-slate-950">{index + 1}</span>
-                      <span className="min-w-0 flex-1"><span className="block font-semibold">{posting.name}</span><span className="block text-xs text-white/50">{posting.role}</span></span>
-                      <ChevronDown className={`h-4 w-4 shrink-0 text-cyan-200 transition-transform ${expanded ? "rotate-180" : ""}`} />
-                    </button>
-                    <AnimatePresence initial={false}>
-                      {expanded && (
-                        <motion.div id={`posting-members-${posting.id}`} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                          <div className="border-t border-white/10 px-4 py-3">
-                            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">Members posted here</p>
-                            {hasAssignments ? (
-                              <div className="space-y-3">
-                                {posting.rows.map((row) => {
-                                  const rowHasAssignments = row.assignments.some((names) => names.length > 0);
-                                  if (!rowHasAssignments) return null;
+                      <div className="min-w-0"><h3 className="font-semibold">{posting.name}</h3><p className="text-xs text-white/50">{posting.role}</p></div>
+                    </div>
+                    <div className="p-4">
+                      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">Members posted here</p>
+                      {assignedRows.length ? (
+                        <div className="space-y-3">
+                          {assignedRows.map((row) => (
+                            <div key={row.id} className="rounded-xl bg-white/[0.05] p-3">
+                              <p className="mb-2 text-xs font-bold text-white">{row.label}</p>
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                {posting.columns.map((column, columnIndex) => {
+                                  const names = row.assignments[columnIndex] || [];
+                                  if (!names.length) return null;
                                   return (
-                                    <div key={row.id} className="rounded-xl bg-white/[0.05] p-3">
-                                      <p className="mb-2 text-xs font-bold text-white">{row.label}</p>
-                                      <div className="grid gap-2 sm:grid-cols-2">
-                                        {posting.columns.map((column, columnIndex) => {
-                                          const names = row.assignments[columnIndex] || [];
-                                          if (!names.length) return null;
-                                          return (
-                                            <div key={`${row.id}-${column}`}>
-                                              <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-cyan-200/70">{column}</p>
-                                              <ul className="mt-1 space-y-1">
-                                                {names.map((member, memberIndex) => <li key={`${member}-${memberIndex}`} className="flex items-start gap-2 text-xs text-white/80"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />{member}</li>)}
-                                              </ul>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
+                                    <div key={`${row.id}-${column}`}>
+                                      <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-cyan-200/70">{column}</p>
+                                      <ul className="mt-1.5 space-y-1.5">
+                                        {names.map((member, memberIndex) => <li key={`${member}-${memberIndex}`} className="flex items-start gap-2 text-xs text-white/80"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />{member}</li>)}
+                                      </ul>
                                     </div>
                                   );
                                 })}
                               </div>
-                            ) : <p className="text-xs text-white/50">No members have been assigned yet.</p>}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : <p className="rounded-xl bg-white/[0.04] p-3 text-xs text-white/50">No members have been assigned yet.</p>}
+                    </div>
+                  </article>
                 );
               })}
             </div>
-            <p className="relative mt-5 shrink-0 text-xs leading-5 text-white/50">Posting assignments are confirmed by team leads during the pre-service briefing.</p>
-            </div>
+            <p className="relative mt-6 text-xs leading-5 text-white/50">Posting assignments are confirmed by team leads during the pre-service briefing.</p>
           </div>
 
-          <div data-testid="uniform-panel" className="glass-card flex rounded-[2rem] p-6 sm:p-8 lg:h-[42rem] lg:p-10">
-            <div className="flex w-full flex-col">
+          <div id="uniform" data-testid="uniform-panel" className="glass-card scroll-mt-24 overflow-hidden rounded-[2rem] p-6 sm:p-8 lg:p-10">
+            <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+              <div className="relative aspect-[4/3] overflow-hidden rounded-[1.5rem] border border-border/70 bg-[linear-gradient(145deg,rgba(14,165,233,0.08),rgba(126,34,206,0.12))]">
+                {content.uniformImageUrl ? (
+                  <img src={content.uniformImageUrl} alt="Current QC uniform reference" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+                    <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10"><Shirt className="h-8 w-8 text-accent" /></span>
+                    <div><p className="font-bold">Uniform reference photo</p><p className="mt-1 text-sm text-muted-foreground">An approved image will appear here when one is available.</p></div>
+                  </div>
+                )}
+              </div>
+              <div>
             <div className="flex items-start justify-between gap-5">
               <div>
                 <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-accent"><Shirt className="h-4 w-4" /> Sunday uniform</p>
@@ -372,32 +348,11 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
-            <div className="mt-auto flex items-center gap-3 rounded-2xl bg-warning/10 p-4 text-sm text-foreground lg:mt-8">
+            <div className="mt-8 flex items-center gap-3 rounded-2xl bg-warning/10 p-4 text-sm text-foreground">
               <Users className="h-5 w-5 flex-none text-warning" /> {content.uniformNote}
             </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="attendance" className="scroll-mt-20 px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
-        <div className="mx-auto grid max-w-7xl items-start gap-10 xl:grid-cols-[0.9fr_1.1fr] xl:gap-12">
-          <div className="xl:sticky xl:top-32">
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-primary"><ClipboardCheck className="h-4 w-4" /> Attendance</p>
-            <h2 className="mt-5 text-4xl font-bold tracking-[-0.045em] sm:text-5xl">Present, prepared and in position.</h2>
-            <p className="mt-5 max-w-lg text-base leading-7 text-muted-foreground">Sign in only when you are physically at church and ready to serve. Your location is checked to confirm your presence.</p>
-            <div className="mt-8 inline-flex items-center gap-3 rounded-2xl border border-border bg-card/70 px-4 py-3 shadow-sm">
-              <span className={`h-2.5 w-2.5 rounded-full ${isOpen ? "bg-success animate-pulse" : "bg-destructive"}`} />
-              <span className="text-sm font-semibold">{isOpen === null ? "Checking attendance status…" : isOpen ? "Attendance is open" : "Attendance is currently closed"}</span>
             </div>
-            <div className="mt-8 space-y-3 text-sm text-muted-foreground">
-              {["Choose the correct service", "Enter your name and unit password", "Allow location access and confirm"].map((step, index) => (
-                <div key={step} className="flex items-center gap-3"><span className="font-mono text-xs font-bold text-primary">0{index + 1}</span><span>{step}</span></div>
-              ))}
-            </div>
-          </div>
-          <div className="flex justify-center xl:justify-end">
-            <AttendanceCard isOpen={isOpen} />
           </div>
         </div>
       </section>
