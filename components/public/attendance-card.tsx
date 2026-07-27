@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { formatAbujaTime } from "@/lib/timezone";
 import { getDeviceId } from "@/lib/device-id";
 import {
-  Loader2, MapPin, User, KeyRound, CheckCircle2, Sparkles,
+  Loader2, MapPin, User, CheckCircle2, Sparkles,
   Satellite, Navigation, AlertCircle, Check, Church, Shield,
 } from "lucide-react";
 
@@ -34,7 +34,6 @@ const GPS_PHASES: GpsPhase[] = [
 
 export function AttendanceCard({ isOpen }: AttendanceCardProps) {
   const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
   const [service, setService] = useState<ServiceType>("Sunday");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -58,10 +57,6 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
   /* ---------- Inline validation ---------- */
   const nameError = nameTouched && name.trim().length > 0 && whitelist.length > 0
     ? (!isNameValid(name) ? "Name not found in the whitelist. Check spelling or try a different combination of your names." : null)
-    : null;
-
-  const passwordError = nameTouched && password.length > 0 && password.length < 3
-    ? "Password seems too short."
     : null;
 
   function isNameValid(value: string): boolean {
@@ -195,7 +190,7 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
 
         try {
           const body: Record<string, any> = {
-            name, password, service, latitude, longitude, browser, device, deviceId,
+            name, service, latitude, longitude, browser, device, deviceId,
           };
           if (adminPw) body.adminPassword = adminPw;
 
@@ -211,7 +206,7 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
             // ── Device already signed — show admin override ──
             if (data.error === "device_already_signed") {
               setShowAdminOverride(true);
-              throw new Error(data.message || "This device has already signed in today.");
+              throw new Error(data.message || "This device has already signed in for this service today.");
             }
             throw new Error(data.error || "Failed to sign attendance");
           }
@@ -224,7 +219,6 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
           setSuccess(true);
           toast.success("Attendance signed successfully!");
           setName("");
-          setPassword("");
           setNameTouched(false);
         } catch (error: any) {
           if (!showAdminOverride) {
@@ -324,9 +318,9 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
                 <div className="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center mb-3">
                   <Shield className="w-7 h-7 text-warning" strokeWidth={1.5} />
                 </div>
-                <h3 className="text-base font-semibold mb-1">Device Already Used Today</h3>
+                <h3 className="text-base font-semibold mb-1">Service Already Recorded</h3>
                 <p className="text-xs text-muted-foreground max-w-xs">
-                  This device has already signed attendance. An administrator can override this with their admin password.
+                  This device has already signed attendance for this service today. An administrator can override this with their admin password.
                 </p>
               </div>
 
@@ -475,39 +469,6 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
                         ))}
                       </div>
                     </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              {/* Password field */}
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Shared Password
-                </Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-4 top-4 h-4 w-4 text-muted-foreground/50" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter shared password"
-                    className={`pl-11 ${passwordError ? "border-destructive/50 focus-visible:ring-destructive/40 focus-visible:border-destructive/40" : ""}`}
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); setNameTouched(true); }}
-                    required
-                    disabled={loading || !isOpen}
-                  />
-                </div>
-                <AnimatePresence>
-                  {passwordError && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -4, height: 0 }}
-                      animate={{ opacity: 1, y: 0, height: "auto" }}
-                      exit={{ opacity: 0, y: -4, height: 0 }}
-                      className="text-xs text-destructive/80 flex items-center gap-1.5 pt-0.5"
-                    >
-                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
-                      {passwordError}
-                    </motion.p>
                   )}
                 </AnimatePresence>
               </div>

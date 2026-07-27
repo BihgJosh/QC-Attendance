@@ -49,7 +49,7 @@ export default function AttendancePage() {
               <span className="text-sm font-semibold">{isOpen === null ? "Checking attendance status…" : isOpen ? "Attendance is open" : "Attendance is currently closed"}</span>
             </div>
             <div className="mt-8 space-y-3 text-sm text-muted-foreground">
-              {["Choose the correct service", "Enter your name and unit password", "Allow location access and confirm"].map((step, index) => (
+              {["Choose the correct service", "Select your name from the member list", "Allow location access and confirm"].map((step, index) => (
                 <div key={step} className="flex items-center gap-3"><span className="font-mono text-xs font-bold text-primary">0{index + 1}</span><span>{step}</span></div>
               ))}
             </div>
