@@ -34,6 +34,7 @@ const navigation = [
   { label: "Home", href: "#home" },
   { label: "Postings", href: "#postings" },
   { label: "Uniform", href: "#uniform" },
+  { label: "Attendance", href: "#attendance" },
   { label: "Service Tools", href: "/service-tools" },
 ];
 
