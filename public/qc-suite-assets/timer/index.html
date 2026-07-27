@@ -90,6 +90,7 @@
 
 <script>
   const API_URL = 'https://script.google.com/macros/s/AKfycbyGwf_1ev72qpX2wfHfespjjW4qahq-UBWissk2aqdtjofpXXssmCbOGGVXtVcHmlHObQ/exec';
+  const TIMER_API_URL = '/api/service-timer';
 
   let ctx = null;
   const segVals = {};
@@ -213,7 +214,7 @@
     btn.disabled = true; btn.textContent = 'Submitting…';
 
     try {
-      const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
+      const res = await fetch(TIMER_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await res.json();
       msg.className = 'msg ' + (result.ok ? 'ok' : 'err');
       msg.textContent = result.message;
