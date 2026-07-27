@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/auth";
-import { getMemberEmails, isMemberEmail, MemberSheetError } from "@/lib/member-sheet";
 import { listMemberStatuses, resetMemberPassword } from "@/lib/member-store";
 import { getPrivilegedAdminEmails, isPrivilegedAdminEmail } from "@/lib/roles";
+import { getTeamMemberByEmail, listTeamMembers, TeamDataError } from "@/lib/team-data-store";
 
 async function requireAdmin() {
   return isAdminAuthenticated();
@@ -15,15 +15,15 @@ export async function GET() {
     let warning: string | undefined;
     let emails = getPrivilegedAdminEmails();
     try {
-      emails = [...new Set([...emails, ...(await getMemberEmails())])].sort();
+      emails = [...new Set([...emails, ...(await listTeamMembers()).map((member) => member.email)])].sort();
     } catch (error) {
-      if (!(error instanceof MemberSheetError)) throw error;
+      if (!(error instanceof TeamDataError)) throw error;
       warning = error.message;
     }
     const indexed = new Map(statuses.map((member) => [member.email, member]));
     return NextResponse.json({ warning, members: emails.map((email) => ({ ...(indexed.get(email) || { email, mustChangePassword: true, lastLoginAt: null, passwordChangedAt: null, resetAt: null }), isPrivilegedAdmin: isPrivilegedAdminEmail(email) })) });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: error instanceof MemberSheetError ? 503 : 500 });
+    return NextResponse.json({ error: (error as Error).message }, { status: error instanceof TeamDataError ? 503 : 500 });
   }
 }
 
@@ -34,12 +34,11 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request." }, { status: 400 });
     const email = String(body.email || "").trim().toLowerCase();
     if (!isPrivilegedAdminEmail(email)) {
-      const emails = await getMemberEmails();
-      if (!isMemberEmail(email, emails)) return NextResponse.json({ error: "Only members currently listed in the team sheet can be reset." }, { status: 400 });
+      if (!(await getTeamMemberByEmail(email))) return NextResponse.json({ error: "Only members currently listed in Team Data can be reset." }, { status: 400 });
     }
     await resetMemberPassword(email);
     return NextResponse.json({ success: true });
   } catch (error) {
-    return NextResponse.json({ error: (error as Error).message }, { status: error instanceof MemberSheetError ? 503 : 500 });
+    return NextResponse.json({ error: (error as Error).message }, { status: error instanceof TeamDataError ? 503 : 500 });
   }
 }

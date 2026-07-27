@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMemberSession } from "@/lib/member-store";
 import { MEMBER_SESSION_COOKIE } from "@/lib/member-auth";
+import { getTeamMemberByEmail } from "@/lib/team-data-store";
+import { isPrivilegedAdminEmail } from "@/lib/roles";
 
 export async function proxy(request: NextRequest) {
   const token = request.cookies.get(MEMBER_SESSION_COOKIE)?.value;
@@ -10,6 +12,11 @@ export async function proxy(request: NextRequest) {
   try {
     const session = await getMemberSession(token);
     if (session.mustChangePassword) return NextResponse.redirect(new URL("/member/change-password", request.url));
+    if (!isPrivilegedAdminEmail(session.email) && !(await getTeamMemberByEmail(session.email))) {
+      const response = NextResponse.redirect(login);
+      response.cookies.delete(MEMBER_SESSION_COOKIE);
+      return response;
+    }
     return NextResponse.next();
   } catch {
     const response = NextResponse.redirect(login);

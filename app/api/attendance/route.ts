@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { appendAttendance, AttendanceStoreError, getAttendanceSettings, getAttendanceStatus, getWhitelist } from "@/lib/attendance-store";
+import { appendAttendance, AttendanceStoreError, getAttendanceSettings, getAttendanceStatus } from "@/lib/attendance-store";
 import { calculateDistance } from "@/lib/geofencing";
 import { getAttendanceEnvConfig } from "@/lib/env";
 import { formatAbujaTime, formatAbujaDate } from "@/lib/timezone";
 import { isValidAdminPassword } from "@/lib/auth";
 import { ALLOWED_SERVICES, type AttendanceRecord } from "@/types";
+import { readMemberSession } from "@/lib/member-auth";
+import { getTeamMemberByEmail } from "@/lib/team-data-store";
 
 export async function POST(request: Request) {
   try {
@@ -12,12 +14,11 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
-    const { name, latitude, longitude, browser, device, service, deviceId, adminPassword } = body as Record<string, unknown>;
+    const { latitude, longitude, browser, device, service, deviceId, adminPassword } = body as Record<string, unknown>;
     const boundedString = (value: unknown, min: number, max: number): value is string =>
       typeof value === "string" && value.trim().length >= min && value.length <= max;
 
     if (
-      !boundedString(name, 2, 160) ||
       !boundedString(deviceId, 8, 200) ||
       typeof latitude !== "number" || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
       typeof longitude !== "number" || !Number.isFinite(longitude) || longitude < -180 || longitude > 180 ||
@@ -39,18 +40,13 @@ export async function POST(request: Request) {
     }
 
     const envConfig = getAttendanceEnvConfig();
+    const session = await readMemberSession();
+    if (!session) return NextResponse.json({ error: "Your member session has expired." }, { status: 401 });
+    const teamMember = await getTeamMemberByEmail(session.email);
+    if (!teamMember) return NextResponse.json({ error: "Your email is not registered in Team Data." }, { status: 403 });
+    const name = teamMember.name;
     if (!(await getAttendanceStatus())) {
       return NextResponse.json({ error: "Attendance is currently closed." }, { status: 403 });
-    }
-
-    const whitelist = await getWhitelist();
-    const inputWords = name.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const isWhitelisted = whitelist.some((whitelistName) => {
-      const whitelistWords = whitelistName.split(/\s+/);
-      return inputWords.every((word) => whitelistWords.includes(word));
-    });
-    if (!isWhitelisted) {
-      return NextResponse.json({ error: "Member not found in whitelist." }, { status: 403 });
     }
 
     const adminOverrideUsed = typeof adminPassword === "string" && adminPassword.length > 0;

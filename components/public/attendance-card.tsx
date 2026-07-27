@@ -20,6 +20,7 @@ type ServiceType = typeof SERVICES[number];
 
 interface AttendanceCardProps {
   isOpen: boolean | null;
+  memberName: string;
 }
 
 interface GpsPhase {
@@ -32,8 +33,8 @@ const GPS_PHASES: GpsPhase[] = [
   { label: "Verifying location...", icon: Navigation },
 ];
 
-export function AttendanceCard({ isOpen }: AttendanceCardProps) {
-  const [name, setName] = useState("");
+export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
+  const [name, setName] = useState(memberName);
   const [service, setService] = useState<ServiceType>("Sunday");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -54,18 +55,13 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => setName(memberName), [memberName]);
+
   /* ---------- Inline validation ---------- */
-  const nameError = nameTouched && name.trim().length > 0 && whitelist.length > 0
-    ? (!isNameValid(name) ? "Name not found in the whitelist. Check spelling or try a different combination of your names." : null)
-    : null;
+  const nameError = nameTouched && !isNameValid(name) ? "Your member name could not be loaded from Team Data." : null;
 
   function isNameValid(value: string): boolean {
-    const inputWords = value.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    if (inputWords.length === 0) return false;
-    return whitelist.some((wn) => {
-      const ww = wn.split(/\s+/);
-      return inputWords.every((w) => ww.includes(w));
-    });
+    return value.trim() === memberName.trim() && memberName.trim().length > 0;
   }
 
   /* ---------- Fetch whitelist ---------- */
@@ -218,7 +214,6 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
           });
           setSuccess(true);
           toast.success("Attendance signed successfully!");
-          setName("");
           setNameTouched(false);
         } catch (error: any) {
           if (!showAdminOverride) {
@@ -403,15 +398,13 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
                   <Input
                     ref={inputRef}
                     id="name"
-                    placeholder="e.g. John or John Michael"
+                    placeholder="Loading your member name…"
                     className={`pl-11 ${nameError ? "border-destructive/50 focus-visible:ring-destructive/40 focus-visible:border-destructive/40" : ""}`}
                     value={name}
-                    onChange={(e) => { setName(e.target.value); setNameTouched(true); }}
-                    onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
-                    onKeyDown={handleKeyDown}
+                    readOnly
                     required
                     disabled={loading || !isOpen}
-                    autoComplete="off"
+                    aria-readonly="true"
                   />
                   {nameTouched && name.trim().length > 0 && !loading && (
                     <div className="absolute right-4 top-4 z-10">
@@ -441,7 +434,7 @@ export function AttendanceCard({ isOpen }: AttendanceCardProps) {
 
                 {/* Autocomplete dropdown */}
                 <AnimatePresence>
-                  {showDropdown && suggestions.length > 0 && (
+                  {false && showDropdown && suggestions.length > 0 && (
                     <motion.div
                       ref={dropdownRef}
                       initial={{ opacity: 0, y: -6, scale: 0.97 }}

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 
 export default function AttendancePage() {
   const [isOpen, setIsOpen] = useState<boolean | null>(null);
+  const [memberName, setMemberName] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -21,7 +22,13 @@ export default function AttendancePage() {
       }
     };
 
+    const fetchMember = async () => {
+      const response = await fetch("/api/member/session", { cache: "no-store" });
+      if (response.ok && active) setMemberName((await response.json()).name || "");
+    };
+
     void fetchStatus();
+    void fetchMember();
     const interval = window.setInterval(() => {
       if (!document.hidden) void fetchStatus();
     }, 15_000);
@@ -49,13 +56,13 @@ export default function AttendancePage() {
               <span className="text-sm font-semibold">{isOpen === null ? "Checking attendance status…" : isOpen ? "Attendance is open" : "Attendance is currently closed"}</span>
             </div>
             <div className="mt-8 space-y-3 text-sm text-muted-foreground">
-              {["Choose the correct service", "Select your name from the member list", "Allow location access and confirm"].map((step, index) => (
+              {["Choose the correct service", "Confirm your linked member name", "Allow location access and confirm"].map((step, index) => (
                 <div key={step} className="flex items-center gap-3"><span className="font-mono text-xs font-bold text-primary">0{index + 1}</span><span>{step}</span></div>
               ))}
             </div>
           </div>
           <div className="flex justify-center xl:justify-end">
-            <AttendanceCard isOpen={isOpen} />
+            <AttendanceCard isOpen={isOpen} memberName={memberName} />
           </div>
         </section>
       </div>
