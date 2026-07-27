@@ -23,8 +23,12 @@ with sync_playwright() as playwright:
     assert banner.locator(".headline").inner_text() == "Main Auditorium"
     assert banner.get_attribute("aria-expanded") == "false"
     assert page.evaluate(
-        "getComputedStyle(document.querySelector('#soj-emg-alert-container')).backgroundColor"
-    ) == "rgb(255, 241, 223)"
+        "getComputedStyle(document.querySelector('#soj-emg-alert-container')).position"
+    ) == "fixed"
+    assert page.evaluate(
+        "getComputedStyle(document.querySelector('#soj-emg-alert-container .copy')).animationName"
+    ) == "soj-emg-ticker"
+    assert banner.get_by_role("button", name="Dismiss emergency alert").is_visible()
 
     banner.click()
     assert banner.get_attribute("aria-expanded") == "true"

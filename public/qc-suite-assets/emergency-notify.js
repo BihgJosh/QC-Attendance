@@ -26,32 +26,36 @@
     var style = document.createElement('style');
     style.id = 'soj-emg-style';
     style.textContent =
-      '#soj-emg-alert-container{position:fixed;top:12px;left:12px;right:12px;z-index:99999;max-width:720px;margin:0 auto;' +
+      '#soj-emg-alert-container{position:fixed;top:90px;left:12px;right:12px;z-index:99999;max-width:1240px;margin:0 auto;' +
       'font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;touch-action:pan-y;user-select:none;' +
-      'background:#FFF1DF;color:#442713;border:1px solid #F3B26B;border-left:5px solid #E97716;border-radius:14px;' +
-      'box-shadow:0 12px 30px rgba(116,61,12,.18);overflow:hidden;cursor:pointer;transform:translateX(0);' +
+      'background:linear-gradient(110deg,#7f1d1d,#dc2626 56%,#f97316);color:#fff;border:1px solid rgba(255,255,255,.22);border-radius:16px;' +
+      'box-shadow:0 14px 34px rgba(127,29,29,.28);overflow:hidden;cursor:pointer;transform:translateX(0);' +
       'transition:transform .2s ease,opacity .2s ease,box-shadow .2s ease}' +
-      '#soj-emg-alert-container:focus-visible{outline:3px solid rgba(233,119,22,.35);outline-offset:3px}' +
-      '#soj-emg-alert-container:hover{box-shadow:0 15px 34px rgba(116,61,12,.23)}' +
-      '#soj-emg-alert-container .summary{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 14px}' +
-      '#soj-emg-alert-container .signal{width:36px;height:36px;border-radius:11px;background:#FFD7A8;display:grid;place-items:center;color:#A94808;font-size:18px;font-weight:900}' +
-      '#soj-emg-alert-container .copy{min-width:0}' +
-      '#soj-emg-alert-container .eyebrow{margin:0 0 2px;color:#A94808;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}' +
-      '#soj-emg-alert-container .headline{margin:0;font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-      '#soj-emg-alert-container .open-hint{color:#9A5A22;font-size:11px;font-weight:800;white-space:nowrap}' +
-      '#soj-emg-alert-container .detail{display:none;border-top:1px solid rgba(194,104,28,.2);padding:12px 14px 14px 62px}' +
+      '#soj-emg-alert-container:focus-visible{outline:3px solid rgba(103,232,249,.65);outline-offset:3px}' +
+      '#soj-emg-alert-container:hover{box-shadow:0 18px 40px rgba(127,29,29,.34)}' +
+      '#soj-emg-alert-container .summary{display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 12px}' +
+      '#soj-emg-alert-container .signal{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.16);display:grid;place-items:center;color:#fff;font-size:17px;font-weight:900}' +
+      '#soj-emg-alert-container .copy{min-width:0;overflow:hidden;animation:soj-emg-ticker 12s linear infinite}' +
+      '#soj-emg-alert-container .ticker{display:flex;width:max-content;align-items:center;gap:16px;animation:soj-emg-ticker 12s linear infinite}' +
+      '#soj-emg-alert-container:hover .copy,#soj-emg-alert-container.is-open .copy,#soj-emg-alert-container:hover .ticker,#soj-emg-alert-container.is-open .ticker{animation-play-state:paused}' +
+      '#soj-emg-alert-container .eyebrow{margin:0;color:#fecaca;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}' +
+      '#soj-emg-alert-container .headline{margin:0;font-size:13.5px;font-weight:800;white-space:nowrap}' +
+      '#soj-emg-alert-container .open-hint{color:#ffedd5;font-size:10.5px;font-weight:800;white-space:nowrap}' +
+      '#soj-emg-alert-container .close-alert{width:32px;height:32px;padding:0!important;border:0!important;background:rgba(255,255,255,.14)!important;color:#fff!important;border-radius:9px!important;font-size:19px!important}' +
+      '#soj-emg-alert-container .detail{display:none;border-top:1px solid rgba(255,255,255,.18);padding:12px 14px 14px 58px;background:rgba(69,10,10,.2)}' +
       '#soj-emg-alert-container.is-open .detail{display:block}' +
-      '#soj-emg-alert-container .description{margin:0 0 7px;font-size:13px;line-height:1.5;color:#5A3218;white-space:pre-wrap}' +
-      '#soj-emg-alert-container .meta{margin:0;color:#8A5328;font-size:11.5px;font-weight:700}' +
+      '#soj-emg-alert-container .description{margin:0 0 7px;font-size:13px;line-height:1.5;color:#fff;white-space:pre-wrap}' +
+      '#soj-emg-alert-container .meta{margin:0;color:#fed7aa;font-size:11.5px;font-weight:700}' +
       '#soj-emg-alert-container .controls{display:flex;gap:8px;align-items:center;margin-top:12px}' +
-      '#soj-emg-alert-container button{border:1px solid rgba(169,72,8,.22);background:rgba(255,255,255,.58);color:#773B11;' +
+      '#soj-emg-alert-container button{border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:#fff;' +
       'border-radius:9px;padding:7px 11px;font:800 11.5px/1 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}' +
-      '#soj-emg-alert-container button.dismiss{background:#C9570E;color:#fff;border-color:#C9570E}' +
-      '#soj-emg-alert-container .swipe-note{margin-left:auto;color:#9A6A43;font-size:10.5px;font-weight:700}' +
+      '#soj-emg-alert-container button.dismiss{background:#fff;color:#991b1b;border-color:#fff}' +
+      '#soj-emg-alert-container .swipe-note{margin-left:auto;color:#fed7aa;font-size:10.5px;font-weight:700}' +
       '#soj-emg-alert-container.is-entering{animation:soj-emg-drop .28s ease-out}' +
       '@keyframes soj-emg-drop{from{transform:translateY(-18px);opacity:0}to{transform:translateY(0);opacity:1}}' +
-      '@media(max-width:520px){#soj-emg-alert-container .open-hint{display:none}#soj-emg-alert-container .detail{padding-left:14px}}' +
-      '@media(prefers-reduced-motion:reduce){#soj-emg-alert-container{transition:none}#soj-emg-alert-container.is-entering{animation:none}}';
+      '@keyframes soj-emg-ticker{0%{transform:translateX(32vw)}100%{transform:translateX(-100%)}}' +
+      '@media(max-width:639px){#soj-emg-alert-container{top:82px;left:8px;right:8px;border-radius:14px}#soj-emg-alert-container .summary{grid-template-columns:34px minmax(0,1fr) auto}#soj-emg-alert-container .open-hint{display:none}#soj-emg-alert-container .detail{padding-left:12px}}' +
+      '@media(prefers-reduced-motion:reduce){#soj-emg-alert-container{transition:none}#soj-emg-alert-container.is-entering{animation:none}#soj-emg-alert-container .copy,#soj-emg-alert-container .ticker{animation:none}}';
     document.head.appendChild(style);
   }
 
@@ -157,6 +161,16 @@
           '<span class="swipe-note">Swipe to remove</span>' +
         '</div>' +
       '</div>';
+    var closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'close-alert';
+    closeButton.setAttribute('aria-label', 'Dismiss emergency alert');
+    closeButton.textContent = '×';
+    closeButton.addEventListener('click', function (event) {
+      event.stopPropagation();
+      removeCurrent(1);
+    });
+    container.querySelector('.summary').appendChild(closeButton);
     var nextButton = container.querySelector('.next');
     if (nextButton) nextButton.addEventListener('click', function (event) {
       event.stopPropagation();
