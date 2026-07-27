@@ -36,7 +36,9 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
         assert uniform_box["y"] > posting_box["y"] + posting_box["height"]
 
     assert page.locator("#attendance").count() == 0
-    assert page.get_by_role("link", name="Attendance", exact=True).count() >= 1
+    attendance_links = page.get_by_role("link", name="Attendance", exact=True)
+    assert attendance_links.count() >= 1
+    assert attendance_links.first.get_attribute("href") == "/attendance"
 
     for section_id in ("announcements", "postings", "uniform"):
         page.locator(f"#{section_id}").scroll_into_view_if_needed()
