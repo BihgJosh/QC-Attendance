@@ -3,7 +3,7 @@ const allowedOperations = new Set([
   "status.get", "status.update", "settings.get", "settings.update", "members.list",
   "attendance.device-check", "attendance.insert", "attendance.list", "migration.import",
   "member.authenticate", "member.session", "member.change-password", "member.logout",
-  "member.list", "member.reset",
+  "member.list", "member.reset", "admin.list", "admin.add", "admin.remove",
 ]);
 
 type Json = Record<string, unknown>;
@@ -259,6 +259,43 @@ Deno.serve(async (request) => {
       if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return json({ error: "Privileged administrator passwords require secure recovery and cannot use the shared team password." }, 403);
       const now = new Date().toISOString();
       await rest("member_credentials?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, password_hash: await hashPassword(DEFAULT_MEMBER_PASSWORD), must_change_password: true, failed_attempts: 0, locked_until: null, reset_at: now, updated_at: now }) });
+      await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      return json({ success: true });
+    }
+    if (operation === "admin.list") {
+      const rows = await rest("admin_access?select=email,created_at&order=email.asc") as Json[];
+      const indexed = new Map(rows.map((row) => [String(row.email), row]));
+      for (const email of PROTECTED_BOOTSTRAP_EMAILS) {
+        if (!indexed.has(email)) indexed.set(email, { email, created_at: null });
+      }
+      return json({
+        admins: [...indexed.values()]
+          .map((row) => ({
+            email: String(row.email),
+            createdAt: row.created_at || null,
+            isProtected: PROTECTED_BOOTSTRAP_EMAILS.has(String(row.email)),
+          }))
+          .sort((left, right) => left.email.localeCompare(right.email)),
+      });
+    }
+    if (operation === "admin.add") {
+      const email = normalizeEmail(body.email);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+        return json({ error: "Enter a valid email address." }, 400);
+      }
+      const now = new Date().toISOString();
+      await rest("admin_access?on_conflict=email", {
+        method: "POST",
+        headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+        body: JSON.stringify({ email, created_at: now }),
+      });
+      return json({ success: true, admin: { email, createdAt: now, isProtected: PROTECTED_BOOTSTRAP_EMAILS.has(email) } });
+    }
+    if (operation === "admin.remove") {
+      const email = normalizeEmail(body.email);
+      if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return json({ error: "The primary administrator cannot be removed." }, 403);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
+      await rest(`admin_access?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       return json({ success: true });
     }

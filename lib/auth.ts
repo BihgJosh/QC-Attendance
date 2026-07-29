@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { getEnv } from "@/lib/env";
 import { MEMBER_SESSION_COOKIE } from "@/lib/member-auth";
 import { getMemberSession } from "@/lib/member-store";
-import { isPrivilegedAdminEmail } from "@/lib/roles";
+import { isAdminEmail } from "@/lib/roles";
 
 export const ADMIN_SESSION_COOKIE = "admin_session";
 
@@ -77,7 +77,7 @@ export async function isAdminAuthenticated() {
   if (!memberToken) return false;
   try {
     const member = await getMemberSession(memberToken);
-    return !member.mustChangePassword && isPrivilegedAdminEmail(member.email);
+    return !member.mustChangePassword && await isAdminEmail(member.email);
   } catch {
     return false;
   }

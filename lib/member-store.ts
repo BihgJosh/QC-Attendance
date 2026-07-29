@@ -8,7 +8,10 @@ type MemberOperation =
   | "member.change-password"
   | "member.logout"
   | "member.list"
-  | "member.reset";
+  | "member.reset"
+  | "admin.list"
+  | "admin.add"
+  | "admin.remove";
 
 export type MemberStatus = {
   email: string;
@@ -116,4 +119,23 @@ export async function listMemberStatuses() {
 
 export function resetMemberPassword(email: string) {
   return callMemberGateway<{ success: boolean }>("member.reset", { email });
+}
+
+export type AdminAccess = {
+  email: string;
+  createdAt: string | null;
+  isProtected: boolean;
+};
+
+export async function listAdminAccess() {
+  const data = await callMemberGateway<{ admins: AdminAccess[] }>("admin.list");
+  return data.admins;
+}
+
+export function addAdminAccess(email: string) {
+  return callMemberGateway<{ success: boolean; admin: AdminAccess }>("admin.add", { email });
+}
+
+export function removeAdminAccess(email: string) {
+  return callMemberGateway<{ success: boolean }>("admin.remove", { email });
 }

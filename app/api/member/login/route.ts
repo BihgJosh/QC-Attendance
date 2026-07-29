@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { authenticateMember } from "@/lib/member-store";
 import { setMemberSession } from "@/lib/member-auth";
-import { isPrivilegedAdminEmail } from "@/lib/roles";
+import { isAdminEmail } from "@/lib/roles";
 import { getTeamMemberByEmail, TeamDataError } from "@/lib/team-data-store";
 
 export async function POST(request: Request) {
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
     if (!email || !password || password.length > 256) return NextResponse.json({ error: "Enter your email and password." }, { status: 400 });
-    if (!isPrivilegedAdminEmail(email)) {
+    if (!(await isAdminEmail(email))) {
       if (!(await getTeamMemberByEmail(email))) return NextResponse.json({ error: "This email is not registered with the QC team." }, { status: 401 });
     }
     const session = await authenticateMember(email, password);

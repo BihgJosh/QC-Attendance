@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  ArrowDown,
   ArrowRight,
   CalendarDays,
   Check,
@@ -164,7 +163,7 @@ export default function HomePage() {
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Button asChild variant="gradient" size="lg" className="h-12 rounded-full px-6">
-                <a href="#announcements">View unit brief <ArrowDown className="ml-2 h-4 w-4" /></a>
+                <Link href="/attendance">Sign attendance <ClipboardCheck className="ml-2 h-4 w-4" /></Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="h-12 rounded-full px-6 glass-card">
                 <a href="#postings">View postings <ArrowRight className="ml-2 h-4 w-4" /></a>
