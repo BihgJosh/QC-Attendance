@@ -252,9 +252,8 @@ function PostingMatrixEditor({ posting, onChange, onDelete }: { posting: Homepag
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/50 shadow-sm">
-      <div className="grid items-end gap-3 bg-gradient-to-r from-slate-950/[0.03] to-primary/[0.06] p-4 md:grid-cols-[1fr_1fr_auto_auto]">
+      <div className="grid items-end gap-3 bg-gradient-to-r from-slate-950/[0.03] to-primary/[0.06] p-4 md:grid-cols-[1fr_auto_auto]">
         <Field label="Posting location"><Input value={posting.name} maxLength={100} onChange={(event) => onChange({ ...posting, name: event.target.value })} /></Field>
-        <Field label="Responsibility"><Input value={posting.role} maxLength={120} onChange={(event) => onChange({ ...posting, role: event.target.value })} /></Field>
         <div className="flex items-center justify-end gap-1 md:contents">
           <Button type="button" variant="ghost" size="icon" aria-label={expanded ? `Collapse ${posting.name}` : `Expand ${posting.name}`} onClick={() => setExpanded((value) => !value)}>{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button>
           <Button type="button" variant="ghost" size="icon" aria-label={`Delete ${posting.name}`} className="text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
@@ -323,9 +322,8 @@ function LegacyPostingEditor({ posting, onChange, onDelete }: { posting: Homepag
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/50">
-      <div className="grid items-end gap-3 p-4 md:grid-cols-[1fr_1fr_auto_auto]">
+      <div className="grid items-end gap-3 p-4 md:grid-cols-[1fr_auto_auto]">
         <Field label="Posting location"><Input value={posting.name} maxLength={100} onChange={(event) => onChange({ ...posting, name: event.target.value })} /></Field>
-        <Field label="Responsibility"><Input value={posting.role} maxLength={120} onChange={(event) => onChange({ ...posting, role: event.target.value })} /></Field>
         <Button type="button" variant="ghost" size="icon" aria-label={expanded ? `Collapse ${posting.name}` : `Expand ${posting.name}`} onClick={() => setExpanded((value) => !value)}>{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button>
         <Button type="button" variant="ghost" size="icon" aria-label={`Delete ${posting.name}`} className="text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
       </div>

@@ -286,7 +286,7 @@ export default function HomePage() {
                   <article key={posting.id} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06]">
                     <div className="flex items-center gap-4 border-b border-white/10 p-4">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-xs font-black text-slate-950">{index + 1}</span>
-                      <div className="min-w-0"><h3 className="font-semibold">{posting.name}</h3><p className="text-xs text-white/50">{posting.role}</p></div>
+                      <div className="min-w-0"><h3 className="font-semibold">{posting.name}</h3></div>
                     </div>
                     <div className="p-4">
                       <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">Members posted here</p>
