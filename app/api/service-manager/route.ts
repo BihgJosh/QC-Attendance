@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { EmailConfigurationError, sendBrevoEmail } from "@/lib/brevo-email";
 import {
   appendEmailDeliveryLog,
@@ -47,12 +48,33 @@ async function callSuite(action: "checkPassword" | "getDashboard" | "generateRep
     params.set("date", date);
     params.set("service", service);
   }
-  const response = await fetch(`${API_URL}?${params.toString()}`, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (!response.ok) throw new Error(`QC suite responded with ${response.status}`);
-  return response.json() as Promise<SuiteResult>;
+  const timeouts = [12_000, 7_000];
+  for (let attempt = 0; attempt < timeouts.length; attempt += 1) {
+    try {
+      const response = await fetch(`${API_URL}?${params.toString()}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(timeouts[attempt]),
+      });
+      if (!response.ok) {
+        if (response.status >= 500 && attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          continue;
+        }
+        throw new Error(`QC suite responded with ${response.status}`);
+      }
+      return await response.json() as SuiteResult;
+    } catch (error) {
+      if (attempt === 0 && (
+        error instanceof TypeError
+        || (error instanceof Error && (error.name === "TimeoutError" || error instanceof SyntaxError))
+      )) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error("QC suite did not respond.");
 }
 
 function reportEmailHtml(input: {
@@ -125,24 +147,31 @@ export async function POST(request: Request) {
     if (action === "sendEmail") {
       const recipient = typeof body.recipient === "string" ? body.recipient.trim().toLowerCase() : "";
       const reportType = body.reportType === "full" ? "full" : body.reportType === "summary" ? "summary" : "";
+      const requestId = typeof body.requestId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)
+        ? body.requestId
+        : randomUUID();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 254 || !reportType) {
         return NextResponse.json({ ok: false, message: "Enter a valid recipient email and choose a report type." }, { status: 400 });
       }
-      const access = await callSuite("checkPassword", token);
-      if (!access.ok) return NextResponse.json({ ok: false, message: "Manager access has expired." }, { status: 401 });
       const dashboard = await callSuite("getDashboard", token, date, service);
       if (!dashboard.ok || !dashboard.data) {
         return NextResponse.json({ ok: false, message: typeof dashboard.message === "string" ? dashboard.message : "The service data could not be loaded." }, { status: 502 });
       }
 
       let documentUrl: string | undefined;
+      let documentLoggingFailed = false;
       if (reportType === "full") {
         const generated = await callSuite("generateReport", token, date, service);
         if (!generated.ok) {
           return NextResponse.json({ ok: false, message: typeof generated.message === "string" ? generated.message : "The full report document could not be generated." }, { status: 502 });
         }
         documentUrl = trustedGoogleDocumentUrl(generated.url);
-        await appendGeneratedDocumentLog({ date, service, url: documentUrl, actor: `Email delivery to ${recipient}` });
+        try {
+          await appendGeneratedDocumentLog({ date, service, url: documentUrl, actor: `Email delivery to ${recipient}` });
+        } catch (error) {
+          documentLoggingFailed = true;
+          console.error("[service-manager] Generated email document logging failed", error instanceof Error ? error.message : "Unknown error");
+        }
       }
 
       const subject = `QC Unit: ${service} ${reportType === "full" ? "full report" : "summary"} · ${date}`;
@@ -150,13 +179,21 @@ export async function POST(request: Request) {
         to: recipient,
         subject,
         html: reportEmailHtml({ service, date, reportType, data: dashboard.data, documentUrl }),
+        idempotencyKey: requestId,
       });
       try {
         const emailLogId = await appendEmailDeliveryLog({
           date, service, recipient, reportType, subject,
           providerMessageId: delivery.messageId, documentUrl,
         });
-        return NextResponse.json({ ok: true, message: `${reportType === "full" ? "Full report" : "Summary"} sent to ${recipient}.`, emailLogId });
+        return NextResponse.json({
+          ok: true,
+          message: documentLoggingFailed
+            ? `${reportType === "full" ? "Full report" : "Summary"} sent to ${recipient}, but its document log could not be saved.`
+            : `${reportType === "full" ? "Full report" : "Summary"} sent to ${recipient}.`,
+          emailLogId,
+          ...(documentLoggingFailed ? { warning: "document_logging_failed" } : {}),
+        });
       } catch (error) {
         console.error("[service-manager] Email sent but delivery logging failed", error instanceof Error ? error.message : "Unknown error");
         return NextResponse.json({

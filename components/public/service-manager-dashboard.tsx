@@ -86,6 +86,7 @@ export function ServiceManagerDashboard() {
   const [shareLoading, setShareLoading] = useState(false);
   const [shareMessage, setShareMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const summaryRequest = useRef(0);
+  const emailRequest = useRef<{ signature: string; id: string } | null>(null);
 
   const loadAllServices = async (accessToken: string, selectedDate: string) => {
     const requestId = ++summaryRequest.current;
@@ -184,6 +185,11 @@ export function ServiceManagerDashboard() {
 
   const shareReport = async (event: React.FormEvent, service: ServiceName) => {
     event.preventDefault();
+    const normalizedRecipient = recipient.trim().toLowerCase();
+    const signature = `${date}|${service}|${normalizedRecipient}|${shareType}`;
+    if (!emailRequest.current || emailRequest.current.signature !== signature) {
+      emailRequest.current = { signature, id: crypto.randomUUID() };
+    }
     setShareLoading(true);
     setShareMessage(null);
     try {
@@ -192,14 +198,16 @@ export function ServiceManagerDashboard() {
         token,
         date,
         service,
-        recipient: recipient.trim(),
+        recipient: normalizedRecipient,
         reportType: shareType,
+        requestId: emailRequest.current.id,
       });
       if (!result.ok) {
         setShareMessage({ kind: "error", text: result.message || "The report email could not be sent." });
         return;
       }
       setShareMessage({ kind: "success", text: result.message || "Report email sent." });
+      emailRequest.current = null;
       setRecipient("");
     } catch {
       setShareMessage({ kind: "error", text: "The report email could not be sent." });
