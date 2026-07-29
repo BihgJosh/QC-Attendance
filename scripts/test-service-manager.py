@@ -1,9 +1,11 @@
 from pathlib import Path
 import json
+import os
 from playwright.sync_api import sync_playwright
 
 
 OUTPUT = Path(r"C:\Users\firebat\.codex\visualizations\2026\07\23\019f9014-a001-7262-bfed-68eff40e102d")
+BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 
 
 def inspect(browser, label: str, width: int, height: int) -> list[str]:
@@ -15,6 +17,13 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
         body = json.loads(request.post_data or "{}")
         if body.get("action") == "checkPassword":
             payload = {"ok": True}
+        elif body.get("action") == "generateReport":
+            payload = {
+                "ok": True,
+                "url": "https://docs.google.com/document/d/test-report/edit",
+                "workbookUrl": "https://docs.google.com/spreadsheets/d/1QuNstJwL2wxBgM-bwa83r8rU9PZNln3tmih6DOBG2oY/edit",
+                "logRecordId": "test-log-record",
+            }
         else:
             service_number = ["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"].index(body["service"]) + 1
             payload = {"ok": True, "data": {
@@ -28,7 +37,7 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
         route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
     page.route("**/api/service-manager", mock_manager)
-    page.goto("http://localhost:3000/service-tools", wait_until="networkidle")
+    page.goto(f"{BASE_URL}/service-tools", wait_until="networkidle")
 
     manager_card = page.get_by_role("article").filter(has_text="Service Manager")
     manager_card.get_by_role("button", name="Open service summary").click()
@@ -49,6 +58,9 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
     assert page.get_by_text("Full detailed report", exact=False).is_visible()
     assert page.get_by_text("Main auditorium", exact=True).is_visible()
     assert page.get_by_text("Preparedness", exact=True).is_visible()
+    page.get_by_role("button", name="Generate document").click()
+    page.get_by_text("Document generated and logged under 1st Service.").wait_for()
+    assert page.get_by_role("link", name="Open service workbook").get_attribute("href").startswith("https://docs.google.com/spreadsheets/")
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 
     workflow.screenshot(path=str(OUTPUT / f"qc-service-manager-{label}.png"))

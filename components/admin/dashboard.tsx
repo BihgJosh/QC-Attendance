@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -17,7 +16,7 @@ import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { toast } from "sonner";
 import {
-  CheckCircle2, XCircle, Lock, Unlock, Settings, LogOut,
+  CheckCircle2, XCircle, Lock, Unlock, Settings,
   Search, Loader2, ShieldCheck, Clock, MapPin, Users,
   TrendingUp, ChevronLeft, ChevronRight, ArrowUp, ArrowDown,
   Download, CalendarIcon, SlidersHorizontal,
@@ -27,10 +26,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ContentManager } from "@/components/admin/content-manager";
 import { MemberPasswordManager } from "@/components/admin/member-password-manager";
 import { AdminAccessManager } from "@/components/admin/admin-access-manager";
-
-interface DashboardProps {
-  onLogout?: () => void;
-}
 
 interface Settings {
   churchLat: string;
@@ -55,8 +50,7 @@ interface AttendanceRecord {
 type SortField = "memberName" | "time" | "distance" | "date";
 type SortDir = "asc" | "desc";
 
-export function Dashboard({ onLogout }: DashboardProps) {
-  const router = useRouter();
+export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -183,16 +177,6 @@ export function Dashboard({ onLogout }: DashboardProps) {
     } finally {
       setTogglingStatus(false);
       setConfirmToggle(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    await fetch("/api/admin/logout", { method: "POST" });
-    if (onLogout) {
-      onLogout();
-    } else {
-      router.push("/admin/login");
-      router.refresh();
     }
   };
 
@@ -328,9 +312,6 @@ export function Dashboard({ onLogout }: DashboardProps) {
               <kbd className="px-1 py-0.5 rounded bg-muted/50 text-[9px] font-mono">R</kbd> refresh
             </span>
             <ThemeToggle />
-            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
-              <LogOut className="w-4 h-4 mr-2" /> Logout
-            </Button>
           </div>
         </div>
       </header>

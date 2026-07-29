@@ -2,6 +2,7 @@ import "server-only";
 
 import { google } from "googleapis";
 import { getGoogleEnv } from "@/lib/env";
+import { appendCategorizedReport } from "@/lib/service-report-workbook";
 
 const SPREADSHEET_ID = "1N2kyYbaOFDryoukMGrxyJplrDTvgXHUSPnBG_8jo7Q4";
 const SHEET_GID = 1227078310;
@@ -64,17 +65,28 @@ export async function appendServiceObserverReport(report: ServiceObserverReport)
     throw new Error("The Service Observer sheet headers do not match the required observer columns.");
   }
 
+  const row = [
+    report.date, report.service, report.observerName, report.generalObservations,
+    report.unitsReported.join(", "), JSON.stringify(report.unitReports),
+    report.recommendations, report.conclusion,
+  ];
+  await appendCategorizedReport({
+    tab: "Observer Reports",
+    headers: ["Record ID", ...SERVICE_OBSERVER_HEADERS],
+    row,
+    date: report.date,
+    service: report.service,
+    category: "Observer",
+    actor: report.observerName,
+    summary: `${report.unitsReported.length} unit${report.unitsReported.length === 1 ? "" : "s"} observed`,
+  });
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
     range: `${sheet}!A:I`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
-      values: [[
-        report.date, report.service, report.observerName, report.generalObservations,
-        report.unitsReported.join(", "), JSON.stringify(report.unitReports),
-        report.recommendations, report.conclusion, new Date().toISOString(),
-      ]],
+      values: [[...row, new Date().toISOString()]],
     },
   });
 }

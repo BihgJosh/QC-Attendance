@@ -10,9 +10,12 @@ import {
   ClipboardList,
   Clock3,
   Eye,
+  FileSpreadsheet,
   FileText,
   Loader2,
   LockKeyhole,
+  Mail,
+  Send,
   ShieldCheck,
   Sparkles,
   Users,
@@ -50,7 +53,15 @@ async function managerRequest(body: Record<string, string>) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return response.json() as Promise<{ ok: boolean; message?: string; data?: DashboardData; url?: string }>;
+  return response.json() as Promise<{
+    ok: boolean;
+    message?: string;
+    data?: DashboardData;
+    url?: string;
+    workbookUrl?: string;
+    logRecordId?: string;
+    emailLogId?: string;
+  }>;
 }
 
 function numberValue(value: unknown) {
@@ -68,6 +79,12 @@ export function ServiceManagerDashboard() {
   const [results, setResults] = useState<ServiceResult[]>([]);
   const [selectedService, setSelectedService] = useState<ServiceName | null>(null);
   const [reportLoading, setReportLoading] = useState<ServiceName | null>(null);
+  const [generatedLog, setGeneratedLog] = useState<{ service: ServiceName; workbookUrl: string; recordId: string } | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [recipient, setRecipient] = useState("");
+  const [shareType, setShareType] = useState<"summary" | "full">("summary");
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareMessage, setShareMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const summaryRequest = useRef(0);
 
   const loadAllServices = async (accessToken: string, selectedDate: string) => {
@@ -140,6 +157,7 @@ export function ServiceManagerDashboard() {
     if (reportWindow) reportWindow.opener = null;
     setReportLoading(service);
     setError("");
+    setGeneratedLog(null);
     try {
       const result = await managerRequest({ action: "generateReport", token, date, service });
       if (!result.ok || !result.url) {
@@ -149,6 +167,11 @@ export function ServiceManagerDashboard() {
       }
       const reportUrl = new URL(result.url);
       if (reportUrl.protocol !== "https:") throw new Error("Unsafe report URL");
+      if (result.workbookUrl && result.logRecordId) {
+        const workbookUrl = new URL(result.workbookUrl);
+        if (workbookUrl.protocol !== "https:" || workbookUrl.hostname !== "docs.google.com") throw new Error("Unsafe workbook URL");
+        setGeneratedLog({ service, workbookUrl: workbookUrl.toString(), recordId: String(result.logRecordId) });
+      }
       if (reportWindow) reportWindow.location.href = reportUrl.toString();
       else setError("The report is ready, but the browser blocked the new tab. Allow pop-ups and try again.");
     } catch {
@@ -156,6 +179,32 @@ export function ServiceManagerDashboard() {
       setError("The report document could not be generated.");
     } finally {
       setReportLoading(null);
+    }
+  };
+
+  const shareReport = async (event: React.FormEvent, service: ServiceName) => {
+    event.preventDefault();
+    setShareLoading(true);
+    setShareMessage(null);
+    try {
+      const result = await managerRequest({
+        action: "sendEmail",
+        token,
+        date,
+        service,
+        recipient: recipient.trim(),
+        reportType: shareType,
+      });
+      if (!result.ok) {
+        setShareMessage({ kind: "error", text: result.message || "The report email could not be sent." });
+        return;
+      }
+      setShareMessage({ kind: "success", text: result.message || "Report email sent." });
+      setRecipient("");
+    } catch {
+      setShareMessage({ kind: "error", text: "The report email could not be sent." });
+    } finally {
+      setShareLoading(false);
     }
   };
 
@@ -191,12 +240,32 @@ export function ServiceManagerDashboard() {
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Full detailed report · {date}</p>
             <h3 className="mt-2 text-3xl font-black tracking-tight">{selectedService}</h3>
           </div>
-          <button type="button" onClick={() => generateReport(selectedService)} disabled={reportLoading === selectedService} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 text-sm font-black text-slate-950 disabled:opacity-60 sm:w-auto">
-            {reportLoading === selectedService ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Generate document
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <button type="button" onClick={() => { setShareOpen((open) => !open); setShareMessage(null); }} aria-expanded={shareOpen} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-cyan-200/25 bg-cyan-200/[0.07] px-5 text-sm font-black text-cyan-100 transition hover:bg-cyan-200/[0.12] sm:w-auto">
+              <Mail className="h-4 w-4" /> Share by email
+            </button>
+            <button type="button" onClick={() => generateReport(selectedService)} disabled={reportLoading === selectedService} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 text-sm font-black text-slate-950 disabled:opacity-60 sm:w-auto">
+              {reportLoading === selectedService ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Generate document
+            </button>
+          </div>
         </div>
 
         {error && <p role="alert" className="mt-5 rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">{error}</p>}
+        {shareOpen && <form onSubmit={(event) => shareReport(event, selectedService)} className="mt-5 rounded-3xl border border-cyan-200/20 bg-[linear-gradient(135deg,rgba(34,211,238,.09),rgba(217,70,239,.07))] p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+            <div className="min-w-0 flex-1">
+              <label htmlFor="report-recipient" className="text-xs font-black uppercase tracking-[0.12em] text-cyan-100">Recipient email</label>
+              <input id="report-recipient" type="email" value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="name@example.com" autoComplete="email" required className="mt-2 min-h-11 w-full rounded-2xl border border-white/15 bg-slate-950/50 px-4 text-sm text-white outline-none placeholder:text-white/25 focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/20" />
+            </div>
+            <fieldset className="min-w-0 flex-1"><legend className="text-xs font-black uppercase tracking-[0.12em] text-cyan-100">Email content</legend><div className="mt-2 grid grid-cols-2 gap-2">
+              <label className={`cursor-pointer rounded-2xl border p-3 transition ${shareType === "summary" ? "border-cyan-300/50 bg-cyan-300/10" : "border-white/10 bg-slate-950/25"}`}><input type="radio" name="report-type" value="summary" checked={shareType === "summary"} onChange={() => setShareType("summary")} className="sr-only" /><span className="block text-sm font-black">Summary</span><span className="mt-1 block text-[11px] text-white/45">Metrics and report coverage</span></label>
+              <label className={`cursor-pointer rounded-2xl border p-3 transition ${shareType === "full" ? "border-fuchsia-300/50 bg-fuchsia-300/10" : "border-white/10 bg-slate-950/25"}`}><input type="radio" name="report-type" value="full" checked={shareType === "full"} onChange={() => setShareType("full")} className="sr-only" /><span className="block text-sm font-black">Full report</span><span className="mt-1 block text-[11px] text-white/45">Details and document link</span></label>
+            </div></fieldset>
+            <button type="submit" disabled={shareLoading || !recipient.trim()} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50">{shareLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{shareLoading ? "Sending" : "Send email"}</button>
+          </div>
+          {shareMessage && <p role={shareMessage.kind === "error" ? "alert" : "status"} className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${shareMessage.kind === "success" ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-100" : "border-red-300/20 bg-red-400/10 text-red-100"}`}>{shareMessage.text}</p>}
+        </form>}
+        {generatedLog?.service === selectedService && <div role="status" className="mt-5 flex flex-col gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4 text-sm text-emerald-100 sm:flex-row sm:items-center sm:justify-between"><span>Document generated and logged under {selectedService}.</span><a href={generatedLog.workbookUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-black text-white underline decoration-emerald-300/50 underline-offset-4"><FileSpreadsheet className="h-4 w-4" /> Open service workbook</a></div>}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <Metric label="Worshippers" value={numberValue(data.headcount?.grandTotal)} icon={Users} />

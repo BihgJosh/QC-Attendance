@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { PWARegister } from "@/components/pwa-register";
+import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 
 export const metadata: Metadata = {
   title: "Quality Control Unit | Streams of Joy International",
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "SOJ QC Unit",
+    title: "QC Unit",
   },
 };
 
@@ -41,6 +42,7 @@ export default function RootLayout({
           {children}
           <Toaster richColors position="top-right" />
           <PWARegister />
+          <PWAInstallPrompt />
         </ThemeProvider>
       </body>
     </html>

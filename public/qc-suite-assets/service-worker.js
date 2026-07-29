@@ -6,7 +6,7 @@
  * always fetched live, never served from cache.
  */
 
-const CACHE_NAME = 'soj-qc-shell-v4';
+const CACHE_NAME = 'soj-qc-shell-v5';
 
 const APP_SHELL = [
   '/qc-tools',
@@ -17,6 +17,7 @@ const APP_SHELL = [
   '/qc-tools/dashboard',
   '/qc-suite-assets/shared.css',
   '/qc-suite-assets/shared-shell.js',
+  '/qc-suite-assets/pwa.js',
   '/qc-suite-assets/emergency-notify.js',
   '/qc-suite-assets/manifest.json',
   '/qc-suite-assets/icons/icon-192.png',

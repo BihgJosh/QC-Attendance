@@ -2,6 +2,7 @@ import "server-only";
 
 import { google } from "googleapis";
 import { getGoogleEnv } from "@/lib/env";
+import { appendCategorizedReport } from "@/lib/service-report-workbook";
 
 const SPREADSHEET_ID = "1BeoEcYvTGtVhBCp4SxX8mlfFscQD5rBrZ2tnPUdKP-8";
 const SHEET_GID = 810317383;
@@ -83,13 +84,23 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
       return [segment.status, segment.min, segment.sec];
     }),
     log.extra.name, log.extra.status, log.extra.min, log.extra.sec,
-    log.generalObservation, new Date().toISOString(),
+    log.generalObservation,
   ];
+  await appendCategorizedReport({
+    tab: "Timer Logs",
+    headers: ["Record ID", ...SERVICE_TIMER_HEADERS],
+    row,
+    date: log.date,
+    service: log.service,
+    category: "Timer",
+    actor: log.name,
+    summary: `${log.serviceStart || "Start not set"} - ${log.serviceEnd || "End not set"}`,
+  });
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
     range: `${sheet}!A:AR`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [row] },
+    requestBody: { values: [[...row, new Date().toISOString()]] },
   });
 }

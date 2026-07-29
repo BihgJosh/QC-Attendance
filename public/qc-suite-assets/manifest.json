@@ -1,6 +1,6 @@
 {
   "name": "QC — Streams of Joy International, Abuja",
-  "short_name": "SOJ QC",
+  "short_name": "QC Unit",
   "description": "Quality Control reporting suite for Streams of Joy International — Service Post reports, Timer & Observer logs, and the Service Manager dashboard.",
   "start_url": "/qc-tools",
   "scope": "/qc-tools/",

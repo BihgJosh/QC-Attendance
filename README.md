@@ -23,6 +23,10 @@ GEOFENCE_RADIUS=100
 GOOGLE_SHEET_ID=your_google_spreadsheet_id_here
 GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account-email@your-project.iam.gserviceaccount.com
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY_HERE\n-----END PRIVATE KEY-----\n"
+BREVO_API_KEY=your_brevo_api_key
+BREVO_SENDER_EMAIL=verified-sender@yourdomain.com
+BREVO_SENDER_NAME=QC Unit
+BREVO_REPLY_TO_EMAIL=reply-to@yourdomain.com
 ```
 
 `ADMIN_PASSWORD` is only checked on the backend. It is never sent to the browser.
@@ -93,9 +97,12 @@ GEOFENCE_RADIUS=
 GOOGLE_SHEET_ID=
 GOOGLE_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_PRIVATE_KEY=
+BREVO_API_KEY=
+BREVO_SENDER_EMAIL=
+BREVO_SENDER_NAME=QC Unit
+BREVO_REPLY_TO_EMAIL=
 ```
 
 4. Deploy.
 
 If any required environment variable is missing, the app logs a clear console error instead of exposing secrets or returning HTML from API routes.
-

@@ -3,10 +3,12 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Quality Control Unit — Streams of Joy International",
-    short_name: "SOJ QC Unit",
+    short_name: "QC Unit",
     description:
       "The Streams of Joy Quality Control Unit hub for announcements, postings, uniforms, attendance and service tools.",
     start_url: "/",
+    id: "/",
+    scope: "/",
     display: "standalone",
     background_color: "#fafaff",
     theme_color: "#39A9DB",

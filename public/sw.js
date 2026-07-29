@@ -1,4 +1,4 @@
-const CACHE = "qcu-attendance-v3";
+const CACHE = "qcu-unit-v4";
 // Only pre-cache the root shell for offline fallback. HTML is served
 // network-first (see fetch handler), so these are just offline backups.
 const STATIC_URLS = ["/"];

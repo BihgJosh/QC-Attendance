@@ -2,6 +2,7 @@ import "server-only";
 
 import { google } from "googleapis";
 import { getGoogleEnv } from "@/lib/env";
+import { appendCategorizedReport } from "@/lib/service-report-workbook";
 
 const SPREADSHEET_ID = "1B-tojwzi1WFsXWRuKdJ4g9M01tiZClDFCISndxTR7gg";
 const SHEET_GID = 1234691256;
@@ -83,13 +84,22 @@ export async function appendServicePostReport(report: ServicePostReport) {
     report.ma.childrenParticipation || "", report.ma.childrenBehaviour || "", report.ma.safetyFlag || "",
     report.ma.safetyDescribe || "", report.teens.lessonTopic || "", report.teens.teacherPreparedness || "",
     report.teens.engagement || "", report.teens.classroomMgmt || "", report.additionalComments,
-    new Date().toISOString(),
   ];
+  await appendCategorizedReport({
+    tab: "Post Reports",
+    headers: ["Record ID", ...SERVICE_POST_HEADERS],
+    row,
+    date: report.date,
+    service: report.service,
+    category: "Service Post",
+    actor: `${report.name} <${report.email}>`,
+    summary: `${report.area}: ${report.adultsHeadcount + report.childrenHeadcount} worshippers, ${report.overallRating} overall`,
+  });
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
     range: `${sheet}!A:AD`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [row] },
+    requestBody: { values: [[...row, new Date().toISOString()]] },
   });
 }
