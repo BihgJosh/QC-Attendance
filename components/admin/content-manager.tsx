@@ -195,8 +195,8 @@ export function ContentManager() {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 {content.uniformItems.map((item, index) => (
-                  <div key={`${index}-${item}`} className="flex items-end gap-2 rounded-2xl border border-border/70 bg-background/50 p-4">
-                    <Field label={`Uniform item ${index + 1}`}><Input value={item} maxLength={150} onChange={(event) => setContent({ ...content, uniformItems: content.uniformItems.map((uniformItem, itemIndex) => itemIndex === index ? event.target.value : uniformItem) })} /></Field>
+                  <div key={index} className="flex items-end gap-2 rounded-2xl border border-border/70 bg-background/50 p-4">
+                    <Field label={`Uniform item ${index + 1}`}><Input value={item} maxLength={150} onChange={(event) => { const value = event.target.value; setContent((current) => ({ ...current, uniformItems: current.uniformItems.map((uniformItem, itemIndex) => itemIndex === index ? value : uniformItem) })); }} /></Field>
                     <Button type="button" variant="ghost" size="icon" aria-label={`Delete uniform item ${index + 1}`} className="shrink-0 text-destructive" onClick={() => setContent({ ...content, uniformItems: content.uniformItems.filter((_, itemIndex) => itemIndex !== index) })}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 ))}
