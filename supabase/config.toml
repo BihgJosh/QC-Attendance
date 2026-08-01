@@ -1,0 +1,10 @@
+project_id = "qc-attendance"
+
+[functions.qcu-attendance]
+verify_jwt = true
+
+[functions.qcu-team-data]
+verify_jwt = true
+
+[functions.qcu-uniform-image]
+verify_jwt = true
