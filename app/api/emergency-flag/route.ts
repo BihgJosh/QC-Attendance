@@ -37,8 +37,13 @@ export async function POST(request: Request) {
       throw new Error("The emergency alert broadcast was not accepted.");
     }
 
-    await appendEmergencyFlag(flag);
-    return NextResponse.json({ ok: true, message: "Emergency flag sent and saved successfully." });
+    try {
+      await appendEmergencyFlag(flag);
+      return NextResponse.json({ ok: true, message: "Emergency flag sent and saved successfully." });
+    } catch (error) {
+      console.error("[emergency-flag] Alert sent but sheet logging failed", error instanceof Error ? error.message : "Unknown error");
+      return NextResponse.json({ ok: true, message: "Emergency alert sent. The report log will need follow-up.", warning: "logging_failed" });
+    }
   } catch (error) {
     console.error("[emergency-flag] Emergency save failed", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({

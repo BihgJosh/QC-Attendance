@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { appendServicePostReport } from "@/lib/service-post-sheet";
+import { isIsoCalendarDate } from "@/lib/validation";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const RATINGS = new Set(["Excellent", "Good", "Fair", "Poor"]);
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     const adultsHeadcount = count(body.adultsHeadcount);
     const childrenHeadcount = count(body.childrenHeadcount);
     const requiredRatings = ["preparedness", "neatness", "orderliness", "conduct", "compliance", "coordination"] as const;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SERVICES.has(service) || !area || adultsHeadcount === null || childrenHeadcount === null) {
+    if (!isIsoCalendarDate(date) || !SERVICES.has(service) || !area || adultsHeadcount === null || childrenHeadcount === null) {
       return NextResponse.json({ ok: false, message: "Complete the date, service, area and headcounts correctly." }, { status: 400 });
     }
     if (requiredRatings.some((field) => !RATINGS.has(text(body[field], 30))) || !OVERALL_RATINGS.has(text(body.overallRating, 30))) {

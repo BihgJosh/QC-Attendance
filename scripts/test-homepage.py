@@ -1,8 +1,10 @@
 from pathlib import Path
+import os
 from playwright.sync_api import sync_playwright
 
 
 OUTPUT = Path(r"C:\Users\firebat\.codex\visualizations\2026\07\23\019f9014-a001-7262-bfed-68eff40e102d")
+BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 
 
 def inspect(browser, label: str, width: int, height: int) -> list[str]:
@@ -11,7 +13,7 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
     page = browser.new_page(viewport={"width": width, "height": height})
     page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
     page.on("response", lambda response: failed_responses.append(f"{response.status} {response.url}") if response.status >= 400 else None)
-    page.goto("http://localhost:3000", wait_until="networkidle")
+    page.goto(BASE_URL, wait_until="networkidle")
     assert page.get_by_text("Abuja date", exact=True).is_visible()
     page.wait_for_timeout(1200)
 

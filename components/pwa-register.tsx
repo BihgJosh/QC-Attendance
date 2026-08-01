@@ -15,6 +15,7 @@ export function PWARegister() {
     if (process.env.NODE_ENV !== "production") return;
     if (!("serviceWorker" in navigator)) return;
 
+    const hadController = Boolean(navigator.serviceWorker.controller);
     navigator.serviceWorker.register("/sw.js").catch(() => {
       // Registration failed — likely offline or unsupported.
       // The app still works, just without offline caching.
@@ -24,7 +25,7 @@ export function PWARegister() {
     // the new assets. The guard prevents an infinite reload loop.
     let reloaded = false;
     const onControllerChange = () => {
-      if (reloaded) return;
+      if (!hadController || reloaded) return;
       reloaded = true;
       window.location.reload();
     };

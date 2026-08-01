@@ -6,6 +6,7 @@ import {
   SERVICE_TIMER_SEGMENTS,
   type TimerSegment,
 } from "@/lib/service-timer-sheet";
+import { isClockTime, isIsoCalendarDate } from "@/lib/validation";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const STATUSES = new Set(["", "On Time", "Overshot", "Finished Early"]);
@@ -42,10 +43,10 @@ export async function POST(request: Request) {
     const service = text(body.service, 40);
     const serviceStart = text(body.serviceStart, 5);
     const serviceEnd = text(body.serviceEnd, 5);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SERVICES.has(service)) {
+    if (!isIsoCalendarDate(date) || !SERVICES.has(service)) {
       return NextResponse.json({ ok: false, message: "Complete the date and service correctly." }, { status: 400 });
     }
-    if ((serviceStart && !/^\d{2}:\d{2}$/.test(serviceStart)) || (serviceEnd && !/^\d{2}:\d{2}$/.test(serviceEnd))) {
+    if ((serviceStart && !isClockTime(serviceStart)) || (serviceEnd && !isClockTime(serviceEnd))) {
       return NextResponse.json({ ok: false, message: "Enter valid service start and end times." }, { status: 400 });
     }
 

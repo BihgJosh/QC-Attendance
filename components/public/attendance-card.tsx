@@ -375,6 +375,8 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
                   Service
                 </Label>
                 <CustomSelect
+                  id="service"
+                  ariaLabel="Service"
                   options={[
                     { value: "Sunday", label: "Sunday Service" },
                     { value: "Thursday", label: "Thursday Service" },

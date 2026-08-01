@@ -6,15 +6,9 @@
  * always fetched live, never served from cache.
  */
 
-const CACHE_NAME = 'soj-qc-shell-v5';
+const CACHE_NAME = 'soj-qc-shell-v6';
 
 const APP_SHELL = [
-  '/qc-tools',
-  '/qc-tools/post-report',
-  '/qc-tools/timer',
-  '/qc-tools/observer',
-  '/qc-tools/emergency',
-  '/qc-tools/dashboard',
   '/qc-suite-assets/shared.css',
   '/qc-suite-assets/shared-shell.js',
   '/qc-suite-assets/pwa.js',
@@ -50,6 +44,11 @@ self.addEventListener('fetch', (event) => {
   // origin (script.google.com, docs.google.com, etc.) is left completely
   // alone — no interception, no caching, always live.
   if (url.origin !== self.location.origin || request.method !== 'GET') {
+    return;
+  }
+
+  if (request.mode === 'navigate' || (request.headers.get('accept') || '').includes('text/html')) {
+    event.respondWith(fetch(request));
     return;
   }
 

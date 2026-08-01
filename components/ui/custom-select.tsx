@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,8 @@ interface CustomSelectProps {
   disabled?: boolean;
   className?: string;
   size?: "default" | "sm";
+  id?: string;
+  ariaLabel?: string;
 }
 
 export function CustomSelect({
@@ -25,11 +27,16 @@ export function CustomSelect({
   disabled = false,
   className,
   size = "default",
+  id,
+  ariaLabel,
 }: CustomSelectProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const generatedId = useId();
+  const triggerId = id || `custom-select-${generatedId}`;
+  const listboxId = `${triggerId}-listbox`;
 
   const selectedOption = options.find((o) => o.value === value);
 
@@ -51,6 +58,7 @@ export function CustomSelect({
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         setOpen(true);
+        setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value)));
       }
       return;
     }
@@ -69,6 +77,16 @@ export function CustomSelect({
         setActiveIndex(-1);
       }
     } else if (e.key === "Escape") {
+      setOpen(false);
+      setActiveIndex(-1);
+      triggerRef.current?.focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActiveIndex(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setActiveIndex(options.length - 1);
+    } else if (e.key === "Tab") {
       setOpen(false);
       setActiveIndex(-1);
     }
@@ -92,7 +110,20 @@ export function CustomSelect({
         ref={triggerRef}
         type="button"
         disabled={disabled}
-        onClick={() => { if (!disabled) setOpen(!open); }}
+        id={triggerId}
+        role="combobox"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-activedescendant={open && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined}
+        onClick={() => {
+          if (disabled) return;
+          setOpen((current) => {
+            if (!current) setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value)));
+            return !current;
+          });
+        }}
         className={cn(
           "flex w-full items-center justify-between border border-border bg-background/50 backdrop-blur",
           "ring-offset-background transition-all duration-200 cursor-pointer",
@@ -128,6 +159,8 @@ export function CustomSelect({
               "rounded-xl border border-border bg-card shadow-xl shadow-black/[0.08]",
               size === "sm" ? "rounded-lg" : "rounded-xl"
             )}
+            id={listboxId}
+            role="listbox"
           >
             <div className={cn("overflow-y-auto scrollbar-thin", size === "sm" ? "max-h-40 py-0.5" : "max-h-48 py-1")}>
               {options.map((option, i) => (
@@ -135,6 +168,10 @@ export function CustomSelect({
                   key={option.value}
                   type="button"
                   disabled={disabled}
+                  id={`${listboxId}-option-${i}`}
+                  role="option"
+                  aria-selected={option.value === value}
+                  tabIndex={-1}
                   className={cn(
                     "w-full text-left transition-colors duration-100 flex items-center",
                     size === "sm" ? "px-3 py-2 text-xs gap-2" : "px-4 py-2.5 text-sm gap-3",
@@ -144,6 +181,7 @@ export function CustomSelect({
                     option.value === value && "bg-primary/5 font-medium"
                   )}
                   onMouseDown={(e) => { e.preventDefault(); selectOption(option.value); }}
+                  onClick={() => selectOption(option.value)}
                   onMouseEnter={() => setActiveIndex(i)}
                 >
                   {option.value === value && (

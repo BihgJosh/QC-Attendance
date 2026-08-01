@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -6,6 +7,7 @@ from playwright.sync_api import sync_playwright
 
 
 OUTPUT = Path(r"C:\Users\firebat\.codex\visualizations\2026\07\23\019f9014-a001-7262-bfed-68eff40e102d")
+BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 TOOLS = {
     "post-report": "Submit Report",
     "timer": "Submit Timer Log",
@@ -49,7 +51,7 @@ def inspect(browser, tool: str, button_name: str, width: int, height: int):
     page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
     page.route("https://script.google.com/**", mock_backend)
     page.route("**/api/service-manager", mock_backend)
-    page.goto(f"http://localhost:3000/qc-tools/{tool}", wait_until="domcontentloaded")
+    page.goto(f"{BASE_URL}/qc-tools/{tool}", wait_until="domcontentloaded")
     page.locator(".qc-suite-nav").wait_for(state="visible")
 
     assert page.locator('link[href="/qc-suite-assets/shared.css"]').count() == 1
@@ -103,7 +105,7 @@ with sync_playwright() as p:
     index_context = browser.new_context(viewport={"width": 1280, "height": 900}, service_workers="block")
     index = index_context.new_page()
     index.route("https://script.google.com/**", mock_backend)
-    index.goto("http://localhost:3000/qc-tools", wait_until="domcontentloaded")
+    index.goto(f"{BASE_URL}/qc-tools", wait_until="domcontentloaded")
     index.locator(".qc-suite-nav").wait_for(state="visible")
     assert index.locator('a.card[href="/qc-tools/post-report"]').count() == 1
     assert index.locator('a[href^="https://"]').count() == 0

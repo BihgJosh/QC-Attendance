@@ -180,7 +180,7 @@ export function ContentManager() {
             <div className="space-y-5">
               <div className="grid gap-4 rounded-2xl border border-primary/20 bg-primary/[0.05] p-4 lg:grid-cols-[16rem_1fr] lg:items-center">
                 <div className="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl border border-border bg-background/70">
-                  {content.uniformImageUrl ? <img src={content.uniformImageUrl} alt="Uniform upload preview" className="h-full w-full object-cover" /> : <ImagePlus className="h-10 w-10 text-muted-foreground" />}
+                  {content.uniformImageUrl ? <img src={content.uniformImageUrl} alt="Uniform upload preview" loading="lazy" decoding="async" className="h-full w-full object-cover" /> : <ImagePlus className="h-10 w-10 text-muted-foreground" />}
                 </div>
                 <div>
                   <p className="font-semibold">Uniform reference picture</p>

@@ -44,17 +44,27 @@ async function callGateway<T>(
 ): Promise<T> {
   const { url, key } = gatewayConfig();
   const secret = getEnv("SUPABASE_GATEWAY_SECRET");
-  const response = await fetch(`${url}/functions/v1/qcu-attendance`, {
-    method: "POST",
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "x-qcu-operation-secret": secret,
-    },
-    body: JSON.stringify({ operation, ...payload }),
-  });
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      response = await fetch(`${url}/functions/v1/qcu-attendance`, {
+        method: "POST",
+        cache: "no-store",
+        signal: AbortSignal.timeout(attempt === 0 ? 8_000 : 12_000),
+        headers: {
+          "Content-Type": "application/json",
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          "x-qcu-operation-secret": secret,
+        },
+        body: JSON.stringify({ operation, ...payload }),
+      });
+      if (response.status < 500 || attempt === 1) break;
+    } catch (error) {
+      if (attempt === 1) throw new AttendanceStoreError("Attendance storage timed out. Please try again.", 504);
+    }
+  }
+  if (!response) throw new AttendanceStoreError("Attendance storage did not respond.", 504);
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {

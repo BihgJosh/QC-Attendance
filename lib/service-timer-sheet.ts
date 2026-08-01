@@ -86,7 +86,8 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
     log.extra.name, log.extra.status, log.extra.min, log.extra.sec,
     log.generalObservation,
   ];
-  await appendCategorizedReport({
+  const submittedAt = new Date().toISOString();
+  const [dashboardResult, primaryResult] = await Promise.allSettled([appendCategorizedReport({
     tab: "Timer Logs",
     headers: ["Record ID", ...SERVICE_TIMER_HEADERS],
     row,
@@ -95,12 +96,16 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
     category: "Timer",
     actor: log.name,
     summary: `${log.serviceStart || "Start not set"} - ${log.serviceEnd || "End not set"}`,
-  });
-  await sheets.spreadsheets.values.append({
+  }), sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
     range: `${sheet}!A:AR`,
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [[...row, new Date().toISOString()]] },
-  });
+    requestBody: { values: [[...row, submittedAt]] },
+  })]);
+  if (dashboardResult.status === "rejected") console.error("[service-timer] Dashboard write failed", dashboardResult.reason);
+  if (primaryResult.status === "rejected") console.error("[service-timer] Primary write failed", primaryResult.reason);
+  if (dashboardResult.status === "rejected" && primaryResult.status === "rejected") {
+    throw new AggregateError([dashboardResult.reason, primaryResult.reason], "Both timer report destinations failed.");
+  }
 }

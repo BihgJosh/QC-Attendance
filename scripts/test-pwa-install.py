@@ -1,10 +1,11 @@
 from pathlib import Path
+import os
 from playwright.sync_api import sync_playwright
 
 
 OUTPUT = Path("artifacts/pwa")
 OUTPUT.mkdir(parents=True, exist_ok=True)
-BASE_URL = "http://localhost:3101"
+BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:3101")
 
 
 def dispatch_install_prompt(page):

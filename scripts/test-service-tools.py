@@ -1,9 +1,11 @@
 from pathlib import Path
+import os
 
 from playwright.sync_api import sync_playwright
 
 
 OUTPUT = Path(r"C:\Users\firebat\.codex\visualizations\2026\07\23\019f9014-a001-7262-bfed-68eff40e102d")
+BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 
 
 with sync_playwright() as p:
@@ -13,7 +15,7 @@ with sync_playwright() as p:
     for label, width, height in (("desktop", 1440, 1000), ("tablet", 820, 1180), ("mobile", 390, 844)):
         page = browser.new_page(viewport={"width": width, "height": height})
         page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
-        page.goto("http://localhost:3000/service-tools", wait_until="networkidle")
+        page.goto(f"{BASE_URL}/service-tools", wait_until="networkidle")
 
         assert page.get_by_role("heading", name="One service. One clear record.").is_visible()
         assert page.get_by_role("heading", name="The right tool for every QC role.").is_visible()
@@ -32,7 +34,7 @@ with sync_playwright() as p:
         page.close()
 
     home = browser.new_page(viewport={"width": 1440, "height": 900})
-    home.goto("http://localhost:3000", wait_until="networkidle")
+    home.goto(BASE_URL, wait_until="networkidle")
     assert home.get_by_role("link", name="Service Tools", exact=True).first.get_attribute("href") == "/service-tools"
     home.close()
 

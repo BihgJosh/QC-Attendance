@@ -70,7 +70,7 @@ export function PWAInstallPrompt() {
   if (dismissed || (!installPrompt && !showIOSInstructions)) return null;
 
   return (
-    <aside aria-label="Install QC unit app" className="fixed inset-x-3 bottom-3 z-[100] mx-auto max-w-xl animate-in slide-in-from-bottom-4 fade-in duration-300 sm:bottom-5">
+    <aside aria-label="Install QC unit app" className="fixed inset-x-3 z-[100] mx-auto max-w-xl animate-in slide-in-from-bottom-4 fade-in duration-300" style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
       <div className="relative overflow-hidden rounded-[1.4rem] border border-white/15 bg-[#071225]/95 p-4 text-white shadow-[0_24px_70px_rgba(3,8,24,.45)] backdrop-blur-xl sm:p-5">
         <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-cyan-400 via-blue-500 to-fuchsia-500" />
         <div className="flex items-center gap-3 pl-1">

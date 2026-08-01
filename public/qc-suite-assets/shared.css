@@ -17,7 +17,7 @@ html {
 
 body {
   min-width: 0;
-  padding: 118px 16px 80px !important;
+  padding: calc(118px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(80px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)) !important;
   color: var(--ink) !important;
   background:
     radial-gradient(circle at 8% 8%, rgba(34, 211, 238, 0.09), transparent 28%),
@@ -29,7 +29,7 @@ body {
   position: fixed;
   inset: 0 0 auto;
   z-index: 99990;
-  padding: 14px 16px 0;
+  padding: calc(14px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
   pointer-events: none;
 }
 
@@ -397,8 +397,8 @@ table { display: block; max-width: 100%; overflow-x: auto; }
 }
 
 @media (max-width: 639px) {
-  body { padding: 98px 12px 64px !important; }
-  .qc-suite-nav { padding: 10px 10px 0; }
+  body { padding: calc(98px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) calc(64px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)) !important; }
+  .qc-suite-nav { padding: calc(10px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left)); }
   .qc-suite-nav__inner { min-height: 62px; padding: 9px 10px; border-radius: 18px; }
   .qc-suite-brand img { width: 40px; height: 40px; }
   .qc-suite-brand strong { font-size: 12px; }

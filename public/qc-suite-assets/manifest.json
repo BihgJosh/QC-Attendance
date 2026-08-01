@@ -3,7 +3,7 @@
   "short_name": "QC Unit",
   "description": "Quality Control reporting suite for Streams of Joy International — Service Post reports, Timer & Observer logs, and the Service Manager dashboard.",
   "start_url": "/qc-tools",
-  "scope": "/qc-tools/",
+  "scope": "/qc-tools",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#020C20",

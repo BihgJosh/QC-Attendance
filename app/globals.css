@@ -263,6 +263,11 @@
 
   .surface-shadow { box-shadow: var(--surface-shadow); }
   .surface-shadow-raised { box-shadow: var(--surface-shadow-raised); }
+  .safe-top-nav { padding-top: calc(0.75rem + env(safe-area-inset-top)); }
+}
+
+@media (min-width: 640px) {
+  .safe-top-nav { padding-top: calc(1.25rem + env(safe-area-inset-top)); }
 }
 
 /* ============================================

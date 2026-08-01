@@ -90,7 +90,7 @@ export default function HomePage() {
   return (
     <main className="relative z-10 min-h-screen overflow-x-hidden">
       <EmergencyAlertLoader />
-      <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
+      <header className="safe-top-nav fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
         <nav className="mx-auto flex max-w-7xl items-center justify-between gap-2 rounded-2xl border border-cyan-200/10 bg-[linear-gradient(110deg,rgba(2,12,32,0.96),rgba(26,20,69,0.95)_58%,rgba(74,20,96,0.94))] px-3 py-2.5 text-white shadow-2xl shadow-slate-950/20 backdrop-blur-xl sm:px-5" aria-label="Main navigation">
           <Link href="/" aria-label="Go to homepage" className="flex min-w-0 items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:gap-3">
             <span className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm">
@@ -325,7 +325,7 @@ export default function HomePage() {
             <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
               <div className="relative aspect-[4/3] overflow-hidden rounded-[1.5rem] border border-border/70 bg-[linear-gradient(145deg,rgba(14,165,233,0.08),rgba(126,34,206,0.12))]">
                 {content.uniformImageUrl ? (
-                  <img src={content.uniformImageUrl} alt="Current QC uniform reference" className="h-full w-full object-cover" />
+                  <img src={content.uniformImageUrl} alt="Current QC uniform reference" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
                     <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10"><Shirt className="h-8 w-8 text-accent" /></span>

@@ -545,6 +545,8 @@ export function Dashboard() {
               <div className="space-y-1.5">
                 <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Service</Label>
                 <CustomSelect
+                  id="attendance-service-filter"
+                  ariaLabel="Filter by service"
                   options={[
                     { value: "All", label: "All Services" },
                     { value: "Sunday", label: "Sunday" },

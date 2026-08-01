@@ -100,7 +100,7 @@ export async function appendServicePostReport(report: ServicePostReport) {
     sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
       range: `${sheet}!A:AD`,
-      valueInputOption: "USER_ENTERED",
+      valueInputOption: "RAW",
       insertDataOption: "INSERT_ROWS",
       requestBody: { values: [[...row, submittedAt]] },
     }),

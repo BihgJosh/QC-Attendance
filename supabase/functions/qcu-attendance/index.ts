@@ -51,7 +51,7 @@ async function rest(path: string, init: RequestInit = {}) {
   return payload;
 }
 
-const DEFAULT_MEMBER_PASSWORD = Deno.env.get("MEMBER_DEFAULT_PASSWORD") || "QCSOJA";
+const DEFAULT_MEMBER_PASSWORD = Deno.env.get("MEMBER_DEFAULT_PASSWORD") || "";
 const PROTECTED_BOOTSTRAP_EMAILS = new Set(["joshuaagusa001@gmail.com"]);
 const PASSWORD_ITERATIONS = 210_000;
 const SESSION_DAYS = 7;
@@ -212,6 +212,10 @@ Deno.serve(async (request) => {
       let credential = rows[0];
       if (!credential) {
         if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return json({ error: "This administrator account must be activated with its private temporary password." }, 401);
+        if (!DEFAULT_MEMBER_PASSWORD) {
+          console.error("MEMBER_DEFAULT_PASSWORD is required before new member credentials can be provisioned.");
+          return json({ error: "Member sign-in is temporarily unavailable." }, 503);
+        }
         if (!safeEqual(password, DEFAULT_MEMBER_PASSWORD)) return json({ error: "Invalid email or password." }, 401);
         const passwordHash = await hashPassword(DEFAULT_MEMBER_PASSWORD);
         await rest("member_credentials", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ email, password_hash: passwordHash, must_change_password: true }) });

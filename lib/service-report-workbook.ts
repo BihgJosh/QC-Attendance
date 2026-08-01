@@ -49,7 +49,7 @@ async function appendRow(title: string, headers: string[], row: unknown[]) {
   await sheets.spreadsheets.values.append({
     spreadsheetId: SERVICE_REPORT_WORKBOOK_ID,
     range: `${sheet}!A:ZZ`,
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: [row] },
   });

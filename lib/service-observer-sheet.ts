@@ -70,7 +70,8 @@ export async function appendServiceObserverReport(report: ServiceObserverReport)
     report.unitsReported.join(", "), JSON.stringify(report.unitReports),
     report.recommendations, report.conclusion,
   ];
-  await appendCategorizedReport({
+  const submittedAt = new Date().toISOString();
+  const [dashboardResult, primaryResult] = await Promise.allSettled([appendCategorizedReport({
     tab: "Observer Reports",
     headers: ["Record ID", ...SERVICE_OBSERVER_HEADERS],
     row,
@@ -79,14 +80,18 @@ export async function appendServiceObserverReport(report: ServiceObserverReport)
     category: "Observer",
     actor: report.observerName,
     summary: `${report.unitsReported.length} unit${report.unitsReported.length === 1 ? "" : "s"} observed`,
-  });
-  await sheets.spreadsheets.values.append({
+  }), sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
     range: `${sheet}!A:I`,
-    valueInputOption: "USER_ENTERED",
+    valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
     requestBody: {
-      values: [[...row, new Date().toISOString()]],
+      values: [[...row, submittedAt]],
     },
-  });
+  })]);
+  if (dashboardResult.status === "rejected") console.error("[service-observer] Dashboard write failed", dashboardResult.reason);
+  if (primaryResult.status === "rejected") console.error("[service-observer] Primary write failed", primaryResult.reason);
+  if (dashboardResult.status === "rejected" && primaryResult.status === "rejected") {
+    throw new AggregateError([dashboardResult.reason, primaryResult.reason], "Both observer report destinations failed.");
+  }
 }

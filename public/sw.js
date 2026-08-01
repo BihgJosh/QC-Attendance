@@ -1,4 +1,4 @@
-const CACHE = "qcu-unit-v5";
+const CACHE = "qcu-unit-v6";
 // Only pre-cache the root shell for offline fallback. HTML is served
 // network-first (see fetch handler), so these are just offline backups.
 const STATIC_URLS = ["/"];
@@ -33,7 +33,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   // Only handle GET; let the browser deal with the rest.
-  if (request.method !== "GET") return;
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
   // API calls — network only, no cache.
   if (url.pathname.startsWith("/api/")) {
@@ -48,10 +48,14 @@ self.addEventListener("fetch", (event) => {
     (request.headers.get("accept") || "").includes("text/html");
 
   if (isNavigation) {
+    if (url.pathname.startsWith("/admin") || url.pathname.startsWith("/member")) {
+      event.respondWith(fetch(request));
+      return;
+    }
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response.ok) {
+          if (response.ok && !response.headers.get("Cache-Control")?.includes("no-store")) {
             const copy = response.clone();
             caches.open(CACHE).then((cache) => cache.put(request, copy));
           }
@@ -63,13 +67,18 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Everything else (hashed static assets, images) — cache-first.
-  event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-      if (response.ok) {
-        const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, copy));
-      }
+  if (url.pathname.startsWith("/_next/static/")) {
+    event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
+      if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
       return response;
-    }))
-  );
+    })));
+    return;
+  }
+
+  event.respondWith(fetch(request).then((response) => {
+    if (response.ok && !response.headers.get("Cache-Control")?.includes("no-store")) {
+      caches.open(CACHE).then((cache) => cache.put(request, response.clone()));
+    }
+    return response;
+  }).catch(() => caches.match(request)));
 });

@@ -1,7 +1,8 @@
 from pathlib import Path
+import os
 from playwright.sync_api import sync_playwright
 
-ROOT = "http://localhost:3000"
+ROOT = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 OUT = Path("artifacts/member-auth")
 OUT.mkdir(parents=True, exist_ok=True)
 
@@ -43,7 +44,7 @@ with sync_playwright() as playwright:
         response = page.request.post(f"{ROOT}/api/admin/login", data={"password": admin_password})
         assert response.ok
         access_response = page.request.get(f"{ROOT}/api/admin/member-passwords")
-        assert access_response.ok
+        assert access_response.ok, f"{access_response.status}: {access_response.text()}"
         payload = access_response.json()
         assert any(member["email"] == "joshuaagusa001@gmail.com" for member in payload["members"])
         page.goto(f"{ROOT}/admin/dashboard", wait_until="networkidle")

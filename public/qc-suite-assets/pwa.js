@@ -17,7 +17,7 @@
     if (document.getElementById('qcu-install-prompt')) return;
     var style = document.createElement('style');
     style.textContent =
-      '#qcu-install-prompt{position:fixed;z-index:9999;left:12px;right:12px;bottom:12px;max-width:560px;margin:auto;display:flex;align-items:center;gap:12px;padding:16px;border:1px solid rgba(255,255,255,.15);border-radius:22px;background:rgba(7,18,37,.96);color:#fff;box-shadow:0 24px 70px rgba(3,8,24,.48);backdrop-filter:blur(18px);font-family:inherit}' +
+      '#qcu-install-prompt{position:fixed;z-index:9999;left:calc(12px + env(safe-area-inset-left));right:calc(12px + env(safe-area-inset-right));bottom:calc(12px + env(safe-area-inset-bottom));max-width:560px;margin:auto;display:flex;align-items:center;gap:12px;padding:16px;border:1px solid rgba(255,255,255,.15);border-radius:22px;background:rgba(7,18,37,.96);color:#fff;box-shadow:0 24px 70px rgba(3,8,24,.48);backdrop-filter:blur(18px);font-family:inherit}' +
       '#qcu-install-prompt:before{content:"";position:absolute;inset:0 auto 0 0;width:4px;border-radius:22px 0 0 22px;background:linear-gradient(#22d3ee,#3b82f6,#d946ef)}' +
       '#qcu-install-prompt .qcu-pwa-icon{display:grid;place-items:center;flex:0 0 44px;height:44px;border-radius:16px;background:linear-gradient(135deg,#22d3ee,#3b82f6 52%,#c026d3);font-size:20px}' +
       '#qcu-install-prompt .qcu-pwa-copy{min-width:0;flex:1}#qcu-install-prompt strong{display:block;font-size:15px;letter-spacing:-.01em}' +

@@ -1,9 +1,11 @@
 from pathlib import Path
+import os
 from playwright.sync_api import sync_playwright
 
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = Path(r"C:\Users\firebat\.codex\visualizations\2026\07\23\019f9014-a001-7262-bfed-68eff40e102d")
+BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 
 
 def admin_password() -> str:
@@ -23,7 +25,7 @@ with sync_playwright() as p:
     console_errors = []
     page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
 
-    page.goto("http://localhost:3000/admin/login", wait_until="networkidle")
+    page.goto(f"{BASE_URL}/admin/login", wait_until="networkidle")
     page.get_by_label("Admin Password").fill(admin_password())
     page.get_by_role("button", name="Access Dashboard").click()
     page.wait_for_url("**/admin/dashboard")

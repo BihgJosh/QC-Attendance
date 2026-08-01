@@ -5,6 +5,7 @@ import {
   appendServiceObserverReport,
   SERVICE_OBSERVER_UNITS,
 } from "@/lib/service-observer-sheet";
+import { isIsoCalendarDate } from "@/lib/validation";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const UNITS = new Set<string>(SERVICE_OBSERVER_UNITS);
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
 
     const date = text(body.date, 10);
     const service = text(body.service, 40);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SERVICES.has(service)) {
+    if (!isIsoCalendarDate(date) || !SERVICES.has(service)) {
       return NextResponse.json({ ok: false, message: "Complete the date and service correctly." }, { status: 400 });
     }
     const rawUnits = Array.isArray(body.unitsReported) ? body.unitsReported : [];

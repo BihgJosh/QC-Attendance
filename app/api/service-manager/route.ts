@@ -6,6 +6,7 @@ import {
   appendGeneratedDocumentLog,
   SERVICE_REPORT_WORKBOOK_URL,
 } from "@/lib/service-report-workbook";
+import { isIsoCalendarDate } from "@/lib/validation";
 
 const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycby9y-TP-NfdLurUyqW9hXg5WaHIyl-bW4kJoAOoUpW-ObemJLjmRV0RVS1kwtPJCx9iFg/exec";
 const API_URL = process.env.QC_SUITE_API_URL || DEFAULT_API_URL;
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
     if (!ACTIONS.has(action) || !token || token.length > 200) {
       return NextResponse.json({ ok: false, message: "Invalid request." }, { status: 400 });
     }
-    if (action !== "checkPassword" && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SERVICES.has(service))) {
+    if (action !== "checkPassword" && (!isIsoCalendarDate(date) || !SERVICES.has(service))) {
       return NextResponse.json({ ok: false, message: "Choose a valid date and service." }, { status: 400 });
     }
 

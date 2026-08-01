@@ -1,8 +1,9 @@
 import os
 from pathlib import Path
+import os
 from playwright.sync_api import sync_playwright
 
-ROOT = "http://localhost:3000"
+ROOT = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 password = os.environ.get("BIRTHDAY_TEST_PASSWORD", "")
 assert password, "BIRTHDAY_TEST_PASSWORD is required"
 output = Path("artifacts/birthdays")

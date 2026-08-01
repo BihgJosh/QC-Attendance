@@ -18,7 +18,10 @@ export async function POST(req: Request) {
 
   try {
     const { isOpen } = await req.json();
-    const result = await updateAttendanceStatus(Boolean(isOpen));
+    if (typeof isOpen !== "boolean") {
+      return NextResponse.json({ error: "isOpen must be true or false." }, { status: 400 });
+    }
+    const result = await updateAttendanceStatus(isOpen);
     return NextResponse.json(result);
   } catch (error) {
     console.error("Failed to update attendance status:", error);
