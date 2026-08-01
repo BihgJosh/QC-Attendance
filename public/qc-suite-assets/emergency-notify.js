@@ -33,7 +33,7 @@
       'transition:transform .2s ease,opacity .2s ease,box-shadow .2s ease}' +
       '#soj-emg-alert-container:focus-visible{outline:3px solid rgba(103,232,249,.65);outline-offset:3px}' +
       '#soj-emg-alert-container:hover{box-shadow:0 18px 40px rgba(127,29,29,.34)}' +
-      '#soj-emg-alert-container .summary{display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 12px}' +
+      '#soj-emg-alert-container .summary{display:grid;grid-template-columns:36px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 10px 10px 12px}' +
       '#soj-emg-alert-container .signal{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.16);display:grid;place-items:center;color:#fff;font-size:17px;font-weight:900}' +
       '#soj-emg-alert-container .copy{min-width:0;overflow:hidden;animation:soj-emg-ticker 12s linear infinite}' +
       '#soj-emg-alert-container .ticker{display:flex;width:max-content;align-items:center;gap:16px;animation:soj-emg-ticker 12s linear infinite}' +
@@ -41,7 +41,10 @@
       '#soj-emg-alert-container .eyebrow{margin:0;color:#fecaca;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}' +
       '#soj-emg-alert-container .headline{margin:0;font-size:13.5px;font-weight:800;white-space:nowrap}' +
       '#soj-emg-alert-container .open-hint{color:#ffedd5;font-size:10.5px;font-weight:800;white-space:nowrap}' +
-      '#soj-emg-alert-container .close-alert{width:32px;height:32px;padding:0!important;border:0!important;background:rgba(255,255,255,.14)!important;color:#fff!important;border-radius:9px!important;font-size:19px!important}' +
+      '#soj-emg-alert-container .close-alert{width:44px;height:44px;padding:0!important;display:grid;place-items:center;border:1px solid rgba(255,255,255,.24)!important;background:rgba(255,255,255,.12)!important;color:#fff!important;border-radius:12px!important;line-height:1!important;touch-action:manipulation}' +
+      '#soj-emg-alert-container .close-alert:hover{background:rgba(255,255,255,.22)!important}' +
+      '#soj-emg-alert-container .close-alert:focus-visible{outline:3px solid rgba(255,255,255,.52);outline-offset:2px}' +
+      '#soj-emg-alert-container .close-alert svg{width:20px;height:20px;pointer-events:none}' +
       '#soj-emg-alert-container .detail{display:none;border-top:1px solid rgba(255,255,255,.18);padding:12px 14px 14px 58px;background:rgba(69,10,10,.2)}' +
       '#soj-emg-alert-container.is-open .detail{display:block}' +
       '#soj-emg-alert-container .description{margin:0 0 7px;font-size:13px;line-height:1.5;color:#fff;white-space:pre-wrap}' +
@@ -71,6 +74,7 @@
     if (!container || !emergencyQueue.length) return;
     container.style.transform = 'translateX(' + (direction < 0 ? '-110%' : '110%') + ')';
     container.style.opacity = '0';
+    container.style.pointerEvents = 'none';
     window.setTimeout(function () {
       emergencyQueue.splice(currentIdx, 1);
       if (currentIdx >= emergencyQueue.length) currentIdx = 0;
@@ -145,6 +149,7 @@
     container.setAttribute('aria-expanded', 'false');
     container.style.transform = '';
     container.style.opacity = '';
+    container.style.pointerEvents = '';
     container.innerHTML =
       '<div class="summary">' +
         '<span class="signal" aria-hidden="true">!</span>' +
@@ -165,7 +170,13 @@
     closeButton.type = 'button';
     closeButton.className = 'close-alert';
     closeButton.setAttribute('aria-label', 'Dismiss emergency alert');
+    ['pointerdown', 'pointerup'].forEach(function (eventName) {
+      closeButton.addEventListener(eventName, function (event) {
+        event.stopPropagation();
+      });
+    });
     closeButton.textContent = '×';
+    closeButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     closeButton.addEventListener('click', function (event) {
       event.stopPropagation();
       removeCurrent(1);

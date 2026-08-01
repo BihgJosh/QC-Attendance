@@ -8,9 +8,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      variant === "default" && "rounded-2xl border border-border bg-card text-card-foreground shadow-lg shadow-black/[0.03]",
-      variant === "glass" && "glass-card shadow-xl shadow-black/[0.06]",
-      variant === "gradient-border" && "gradient-border shadow-xl shadow-black/[0.06]",
+      variant === "default" && "surface-shadow rounded-2xl bg-card text-card-foreground",
+      variant === "glass" && "glass-card",
+      variant === "gradient-border" && "gradient-border surface-shadow-raised",
       className
     )}
     {...props}

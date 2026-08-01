@@ -85,21 +85,37 @@ export async function appendServicePostReport(report: ServicePostReport) {
     report.ma.safetyDescribe || "", report.teens.lessonTopic || "", report.teens.teacherPreparedness || "",
     report.teens.engagement || "", report.teens.classroomMgmt || "", report.additionalComments,
   ];
-  await appendCategorizedReport({
-    tab: "Post Reports",
-    headers: ["Record ID", ...SERVICE_POST_HEADERS],
-    row,
-    date: report.date,
-    service: report.service,
-    category: "Service Post",
-    actor: `${report.name} <${report.email}>`,
-    summary: `${report.area}: ${report.adultsHeadcount + report.childrenHeadcount} worshippers, ${report.overallRating} overall`,
-  });
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${sheet}!A:AD`,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: { values: [[...row, new Date().toISOString()]] },
-  });
+  const submittedAt = new Date().toISOString();
+  const [dashboardResult, primaryResult] = await Promise.allSettled([
+    appendCategorizedReport({
+      tab: "Post Reports",
+      headers: ["Record ID", ...SERVICE_POST_HEADERS],
+      row,
+      date: report.date,
+      service: report.service,
+      category: "Service Post",
+      actor: `${report.name} <${report.email}>`,
+      summary: `${report.area}: ${report.adultsHeadcount + report.childrenHeadcount} worshippers, ${report.overallRating} overall`,
+    }),
+    sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheet}!A:AD`,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: [[...row, submittedAt]] },
+    }),
+  ]);
+
+  if (dashboardResult.status === "rejected") {
+    console.error("[service-post] Dashboard workbook write failed", dashboardResult.reason);
+  }
+  if (primaryResult.status === "rejected") {
+    console.error("[service-post] Primary workbook write failed", primaryResult.reason);
+  }
+  if (dashboardResult.status === "rejected" && primaryResult.status === "rejected") {
+    throw new AggregateError(
+      [dashboardResult.reason, primaryResult.reason],
+      "Both Service Post report destinations rejected the submission.",
+    );
+  }
 }
