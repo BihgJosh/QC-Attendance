@@ -242,14 +242,14 @@ export function ServiceManagerDashboard() {
     const data = selected.data;
     return (
       <div className="p-4 sm:p-7 lg:p-9">
-        <div className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <button type="button" onClick={() => setSelectedService(null)} className="mb-4 inline-flex items-center gap-2 rounded-full text-xs font-bold text-cyan-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"><ArrowLeft className="h-4 w-4" /> All services</button>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/45">Full detailed report · {date}</p>
-            <h3 className="mt-2 text-3xl font-black tracking-tight">{selectedService}</h3>
+            <button type="button" onClick={() => setSelectedService(null)} className="mb-4 inline-flex items-center gap-2 rounded-full text-xs font-bold text-blue-700 hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"><ArrowLeft className="h-4 w-4" /> All services</button>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">Full detailed report · {date}</p>
+            <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950">{selectedService}</h3>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <button type="button" onClick={() => { setShareOpen((open) => !open); setShareMessage(null); }} aria-expanded={shareOpen} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-cyan-200/25 bg-cyan-200/[0.07] px-5 text-sm font-black text-cyan-100 transition hover:bg-cyan-200/[0.12] sm:w-auto">
+            <button type="button" onClick={() => { setShareOpen((open) => !open); setShareMessage(null); }} aria-expanded={shareOpen} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-cyan-100 px-5 text-sm font-black text-cyan-900 transition hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 sm:w-auto">
               <Mail className="h-4 w-4" /> Share by email
             </button>
             <button type="button" onClick={() => generateReport(selectedService)} disabled={reportLoading === selectedService} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 text-sm font-black text-slate-950 disabled:opacity-60 sm:w-auto">
@@ -258,22 +258,22 @@ export function ServiceManagerDashboard() {
           </div>
         </div>
 
-        {error && <p role="alert" className="mt-5 rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">{error}</p>}
-        {shareOpen && <form onSubmit={(event) => shareReport(event, selectedService)} className="mt-5 rounded-3xl border border-cyan-200/20 bg-[linear-gradient(135deg,rgba(34,211,238,.09),rgba(217,70,239,.07))] p-4 sm:p-5">
+        {error && <p role="alert" className="mt-5 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-800 ring-1 ring-inset ring-red-200">{error}</p>}
+        {shareOpen && <form onSubmit={(event) => shareReport(event, selectedService)} className="mt-5 rounded-2xl bg-cyan-50 p-4 ring-1 ring-inset ring-cyan-200 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
             <div className="min-w-0 flex-1">
-              <label htmlFor="report-recipient" className="text-xs font-black uppercase tracking-[0.12em] text-cyan-100">Recipient email</label>
-              <input id="report-recipient" type="email" value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="name@example.com" autoComplete="email" required className="mt-2 min-h-11 w-full rounded-2xl border border-white/15 bg-slate-950/50 px-4 text-sm text-white outline-none placeholder:text-white/25 focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/20" />
+              <label htmlFor="report-recipient" className="text-xs font-black uppercase tracking-[0.12em] text-cyan-900">Recipient email</label>
+              <input id="report-recipient" type="email" value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="name@example.com" autoComplete="email" required className="mt-2 min-h-11 w-full rounded-xl border border-cyan-300 bg-white px-4 text-base text-slate-950 outline-none placeholder:text-slate-500 focus:border-cyan-700 focus:ring-2 focus:ring-cyan-200" />
             </div>
-            <fieldset className="min-w-0 flex-1"><legend className="text-xs font-black uppercase tracking-[0.12em] text-cyan-100">Email content</legend><div className="mt-2 grid grid-cols-2 gap-2">
-              <label className={`cursor-pointer rounded-2xl border p-3 transition ${shareType === "summary" ? "border-cyan-300/50 bg-cyan-300/10" : "border-white/10 bg-slate-950/25"}`}><input type="radio" name="report-type" value="summary" checked={shareType === "summary"} onChange={() => setShareType("summary")} className="sr-only" /><span className="block text-sm font-black">Summary</span><span className="mt-1 block text-[11px] text-white/45">Metrics and report coverage</span></label>
-              <label className={`cursor-pointer rounded-2xl border p-3 transition ${shareType === "full" ? "border-fuchsia-300/50 bg-fuchsia-300/10" : "border-white/10 bg-slate-950/25"}`}><input type="radio" name="report-type" value="full" checked={shareType === "full"} onChange={() => setShareType("full")} className="sr-only" /><span className="block text-sm font-black">Full report</span><span className="mt-1 block text-[11px] text-white/45">Details and document link</span></label>
+            <fieldset className="min-w-0 flex-1"><legend className="text-xs font-black uppercase tracking-[0.12em] text-cyan-900">Email content</legend><div className="mt-2 grid grid-cols-2 gap-2">
+              <label className={`cursor-pointer rounded-xl p-3 ring-1 ring-inset transition ${shareType === "summary" ? "bg-cyan-100 text-cyan-950 ring-cyan-400" : "bg-white text-slate-950 ring-slate-300"}`}><input type="radio" name="report-type" value="summary" checked={shareType === "summary"} onChange={() => setShareType("summary")} className="sr-only" /><span className="block text-sm font-black">Summary</span><span className="mt-1 block text-[11px] opacity-70">Metrics and report coverage</span></label>
+              <label className={`cursor-pointer rounded-xl p-3 ring-1 ring-inset transition ${shareType === "full" ? "bg-violet-100 text-violet-950 ring-violet-400" : "bg-white text-slate-950 ring-slate-300"}`}><input type="radio" name="report-type" value="full" checked={shareType === "full"} onChange={() => setShareType("full")} className="sr-only" /><span className="block text-sm font-black">Full report</span><span className="mt-1 block text-[11px] opacity-70">Details and document link</span></label>
             </div></fieldset>
-            <button type="submit" disabled={shareLoading || !recipient.trim()} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-sm font-black text-slate-950 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50">{shareLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{shareLoading ? "Sending" : "Send email"}</button>
+            <button type="submit" disabled={shareLoading || !recipient.trim()} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 text-sm font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">{shareLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{shareLoading ? "Sending" : "Send email"}</button>
           </div>
-          {shareMessage && <p role={shareMessage.kind === "error" ? "alert" : "status"} className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${shareMessage.kind === "success" ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-100" : "border-red-300/20 bg-red-400/10 text-red-100"}`}>{shareMessage.text}</p>}
+          {shareMessage && <p role={shareMessage.kind === "error" ? "alert" : "status"} className={`mt-4 rounded-xl px-4 py-3 text-sm font-semibold ${shareMessage.kind === "success" ? "bg-emerald-100 text-emerald-900" : "bg-red-100 text-red-900"}`}>{shareMessage.text}</p>}
         </form>}
-        {generatedLog?.service === selectedService && <div role="status" className="mt-5 flex flex-col gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-400/10 p-4 text-sm text-emerald-100 sm:flex-row sm:items-center sm:justify-between"><span>Document generated and logged under {selectedService}.</span><a href={generatedLog.workbookUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-black text-white underline decoration-emerald-300/50 underline-offset-4"><FileSpreadsheet className="h-4 w-4" /> Open service workbook</a></div>}
+        {generatedLog?.service === selectedService && <div role="status" className="mt-5 flex flex-col gap-3 rounded-xl bg-emerald-100 p-4 text-sm font-semibold text-emerald-900 sm:flex-row sm:items-center sm:justify-between"><span>Document generated and logged under {selectedService}.</span><a href={generatedLog.workbookUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-black text-emerald-950 underline decoration-emerald-600 underline-offset-4"><FileSpreadsheet className="h-4 w-4" /> Open service workbook</a></div>}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <Metric label="Worshippers" value={numberValue(data.headcount?.grandTotal)} icon={Users} />
@@ -281,20 +281,20 @@ export function ServiceManagerDashboard() {
           <Metric label="Emergency flags" value={data.emergencies?.length || 0} icon={ShieldCheck} />
         </div>
 
-        {!!data.emergencies?.length && <ReportSection title="Emergency flags" icon={AlertTriangle} danger>{data.emergencies.map((item, index) => <div key={`${item.location}-${index}`} className="rounded-2xl border border-red-300/20 bg-red-400/10 p-4"><p className="font-bold text-red-100">{item.location || "Location not provided"}</p><p className="mt-1 text-sm leading-6 text-white/70">{item.description || "No description"}</p><p className="mt-2 text-xs text-white/45">{item.reportedBy || "Unknown reporter"} · {item.submittedAt || "Time unavailable"} · {item.status || "Status unavailable"}</p></div>)}</ReportSection>}
+        {!!data.emergencies?.length && <ReportSection title="Emergency flags" icon={AlertTriangle} danger>{data.emergencies.map((item, index) => <div key={`${item.location}-${index}`} className="rounded-xl bg-red-100 p-4"><p className="font-bold text-red-950">{item.location || "Location not provided"}</p><p className="mt-1 text-sm leading-6 text-red-900">{item.description || "No description"}</p><p className="mt-2 text-xs font-medium text-red-800">{item.reportedBy || "Unknown reporter"} · {item.submittedAt || "Time unavailable"} · {item.status || "Status unavailable"}</p></div>)}</ReportSection>}
 
         <ReportSection title="Worshipper headcount" icon={Users}>
-          <div className="overflow-x-auto rounded-2xl border border-white/10"><table className="w-full min-w-[34rem] text-left text-sm"><thead className="bg-white/[0.06] text-[10px] uppercase tracking-wider text-white/45"><tr><th className="px-4 py-3">Department</th><th className="px-4 py-3">Adults</th><th className="px-4 py-3">Children</th><th className="px-4 py-3">Total</th></tr></thead><tbody>{(data.headcount?.byDepartment || []).map((row, index) => <tr key={`${row.department}-${index}`} className="border-t border-white/10 text-white/75"><td className="px-4 py-3 font-semibold">{row.department || "Unspecified"}</td><td className="px-4 py-3">{numberValue(row.adults)}</td><td className="px-4 py-3">{numberValue(row.children)}</td><td className="px-4 py-3 font-black text-cyan-200">{numberValue(row.total)}</td></tr>)}</tbody></table></div>
+          <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-slate-200"><table className="w-full min-w-[34rem] text-left text-sm"><thead className="bg-slate-100 text-[10px] uppercase tracking-wider text-slate-700"><tr><th className="px-4 py-3">Department</th><th className="px-4 py-3">Adults</th><th className="px-4 py-3">Children</th><th className="px-4 py-3">Total</th></tr></thead><tbody>{(data.headcount?.byDepartment || []).map((row, index) => <tr key={`${row.department}-${index}`} className="border-t border-slate-200 text-slate-800"><td className="px-4 py-3 font-semibold text-slate-950">{row.department || "Unspecified"}</td><td className="px-4 py-3">{numberValue(row.adults)}</td><td className="px-4 py-3">{numberValue(row.children)}</td><td className="px-4 py-3 font-black text-blue-800">{numberValue(row.total)}</td></tr>)}</tbody></table></div>
           {!data.headcount?.byDepartment?.length && <EmptyReport text="No department headcount was submitted." />}
         </ReportSection>
 
         <ReportSection title="Post ratings" icon={ClipboardList}>
-          <div className="grid gap-3 sm:grid-cols-2">{Object.entries(data.ratings || {}).map(([label, rating]) => <div key={label} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4"><span className="text-sm text-white/65">{label}</span><span className="rounded-full bg-cyan-300/10 px-3 py-1 text-xs font-black text-cyan-200">{String(rating)}</span></div>)}</div>
+          <div className="grid gap-3 sm:grid-cols-2">{Object.entries(data.ratings || {}).map(([label, rating]) => <div key={label} className="flex items-center justify-between gap-4 rounded-xl bg-slate-100 p-4"><span className="text-sm font-semibold text-slate-800">{label}</span><span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-900 ring-1 ring-inset ring-cyan-300">{String(rating)}</span></div>)}</div>
           {!Object.keys(data.ratings || {}).length && <EmptyReport text="No post ratings were submitted." />}
         </ReportSection>
 
         <ReportSection title={`Service timer${data.timer?.timerName ? ` · ${data.timer.timerName}` : ""}`} icon={Clock3}>
-          {data.timer ? <><p className="mb-4 text-sm text-white/55">{data.timer.serviceStart || "Start unavailable"} — {data.timer.serviceEnd || "End unavailable"}</p><div className="grid gap-2">{(data.timer.segments || []).map((segment, index) => <div key={`${segment.label}-${index}`} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4"><span className="text-sm font-semibold text-white/75">{segment.label || "Unnamed segment"}</span><span className={`rounded-full px-3 py-1 text-xs font-bold ${segment.status === "On Time" ? "bg-emerald-400/10 text-emerald-200" : "bg-amber-300/10 text-amber-100"}`}>{segment.status || "No data"}{segment.status && segment.status !== "On Time" && segment.status !== "No data" ? ` · ${numberValue(segment.min)}m ${numberValue(segment.sec)}s` : ""}</span></div>)}</div>{data.timer.generalObservation && <Note title="Timer observation" text={data.timer.generalObservation} />}</> : <EmptyReport text="No timer log was submitted." />}
+          {data.timer ? <><p className="mb-4 text-sm font-semibold text-slate-700">{data.timer.serviceStart || "Start unavailable"} — {data.timer.serviceEnd || "End unavailable"}</p><div className="grid gap-2">{(data.timer.segments || []).map((segment, index) => <div key={`${segment.label}-${index}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-100 p-4"><span className="text-sm font-semibold text-slate-900">{segment.label || "Unnamed segment"}</span><span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset ${segment.status === "On Time" ? "bg-emerald-100 text-emerald-900 ring-emerald-300" : "bg-amber-100 text-amber-950 ring-amber-300"}`}>{segment.status || "No data"}{segment.status && segment.status !== "On Time" && segment.status !== "No data" ? ` · ${numberValue(segment.min)}m ${numberValue(segment.sec)}s` : ""}</span></div>)}</div>{data.timer.generalObservation && <Note title="Timer observation" text={data.timer.generalObservation} />}</> : <EmptyReport text="No timer log was submitted." />}
         </ReportSection>
 
         <ReportSection title={`Observer report${data.observer?.observerName ? ` · ${data.observer.observerName}` : ""}`} icon={Eye}>
@@ -357,13 +357,13 @@ function MiniMetric({ label, value }: { label: string; value: number | string })
 }
 
 function ReportSection({ title, icon: Icon, danger = false, children }: { title: string; icon: typeof Users; danger?: boolean; children: React.ReactNode }) {
-  return <section className={`mt-7 rounded-3xl border p-4 sm:p-6 ${danger ? "border-red-300/20 bg-red-950/10" : "border-white/10 bg-white/[0.04]"}`}><h4 className={`mb-5 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] ${danger ? "text-red-200" : "text-cyan-200"}`}><Icon className="h-4 w-4" />{title}</h4>{children}</section>;
+  return <section className={`mt-7 rounded-2xl p-4 sm:p-6 ${danger ? "bg-red-50 ring-1 ring-inset ring-red-200" : "bg-white shadow-[0_10px_30px_rgba(15,23,42,0.08)]"}`}><h4 className={`mb-5 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] ${danger ? "text-red-900" : "text-cyan-800"}`}><Icon className="h-4 w-4" />{title}</h4>{children}</section>;
 }
 
 function Note({ title, text }: { title: string; text: string }) {
-  return <div className="rounded-2xl border border-white/10 bg-slate-950/25 p-4"><p className="text-xs font-black text-white/80">{title}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/60">{text}</p></div>;
+  return <div className="rounded-xl bg-slate-100 p-4"><p className="text-xs font-black text-slate-950">{title}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{text}</p></div>;
 }
 
 function EmptyReport({ text }: { text: string }) {
-  return <p className="flex items-center gap-2 rounded-2xl border border-dashed border-white/10 p-4 text-sm text-white/40"><CheckCircle2 className="h-4 w-4" />{text}</p>;
+  return <p className="flex items-center gap-2 rounded-xl bg-slate-100 p-4 text-sm font-medium text-slate-700"><CheckCircle2 className="h-4 w-4 text-slate-500" />{text}</p>;
 }
