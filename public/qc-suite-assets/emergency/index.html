@@ -107,18 +107,16 @@
     try {
       const res = await fetch(EMERGENCY_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reportedBy, location, description }) });
       const result = await res.json();
-      msg.className = 'msg ' + (result.ok ? 'ok' : 'err');
-      msg.textContent = result.message;
-      msg.style.display = 'block';
       if (result.ok) {
         document.getElementById('reportedBy').value = '';
         document.getElementById('location').value = '';
         document.getElementById('description').value = '';
+        QCSubmissionResult.show({ status: 'success', title: 'Emergency flag sent', message: result.message || 'The emergency flag was delivered successfully.' });
+      } else {
+        QCSubmissionResult.show({ status: 'error', title: 'Emergency flag not sent', message: result.message || 'The server could not send this emergency flag. Alert someone nearby and retry.', onRetry: submit });
       }
     } catch (err) {
-      msg.className = 'msg err';
-      msg.textContent = 'Could not reach the server. If this is urgent, alert someone in person right away.';
-      msg.style.display = 'block';
+      QCSubmissionResult.show({ status: 'error', title: 'Connection interrupted', message: 'Could not reach the server. If this is urgent, alert someone in person right away, then retry.', onRetry: submit });
     }
     btn.disabled = false; btn.textContent = '🚨 Send Emergency Flag';
   }

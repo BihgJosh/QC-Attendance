@@ -310,14 +310,13 @@
     try {
       const res = await fetch(REPORT_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await res.json();
-      msg.className = 'msg ' + (result.ok ? 'ok' : 'err');
-      msg.textContent = result.message;
-      msg.style.display = 'block';
-      if (result.ok) setTimeout(() => location.reload(), 1800);
+      if (result.ok) {
+        QCSubmissionResult.show({ status: 'success', title: 'Post report submitted', message: result.message || 'Your service post report has been saved successfully.' });
+      } else {
+        QCSubmissionResult.show({ status: 'error', title: 'Post report not saved', message: result.message || 'The server could not save this report. Please retry.', onRetry: submit });
+      }
     } catch (err) {
-      msg.className = 'msg err';
-      msg.textContent = 'Could not reach the server. Check your connection and try again.';
-      msg.style.display = 'block';
+      QCSubmissionResult.show({ status: 'error', title: 'Connection interrupted', message: 'Could not reach the server. Check your connection and try again.', onRetry: submit });
     }
     btn.disabled = false; btn.textContent = 'Submit Report';
   }

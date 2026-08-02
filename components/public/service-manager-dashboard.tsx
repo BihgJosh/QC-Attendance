@@ -308,14 +308,14 @@ export function ServiceManagerDashboard() {
     <div className="p-4 sm:p-7 lg:p-9">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200"><Sparkles className="h-4 w-4" /> Daily command view</p>
-          <h3 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">All services at a glance.</h3>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/55">Compare attendance, incidents and report coverage before opening any individual service.</p>
+          <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-700"><Sparkles className="h-4 w-4" /> Daily command view</p>
+          <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">All services at a glance.</h3>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Compare attendance, incidents and report coverage before opening any individual service.</p>
         </div>
-        <label className="min-w-48 text-xs font-bold text-white/65"><span className="mb-2 flex items-center gap-2"><CalendarDays className="h-4 w-4 text-cyan-200" /> Report date</span><input type="date" value={date} onChange={(event) => { setDate(event.target.value); if (event.target.value) void loadAllServices(token, event.target.value); }} className="min-h-11 w-full rounded-xl border border-white/15 bg-slate-950/45 px-3 text-sm text-white outline-none focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/20" /></label>
+        <label className="min-w-48 text-xs font-bold text-slate-700"><span className="mb-2 flex items-center gap-2"><CalendarDays className="h-4 w-4 text-cyan-700" /> Report date</span><input type="date" value={date} onChange={(event) => { setDate(event.target.value); if (event.target.value) void loadAllServices(token, event.target.value); }} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-200" /></label>
       </div>
 
-      {error && <p role="alert" className="mt-5 rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm text-red-100">{error}</p>}
+      {error && <p role="alert" className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">{error}</p>}
 
       <div className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Total worshippers" value={summary.worshippers} icon={Users} prominent />
@@ -324,21 +324,21 @@ export function ServiceManagerDashboard() {
         <Metric label="Reports loaded" value={`${summary.loaded}/${SERVICES.length}`} icon={FileText} />
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2 text-xs text-white/55"><span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">Timer logs {summary.timerLogs}/{SERVICES.length}</span><span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">Observer logs {summary.observerLogs}/{SERVICES.length}</span></div>
+      <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-full bg-cyan-50 px-3 py-1.5 text-cyan-900 ring-1 ring-inset ring-cyan-200">Timer logs {summary.timerLogs}/{SERVICES.length}</span><span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-900 ring-1 ring-inset ring-violet-200">Observer logs {summary.observerLogs}/{SERVICES.length}</span></div>
 
-      {loading ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-cyan-300" /><span className="ml-3 text-sm text-white/55">Compiling every service…</span></div> : (
+      {loading ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-cyan-700" /><span className="ml-3 text-sm font-semibold text-slate-600">Compiling every service…</span></div> : (
         <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {SERVICES.map((service) => {
             const result = results.find((item) => item.service === service);
             const data = result?.data;
             const coverage = [data?.headcount?.byDepartment?.length, data?.timer, data?.observer].filter(Boolean).length;
-            return <article key={service} className="flex min-h-72 flex-col rounded-3xl border border-white/10 bg-white/[0.05] p-5 shadow-xl shadow-slate-950/10">
-              <div className="flex items-center justify-between gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-300/10 text-cyan-200"><ClipboardList className="h-5 w-5" /></span><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${data ? "bg-emerald-400/10 text-emerald-200" : "bg-white/[0.06] text-white/40"}`}>{data ? "Available" : "No data"}</span></div>
-              <h4 className="mt-5 text-lg font-black tracking-tight">{service}</h4>
-              <p className="mt-1 text-xs text-white/40">{date}</p>
+            return <article key={service} className="flex min-h-72 flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.12)]">
+              <div className="flex items-center justify-between gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-800"><ClipboardList className="h-5 w-5" /></span><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${data ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-slate-100 text-slate-700 ring-slate-300"}`}>{data ? "Available" : "No data"}</span></div>
+              <h4 className="mt-5 text-lg font-black tracking-tight text-slate-950">{service}</h4>
+              <p className="mt-1 text-xs font-semibold text-slate-600">{date}</p>
               <div className="mt-5 grid grid-cols-2 gap-2"><MiniMetric label="Worshippers" value={numberValue(data?.headcount?.grandTotal)} /><MiniMetric label="Incidents" value={numberValue(data?.incidentCount)} /><MiniMetric label="Emergency" value={data?.emergencies?.length || 0} /><MiniMetric label="Coverage" value={`${coverage}/3`} /></div>
-              <button type="button" disabled={!data} onClick={() => setSelectedService(service)} className="mt-auto flex min-h-11 items-center justify-between rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.07] px-4 text-sm font-black text-cyan-100 transition hover:bg-cyan-300/[0.12] disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-white/25">View report <ChevronRight className="h-4 w-4" /></button>
-              {!data && result?.message && <p className="mt-2 text-[10px] leading-4 text-white/35">{result.message}</p>}
+              <button type="button" disabled={!data} onClick={() => setSelectedService(service)} className="mt-auto flex min-h-11 items-center justify-between rounded-xl bg-blue-700 px-4 text-sm font-black text-white shadow-[0_6px_16px_rgba(29,78,216,0.24)] transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-white disabled:text-slate-600 disabled:ring-1 disabled:ring-inset disabled:ring-slate-300 disabled:shadow-none">View report <ChevronRight className="h-4 w-4" /></button>
+              {!data && result?.message && <p className="mt-2 text-[10px] font-medium leading-4 text-slate-600">{result.message}</p>}
             </article>;
           })}
         </div>
@@ -348,11 +348,12 @@ export function ServiceManagerDashboard() {
 }
 
 function Metric({ label, value, icon: Icon, prominent = false }: { label: string; value: number | string; icon: typeof Users; prominent?: boolean }) {
-  return <div className={`rounded-2xl border p-4 sm:p-5 ${prominent ? "border-cyan-300/25 bg-gradient-to-br from-cyan-300/15 to-fuchsia-400/10" : "border-white/10 bg-white/[0.05]"}`}><div className="flex items-center justify-between gap-3"><p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">{label}</p><Icon className="h-4 w-4 text-cyan-200" /></div><p className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">{value}</p></div>;
+  return <div className={`rounded-2xl p-4 sm:p-5 ${prominent ? "bg-cyan-100 text-cyan-950" : "bg-slate-100 text-slate-950"}`}><div className="flex items-center justify-between gap-3"><p className="text-[10px] font-bold uppercase tracking-[0.14em] opacity-80">{label}</p><Icon className={`h-4 w-4 ${prominent ? "text-cyan-800" : "text-blue-700"}`} /></div><p className="mt-3 text-2xl font-black tracking-tight sm:text-3xl">{value}</p></div>;
 }
 
 function MiniMetric({ label, value }: { label: string; value: number | string }) {
-  return <div className="rounded-xl bg-slate-950/30 p-3"><p className="text-lg font-black text-white">{value}</p><p className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-white/35">{label}</p></div>;
+  const tone = label === "Worshippers" ? "bg-cyan-100 text-cyan-950" : label === "Incidents" ? "bg-amber-100 text-amber-950" : label === "Emergency" ? "bg-rose-100 text-rose-950" : "bg-violet-100 text-violet-950";
+  return <div className={`rounded-xl p-3 ${tone}`}><p className="text-lg font-black">{value}</p><p className="mt-0.5 text-[9px] font-black uppercase tracking-wider opacity-80">{label}</p></div>;
 }
 
 function ReportSection({ title, icon: Icon, danger = false, children }: { title: string; icon: typeof Users; danger?: boolean; children: React.ReactNode }) {
