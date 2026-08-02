@@ -219,16 +219,16 @@ export function ServiceManagerDashboard() {
   if (!token) {
     return (
       <div className="relative overflow-hidden p-5 sm:p-8 lg:p-10">
-        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-fuchsia-400/10 blur-3xl" />
+        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-fuchsia-200/35 blur-3xl" />
         <div className="relative mx-auto max-w-lg py-4 sm:py-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-200/20 bg-cyan-300/10 text-cyan-200 shadow-xl shadow-cyan-950/20"><LockKeyhole className="h-6 w-6" /></div>
-          <p className="mt-5 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-200">Leadership access</p>
-          <h3 className="mt-2 text-center text-3xl font-bold tracking-tight">Service Manager</h3>
-          <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-white/60">Unlock the daily command view to compare every Sunday and Thursday service at a glance.</p>
-          <form onSubmit={unlock} className="mt-8 rounded-3xl border border-white/10 bg-white/[0.05] p-4 sm:p-6">
-            <label htmlFor="manager-password" className="text-xs font-bold text-white/75">Manager password</label>
-            <input id="manager-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" className="mt-2 min-h-12 w-full rounded-2xl border border-white/15 bg-slate-950/45 px-4 text-base text-white outline-none placeholder:text-white/25 focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/20" placeholder="Enter password" />
-            {error && <p role="alert" className="mt-3 text-sm text-red-200">{error}</p>}
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-lg shadow-cyan-900/10"><LockKeyhole className="h-6 w-6" /></div>
+          <p className="mt-5 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-700">Leadership access</p>
+          <h3 className="mt-2 text-center text-3xl font-bold tracking-tight text-slate-950">Service Manager</h3>
+          <p className="mx-auto mt-3 max-w-md text-center text-sm leading-6 text-slate-600">Unlock the daily command view to compare every Sunday and Thursday service at a glance.</p>
+          <form onSubmit={unlock} className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-6">
+            <label htmlFor="manager-password" className="text-xs font-bold text-slate-700">Manager password</label>
+            <input id="manager-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" className="mt-2 min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 text-base text-slate-950 outline-none placeholder:text-slate-400 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200" placeholder="Enter password" />
+            {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
             <button type="submit" disabled={unlocking || !password.trim()} className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 text-sm font-black text-slate-950 shadow-lg transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50">
               {unlocking ? <><Loader2 className="h-4 w-4 animate-spin" /> Checking access</> : <>Open service summary <ChevronRight className="h-4 w-4" /></>}
             </button>

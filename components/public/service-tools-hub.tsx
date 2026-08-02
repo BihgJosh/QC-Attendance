@@ -126,11 +126,11 @@ const tools = [
 type ToolId = (typeof tools)[number]["id"];
 
 const toneClasses = {
-  cyan: "border-cyan-300/20 bg-cyan-300/10 text-cyan-200",
-  purple: "border-fuchsia-300/20 bg-fuchsia-300/10 text-fuchsia-200",
-  blue: "border-blue-300/20 bg-blue-300/10 text-blue-200",
-  red: "border-red-300/25 bg-red-400/10 text-red-200",
-  slate: "border-white/15 bg-white/[0.07] text-slate-200",
+  cyan: "border-cyan-200 bg-cyan-50 text-cyan-700",
+  purple: "border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700",
+  blue: "border-blue-200 bg-blue-50 text-blue-700",
+  red: "border-red-200 bg-red-50 text-red-700",
+  slate: "border-slate-200 bg-slate-100 text-slate-700",
 };
 
 export function ServiceToolsHub() {
@@ -228,19 +228,19 @@ export function ServiceToolsHub() {
       </section>
 
       <section id="workflow" className="scroll-mt-24 px-4 pb-16 sm:px-6 sm:pb-24 lg:px-8">
-        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-[linear-gradient(135deg,#020c20,#111b44_55%,#38134e)] text-white shadow-2xl">
-          <div className="border-b border-white/10 px-5 py-6 sm:px-8">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Workflow guide</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Know what each submission captures.</h2>
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white text-slate-950 shadow-[0_24px_70px_-32px_rgba(15,23,42,0.28)]">
+          <div className="border-b border-slate-200 bg-[linear-gradient(120deg,#f8fbff_0%,#eefcff_52%,#faf5ff_100%)] px-5 py-6 sm:px-8">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">Workflow guide</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Know what each submission captures.</h2>
           </div>
           <div className="grid min-w-0 lg:grid-cols-[18rem_minmax(0,1fr)]">
-            <div className="flex min-w-0 gap-2 overflow-x-auto border-b border-white/10 p-3 lg:block lg:border-b-0 lg:border-r lg:p-4">
+            <div className="flex min-w-0 gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50/80 p-3 lg:block lg:border-b-0 lg:border-r lg:p-4">
               {tools.map((tool) => {
                 const Icon = tool.icon;
                 const active = tool.id === activeId;
                 return (
-                  <button key={tool.id} type="button" onClick={() => setActiveId(tool.id)} className={`flex min-h-12 min-w-max items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition lg:mb-1 lg:w-full ${active ? "bg-white text-slate-950" : "text-white/60 hover:bg-white/[0.07] hover:text-white"}`} aria-pressed={active}>
-                    <Icon className={`h-4 w-4 ${active ? "text-primary" : ""}`} />{tool.shortTitle}<ChevronRight className="ml-auto hidden h-4 w-4 lg:block" />
+                  <button key={tool.id} type="button" onClick={() => setActiveId(tool.id)} className={`flex min-h-12 min-w-max items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 lg:mb-1 lg:w-full ${active ? "bg-cyan-600 text-white shadow-md shadow-cyan-900/10" : "text-cyan-950/65 hover:bg-white hover:text-cyan-950"}`} aria-pressed={active}>
+                    <Icon className={`h-4 w-4 ${active ? "text-white" : "text-slate-400"}`} />{tool.shortTitle}<ChevronRight className="ml-auto hidden h-4 w-4 lg:block" />
                   </button>
                 );
               })}
@@ -249,16 +249,16 @@ export function ServiceToolsHub() {
               <div className="flex flex-wrap items-start justify-between gap-5">
                 <div>
                   <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl border ${toneClasses[activeTool.tone]}`}><ActiveIcon className="h-5 w-5" /></div>
-                  <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-200">{activeTool.eyebrow}</p>
-                  <h3 className="mt-2 text-3xl font-bold tracking-tight">{activeTool.title}</h3>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-white/55">{activeTool.description}</p>
+                  <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-700">{activeTool.eyebrow}</p>
+                  <h3 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{activeTool.title}</h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{activeTool.description}</p>
                 </div>
               </div>
               <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                {activeTool.details.map((detail) => <div key={detail} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-sm leading-6 text-white/75"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />{detail}</div>)}
+                {activeTool.details.map((detail) => <div key={detail} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600" />{detail}</div>)}
               </div>
-              <div className="mt-7 flex flex-col gap-4 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.06] p-5 sm:flex-row sm:items-center sm:justify-between">
-                <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">Result</p><p className="mt-1 max-w-2xl text-sm leading-6 text-white/65">{activeTool.outcome}</p></div>
+              <div className="mt-7 flex flex-col gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/80 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-800">Result</p><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-700">{activeTool.outcome}</p></div>
                 <Button asChild variant="gradient" className="min-h-11 shrink-0 rounded-full px-5"><a href={activeTool.href}>Open {activeTool.shortTitle.toLowerCase()} <ArrowRight className="ml-2 h-4 w-4" /></a></Button>
               </div>
             </motion.div>}
