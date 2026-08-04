@@ -23,12 +23,14 @@
     "react-dom": "^18.3.1",
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/web-push": "3.6.4",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.23",
     "supabase": "2.111.0",

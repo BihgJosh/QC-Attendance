@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronUp, ImagePlus, Loader2, Megaphone, Plus, Save, Shirt, Table2, Trash2, Upload, Users } from "lucide-react";
+import { BellRing, ChevronDown, ChevronUp, ImagePlus, Loader2, Megaphone, Plus, Save, Shirt, Table2, Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +34,7 @@ export function ContentManager() {
   const [content, setContent] = useState<HomepageContent>(DEFAULT_HOMEPAGE_CONTENT);
   const [loading, setLoading] = useState(true);
   const [savingSection, setSavingSection] = useState<"announcements" | "postings" | "uniform" | null>(null);
+  const [notifyingSection, setNotifyingSection] = useState<"announcements" | "postings" | "uniform" | null>(null);
   const [openPanel, setOpenPanel] = useState<"announcements" | "postings" | "uniform">("announcements");
   const [postingDay, setPostingDay] = useState<ServiceDay>("Sunday");
   const [uploadingUniformImage, setUploadingUniformImage] = useState(false);
@@ -63,8 +64,10 @@ export function ContentManager() {
       if (!response.ok) throw new Error(data.error || "Publishing failed");
       setContent(data.content);
       toast.success(`${section === "uniform" ? "Uniform" : section[0].toUpperCase() + section.slice(1)} saved to the homepage.`);
+      return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "This section could not be saved.");
+      return false;
     } finally {
       setSavingSection(null);
     }
@@ -75,6 +78,26 @@ export function ContentManager() {
     { id: "postings" as const, label: "Postings", icon: Users, count: content.postings.filter((posting) => posting.day === postingDay).length },
     { id: "uniform" as const, label: "Uniform", icon: Shirt, count: content.uniformItems.length },
   ];
+
+  const notifySection = async (section: "announcements" | "postings" | "uniform") => {
+    setNotifyingSection(section);
+    try {
+      if (!(await saveSection(section))) return;
+      const response = await fetch("/api/admin/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section, day: postingDay }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Notification failed");
+      toast.success(`Team notified on ${data.delivered} device${data.delivered === 1 ? "" : "s"}.`);
+      if (data.failed > 0) toast.warning(`${data.failed} device notification${data.failed === 1 ? "" : "s"} could not be delivered.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The team could not be notified.");
+    } finally {
+      setNotifyingSection(null);
+    }
+  };
 
   const uploadImage = async (file: File) => {
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return toast.error("Use a JPG, PNG or WebP image.");
@@ -149,7 +172,7 @@ export function ContentManager() {
               ))}
               <div className="flex flex-col-reverse justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
                 <Button type="button" variant="outline" onClick={() => setContent({ ...content, announcements: [...content.announcements, { id: newId("announcement"), date: "New notice", title: "Announcement title", copy: "Add the announcement details here.", accent: "primary" }] })}><Plus className="mr-2 h-4 w-4" /> Add announcement</Button>
-                <SaveSectionButton label="Save announcements" saving={savingSection === "announcements"} disabled={savingSection !== null} onClick={() => saveSection("announcements")} />
+                <SectionActions section="announcements" saveLabel="Save announcements" saving={savingSection === "announcements"} notifying={notifyingSection === "announcements"} disabled={savingSection !== null || notifyingSection !== null} onSave={() => saveSection("announcements")} onNotify={() => notifySection("announcements")} />
               </div>
             </div>
           )}
@@ -171,7 +194,7 @@ export function ContentManager() {
               ))}
               <div className="flex flex-col-reverse justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
                 <Button type="button" variant="outline" onClick={() => setContent({ ...content, postings: [...content.postings, createNewPosting(postingDay)] })}><Plus className="mr-2 h-4 w-4" /> Add {postingDay} section</Button>
-                <SaveSectionButton label={`Save ${postingDay} postings`} saving={savingSection === "postings"} disabled={savingSection !== null} onClick={() => saveSection("postings")} />
+                <SectionActions section="postings" saveLabel={`Save ${postingDay} postings`} saving={savingSection === "postings"} notifying={notifyingSection === "postings"} disabled={savingSection !== null || notifyingSection !== null} onSave={() => saveSection("postings")} onNotify={() => notifySection("postings")} />
               </div>
             </div>
           )}
@@ -204,7 +227,7 @@ export function ContentManager() {
               <Button type="button" variant="outline" onClick={() => setContent({ ...content, uniformItems: [...content.uniformItems, "New uniform item"] })}><Plus className="mr-2 h-4 w-4" /> Add uniform item</Button>
               <Field label="Additional uniform note"><Input value={content.uniformNote} maxLength={300} onChange={(event) => setContent({ ...content, uniformNote: event.target.value })} /></Field>
               <div className="flex justify-end border-t border-border/60 pt-4">
-                <SaveSectionButton label="Save uniform" saving={savingSection === "uniform"} disabled={savingSection !== null} onClick={() => saveSection("uniform")} />
+                <SectionActions section="uniform" saveLabel="Save uniform" saving={savingSection === "uniform"} notifying={notifyingSection === "uniform"} disabled={savingSection !== null || notifyingSection !== null} onSave={() => saveSection("uniform")} onNotify={() => notifySection("uniform")} />
               </div>
             </div>
           )}
@@ -352,4 +375,14 @@ function SaveSectionButton({ label, saving, disabled, onClick }: { label: string
       {saving ? "Saving…" : label}
     </Button>
   );
+}
+
+function SectionActions({ section, saveLabel, saving, notifying, disabled, onSave, onNotify }: { section: string; saveLabel: string; saving: boolean; notifying: boolean; disabled: boolean; onSave: () => void; onNotify: () => void }) {
+  return <div className="flex flex-col gap-2 sm:flex-row">
+    <SaveSectionButton label={saveLabel} saving={saving} disabled={disabled} onClick={onSave} />
+    <Button type="button" variant="outline" className="min-w-36 border-cyan-600/40 text-cyan-800 hover:bg-cyan-50 dark:text-cyan-200 dark:hover:bg-cyan-950/40" disabled={disabled} onClick={onNotify} aria-label={`Notify team about saved ${section}`}>
+      {notifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BellRing className="mr-2 h-4 w-4" />}
+      {notifying ? "Notifying…" : "Notify Team"}
+    </Button>
+  </div>;
 }

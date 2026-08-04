@@ -4,6 +4,7 @@ const allowedOperations = new Set([
   "attendance.device-check", "attendance.insert", "attendance.list", "migration.import",
   "member.authenticate", "member.session", "member.change-password", "member.logout",
   "member.list", "member.reset", "admin.list", "admin.add", "admin.remove",
+  "push.subscribe", "push.unsubscribe", "push.list", "push.deactivate",
 ]);
 
 type Json = Record<string, unknown>;
@@ -312,6 +313,58 @@ Deno.serve(async (request) => {
       await rest(`admin_access?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       return json({ success: true });
+    }
+    if (operation === "push.subscribe") {
+      const endpoint = String(body.endpoint || "").trim();
+      const p256dh = String(body.p256dh || "").trim();
+      const auth = String(body.auth || "").trim();
+      const memberEmail = normalizeEmail(body.memberEmail) || null;
+      const userAgent = String(body.userAgent || "Unknown").trim().slice(0, 500) || "Unknown";
+      if (!endpoint.startsWith("https://") || endpoint.length > 4096 || p256dh.length < 20 || p256dh.length > 512 || auth.length < 8 || auth.length > 256) {
+        return json({ error: "Invalid push subscription." }, 400);
+      }
+      if (!memberEmail) return json({ error: "A member email is required." }, 400);
+      const existing = await rest(`push_subscriptions?select=member_email&endpoint=eq.${encodeURIComponent(endpoint)}&limit=1`) as Json[];
+      if (existing[0] && normalizeEmail(existing[0].member_email) !== memberEmail) return json({ error: "This device is already linked to another member. Sign out on that account first." }, 409);
+      if (!existing[0]) {
+        const owned = await rest(`push_subscriptions?select=id&member_email=eq.${encodeURIComponent(memberEmail)}&is_active=eq.true&limit=4`) as Json[];
+        if (owned.length >= 3) return json({ error: "This account already has notifications enabled on three devices." }, 409);
+      }
+      const now = new Date().toISOString();
+      await rest("push_subscriptions?on_conflict=endpoint", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ endpoint, p256dh, auth, member_email: memberEmail, user_agent: userAgent, is_active: true, updated_at: now, last_seen_at: now }),
+      });
+      return json({ success: true });
+    }
+    if (operation === "push.unsubscribe") {
+      const endpoint = String(body.endpoint || "").trim();
+      const memberEmail = normalizeEmail(body.memberEmail);
+      if (!endpoint.startsWith("https://") || endpoint.length > 4096) return json({ error: "Invalid push subscription." }, 400);
+      if (!memberEmail) return json({ error: "A member email is required." }, 400);
+      await rest(`push_subscriptions?endpoint=eq.${encodeURIComponent(endpoint)}&member_email=eq.${encodeURIComponent(memberEmail)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      return json({ success: true });
+    }
+    if (operation === "push.list") {
+      const rows: Json[] = [];
+      for (let offset = 0; ; offset += 1000) {
+        const page = await rest(`push_subscriptions?select=endpoint,p256dh,auth&is_active=eq.true&order=id.asc&offset=${offset}&limit=1000`) as Json[];
+        rows.push(...page);
+        if (page.length < 1000) break;
+      }
+      return json({ subscriptions: rows.map((row) => ({ endpoint: String(row.endpoint), p256dh: String(row.p256dh), auth: String(row.auth) })) });
+    }
+    if (operation === "push.deactivate") {
+      const endpoints = Array.isArray(body.endpoints) ? body.endpoints.map((value) => String(value || "").trim()).filter((value) => value.startsWith("https://") && value.length <= 4096).slice(0, 1000) : [];
+      for (const endpoint of endpoints) {
+        await rest(`push_subscriptions?endpoint=eq.${encodeURIComponent(endpoint)}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ is_active: false, updated_at: new Date().toISOString() }),
+        });
+      }
+      return json({ success: true, deactivated: endpoints.length });
     }
     return json({ error: "Unknown operation." }, 400);
   } catch (error) {

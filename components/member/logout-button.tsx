@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 export function MemberLogoutButton({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   async function logout() {
+    if ("serviceWorker" in navigator) {
+      const subscription = await navigator.serviceWorker.ready.then((registration) => registration.pushManager.getSubscription()).catch(() => null);
+      if (subscription) {
+        await fetch("/api/notifications/subscription", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: subscription.endpoint }) }).catch(() => undefined);
+        await subscription.unsubscribe().catch(() => false);
+      }
+    }
     await fetch("/api/member/logout", { method: "POST" });
     router.replace("/member/login"); router.refresh();
   }

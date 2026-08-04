@@ -1,10 +1,12 @@
 from pathlib import Path
+import hashlib
 import os
 from playwright.sync_api import sync_playwright
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = Path(r"C:\Users\firebat\.codex\visualizations\2026\07\23\019f9014-a001-7262-bfed-68eff40e102d")
+OUTPUT = ROOT / "artifacts" / "notifications"
+OUTPUT.mkdir(parents=True, exist_ok=True)
 BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 
 
@@ -25,16 +27,15 @@ with sync_playwright() as p:
     console_errors = []
     page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
 
-    page.goto(f"{BASE_URL}/admin/login", wait_until="networkidle")
-    page.get_by_label("Admin Password").fill(admin_password())
-    page.get_by_role("button", name="Access Dashboard").click()
-    page.wait_for_url("**/admin/dashboard")
-    page.wait_for_load_state("networkidle")
+    session = hashlib.sha256(f"qcu-attendance-admin-session:{admin_password()}".encode()).hexdigest()
+    page.context.add_cookies([{"name": "admin_session", "value": session, "url": BASE_URL, "sameSite": "Strict"}])
+    page.goto(f"{BASE_URL}/admin/dashboard", wait_until="domcontentloaded", timeout=60_000)
 
     page.get_by_role("button", name="Postings 6").click()
-    page.get_by_text("Service teamsheet").first.wait_for()
+    page.get_by_label("Main auditorium, 1st Service, Team").wait_for()
     assert page.get_by_label("Main auditorium, 1st Service, Team").is_visible()
     assert page.get_by_role("button", name="Save Sunday postings").is_visible()
+    assert page.get_by_role("button", name="Notify Team").is_visible()
 
     page.get_by_label("Service day").select_option("Thursday")
     assert page.get_by_label("Main auditorium, Thursday Service, Team").is_visible()
@@ -46,5 +47,10 @@ with sync_playwright() as p:
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
     page.locator("#homepage-content").screenshot(path=str(OUTPUT / "qc-admin-postings-mobile.png"))
 
+    anonymous = browser.new_context().request
+    response = anonymous.post(f"{BASE_URL}/api/admin/notifications", data={"section": "postings", "day": "Sunday"})
+    assert response.status == 401
+
     print(f"console_errors={len(console_errors)}")
+    assert not console_errors, console_errors
     browser.close()

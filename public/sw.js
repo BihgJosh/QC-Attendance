@@ -1,4 +1,4 @@
-const CACHE = "qcu-unit-v6";
+const CACHE = "qcu-unit-v7";
 // Only pre-cache the root shell for offline fallback. HTML is served
 // network-first (see fetch handler), so these are just offline backups.
 const STATIC_URLS = ["/"];
@@ -81,4 +81,30 @@ self.addEventListener("fetch", (event) => {
     }
     return response;
   }).catch(() => caches.match(request)));
+});
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
+  const title = data.title || "QC Unit update";
+  event.waitUntil(self.registration.showNotification(title, {
+    body: data.body || "A new team update is available.",
+    icon: data.icon || "/icons/icon-192.png",
+    badge: data.badge || "/icons/icon-192.png",
+    tag: data.tag || "qc-team-update",
+    renotify: true,
+    data: { url: data.url || "/" },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const requestedTarget = new URL(event.notification.data?.url || "/", self.location.origin);
+  const target = requestedTarget.origin === self.location.origin ? requestedTarget.href : new URL("/", self.location.origin).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const existing = windows.find((client) => new URL(client.url).origin === self.location.origin);
+    if (existing) { await existing.navigate(target); return existing.focus(); }
+    return self.clients.openWindow(target);
+  })());
 });

@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { PWARegister } from "@/components/pwa-register";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
+import { NotificationPrompt } from "@/components/notification-prompt";
 
 export const metadata: Metadata = {
   title: "Quality Control Unit | Streams of Joy International",
@@ -43,6 +44,7 @@ export default function RootLayout({
           <Toaster richColors position="top-right" />
           <PWARegister />
           <PWAInstallPrompt />
+          <NotificationPrompt />
         </ThemeProvider>
       </body>
     </html>
