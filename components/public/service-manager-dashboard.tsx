@@ -62,6 +62,7 @@ async function managerRequest(body: Record<string, string>) {
     logRecordId?: string;
     emailLogId?: string;
     includedServices?: string[];
+    skippedServices?: string[];
   };
   return { ...result, data: normalizeDashboardData(result.data) || undefined };
 }

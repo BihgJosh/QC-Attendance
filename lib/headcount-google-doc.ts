@@ -36,7 +36,7 @@ function normalize(value: unknown) {
 }
 
 export function organizeHeadcount(rows: HeadcountRow[]) {
-  const source = rows.map((row, index) => ({ index, department: String(row.department || "Unspecified"), normalized: normalize(row.department), adults: numberValue(row.adults), children: numberValue(row.children) }));
+  const source = rows.flatMap((row, index) => row && typeof row === "object" ? [{ index, department: String(row.department || "Unspecified"), normalized: normalize(row.department), adults: numberValue(row.adults), children: numberValue(row.children) }] : []);
   const used = new Set<number>();
   const sections = SECTION_RULES.map((section) => ({ title: section.title, rows: section.rows.map((rule): DisplayRow => {
     const matched = source.filter((item) => !used.has(item.index) && rule.matches.some((match) => match === "media" ? item.normalized === "media" : item.normalized.includes(match)));
@@ -52,17 +52,19 @@ export function organizeHeadcount(rows: HeadcountRow[]) {
 function serviceText(input: HeadcountService) {
   const organized = organizeHeadcount(Array.isArray(input.headcount.byDepartment) ? input.headcount.byDepartment : []);
   const reported = numberValue(input.headcount.grandTotal);
+  const displayedGrandTotal = organized.grandTotal || reported;
   const sections = organized.sections.map((section) => `${section.title}\n${section.rows.map((row) => `${row.label}\nAdult = ${row.adults}  |  Children = ${row.children}`).join("\n\n")}`).join("\n\n");
-  const warning = reported > 0 && reported !== organized.grandTotal ? `\nReconciliation notice: submitted area rows total ${organized.grandTotal}, while the service report records ${reported}. Please verify the source entries.` : "";
-  return `${input.service.toUpperCase()}\n\n${sections}\n\nSubtotal — Adult: ${organized.totals.adults}  |  Children: ${organized.totals.children}\nGrand Total = ${organized.grandTotal}${warning}`;
+  const warning = organized.grandTotal > 0 && reported > 0 && reported !== organized.grandTotal ? `\nReconciliation notice: submitted area rows total ${organized.grandTotal}, while the service report records ${reported}. Please verify the source entries.` : "";
+  const splitNote = organized.grandTotal === 0 && reported > 0 ? "\nAdult/children breakdown was not submitted for this service." : "";
+  return `${input.service.toUpperCase()}\n\n${sections}\n\nSubtotal — Adult: ${organized.totals.adults}  |  Children: ${organized.totals.children}\nGrand Total = ${displayedGrandTotal}${splitNote}${warning}`;
 }
 
 function documentText(date: string, services: HeadcountService[]) {
   const combined = services.reduce((sum, service) => {
-    const totals = organizeHeadcount(Array.isArray(service.headcount.byDepartment) ? service.headcount.byDepartment : []).totals;
-    return { adults: sum.adults + totals.adults, children: sum.children + totals.children };
-  }, { adults: 0, children: 0 });
-  const summary = services.length > 1 ? `ALL SERVICES COMBINED\nAdults: ${combined.adults}  |  Children: ${combined.children}\nGrand Total = ${combined.adults + combined.children}\n\n` : "";
+    const organized = organizeHeadcount(Array.isArray(service.headcount.byDepartment) ? service.headcount.byDepartment : []);
+    return { adults: sum.adults + organized.totals.adults, children: sum.children + organized.totals.children, grand: sum.grand + (organized.grandTotal || numberValue(service.headcount.grandTotal)) };
+  }, { adults: 0, children: 0, grand: 0 });
+  const summary = services.length > 1 ? `ALL SERVICES COMBINED\nAdults: ${combined.adults}  |  Children: ${combined.children}\nGrand Total = ${combined.grand}\n\n` : "";
   return `QC SERVICE HEADCOUNT\nService date: ${date}  ·  Updated: ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n${summary}${services.map(serviceText).join("\n\n────────────────────────────────────────\n\n")}\n`;
 }
 
@@ -78,14 +80,21 @@ async function performUpdate(date: string, services: HeadcountService[]) {
   if (!services.length) throw new Error("No headcount data is available for this selection.");
   const documentId = process.env.HEADCOUNT_GOOGLE_DOC_ID || DEFAULT_DOCUMENT_ID;
   const docs = docsClient();
-  const current = await docs.documents.get({ documentId });
-  const endIndex = current.data.body?.content?.at(-1)?.endIndex || 1;
   const content = documentText(date, services);
-  const requests: Array<Record<string, unknown>> = [];
-  if (endIndex > 2) requests.push({ deleteContentRange: { range: { startIndex: 1, endIndex: endIndex - 1 } } });
-  requests.push({ insertText: { location: { index: 1 }, text: content } });
-  requests.push({ updateTextStyle: { range: { startIndex: 1, endIndex: content.length + 1 }, textStyle: { weightedFontFamily: { fontFamily: "Arial" }, fontSize: { magnitude: 10, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0.09, green: 0.13, blue: 0.2 } } } }, fields: "weightedFontFamily,fontSize,foregroundColor" } });
-  await docs.documents.batchUpdate({ documentId, requestBody: { requests } });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const current = await docs.documents.get({ documentId });
+    const endIndex = current.data.body?.content?.at(-1)?.endIndex || 1;
+    const requests: Array<Record<string, unknown>> = [];
+    if (endIndex > 2) requests.push({ deleteContentRange: { range: { startIndex: 1, endIndex: endIndex - 1 } } });
+    requests.push({ insertText: { location: { index: 1 }, text: content } });
+    requests.push({ updateTextStyle: { range: { startIndex: 1, endIndex: content.length + 1 }, textStyle: { weightedFontFamily: { fontFamily: "Arial" }, fontSize: { magnitude: 10, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0.09, green: 0.13, blue: 0.2 } } } }, fields: "weightedFontFamily,fontSize,foregroundColor" } });
+    try {
+      await docs.documents.batchUpdate({ documentId, requestBody: { requests } }, { timeout: 15_000 });
+      break;
+    } catch (error) {
+      if (attempt === 1) throw error;
+    }
+  }
   return { id: documentId, url: documentId === DEFAULT_DOCUMENT_ID ? DEFAULT_DOCUMENT_URL : `https://docs.google.com/document/d/${documentId}/edit` };
 }
 

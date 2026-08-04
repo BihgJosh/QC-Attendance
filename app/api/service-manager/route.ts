@@ -149,12 +149,15 @@ export async function POST(request: Request) {
 
     if (action === "generateHeadcount") {
       const requestedServices = isAllServicesHeadcount ? Array.from(SERVICES) : [service];
-      const dashboards = await Promise.all(requestedServices.map(async (serviceName) => ({
-        service: serviceName,
-        result: await callSuite("getDashboard", token, date, serviceName),
-      })));
+      const dashboards = await Promise.all(requestedServices.map(async (serviceName) => {
+        try {
+          return { service: serviceName, result: await callSuite("getDashboard", token, date, serviceName) };
+        } catch {
+          return { service: serviceName, result: null };
+        }
+      }));
       const available: HeadcountService[] = dashboards.flatMap(({ service: serviceName, result }) => {
-        if (!result.ok || !result.data) return [];
+        if (!result?.ok || !result.data) return [];
         const rawHeadcount = result.data.headcount;
         const headcount = rawHeadcount && typeof rawHeadcount === "object" ? rawHeadcount as HeadcountService["headcount"] : {};
         const rows = Array.isArray(headcount.byDepartment) ? headcount.byDepartment : [];
@@ -185,6 +188,7 @@ export async function POST(request: Request) {
         ok: true,
         url: document.url,
         includedServices: available.map((item) => item.service),
+        skippedServices: requestedServices.filter((serviceName) => !available.some((item) => item.service === serviceName)),
         message: `Shared headcount document updated for ${available.length} service${available.length === 1 ? "" : "s"}.`,
       }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }
