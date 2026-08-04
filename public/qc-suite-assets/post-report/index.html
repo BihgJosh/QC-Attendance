@@ -91,6 +91,19 @@
   }
   .pill.active { background: var(--grad); border-color: transparent; color: #fff; }
 
+  .observation-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .observation-choice {
+    min-height: 58px; padding: 10px 12px; border: 1.5px solid #E4E1F5; border-radius: 14px;
+    background: #fff; color: #3A3F55; font: 700 13px/1.35 inherit; cursor: pointer; text-align: center;
+  }
+  .observation-choice[aria-pressed="true"] { border-color: var(--purple); background: #F3EEFF; color: #6424B8; box-shadow: 0 0 0 3px rgba(155,79,247,.12); }
+  .observation-ratings { display: grid; gap: 12px; margin-top: 16px; }
+  .observation-rating { padding: 14px; border-radius: 14px; background: #FAF9FF; border: 1px solid #E4E1F5; }
+  .observation-rating label { margin-top: 0; }
+  .overall-rating { margin-top: 16px; padding: 13px 15px; border-radius: 14px; background: #F0EDFF; color: #3F4B72; font-size: 13px; line-height: 1.5; }
+  .overall-rating strong { color: #7C3AED; }
+  @media (min-width: 560px) { .observation-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); } .observation-ratings { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
   .unit-card { border: 1.5px dashed var(--purple); background: rgba(155,79,247,0.06); border-radius: 16px; padding: 16px; margin-top: 16px; }
   .unit-title { font-weight: 800; color: var(--purple); font-size: 13.5px; margin-bottom: 8px; }
 
@@ -146,6 +159,12 @@
 
   let ctx = null;
   const vals = { ma: { safetyFlag: 'No' }, teens: {}, incidentFlag: 'No' };
+  const observations = [
+    ['preparedness', 'Prepared before service?'], ['neatness', 'Neatness & Appearance'],
+    ['orderliness', 'Orderliness'], ['conduct', "Workers' Conduct"],
+    ['compliance', 'Compliance'], ['coordination', 'Coordination']
+  ];
+  const observationRatings = ['Excellent', 'Very Good', 'Good', 'Poor'];
 
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -179,14 +198,13 @@
       <label>Children Headcount <span style="font-weight:400;color:var(--muted);">(incl. kids with parents outside children's classes)</span></label>
       <input type="number" min="0" id="childrenHeadcount" value="0">
 
-      <div class="section-label">Observation</div>
-      <label>Area properly prepared before service? *</label>${pillGroup('preparedness', ctx.ratings, '')}
-      <label>Neatness and Appearance *</label>${pillGroup('neatness', ctx.ratings, '')}
-      <label>Orderliness During Service *</label>${pillGroup('orderliness', ctx.ratings, '')}
-      <label>Workers' Conduct and Professionalism *</label>${pillGroup('conduct', ctx.ratings, '')}
-      <label>Compliance with Church Guidelines *</label>${pillGroup('compliance', ctx.ratings, '')}
-      <label>Overall Coordination *</label>${pillGroup('coordination', ctx.ratings, '')}
-      <label>Overall Rating *</label>${pillGroup('overallRating', ctx.overallRatings, '')}
+      <div class="section-label">Observation <span style="font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted);">Optional</span></div>
+      <label id="observationPrompt">Which aspects would you like to rate?</label>
+      <div class="observation-picker" role="group" aria-labelledby="observationPrompt">
+        ${observations.map(([field, label]) => `<button type="button" class="observation-choice" data-observation="${field}" aria-pressed="false">${esc(label)}</button>`).join('')}
+      </div>
+      <div class="observation-ratings" id="observationRatings"></div>
+      <div class="overall-rating" id="overallRating">Select any observations you want to include. You can submit without rating an observation.</div>
 
       <div class="section-label">Comments</div>
       <label>What went well?</label><textarea id="whatWentWell"></textarea>
@@ -202,13 +220,46 @@
       <label>Additional Comments</label><textarea id="additionalComments"></textarea>
       <div class="checkbox-row"><input type="checkbox" id="confirmAccurate"><label for="confirmAccurate" style="margin:0;font-weight:500;">I confirm this report is accurate to the best of my knowledge. *</label></div>
 
-      <div class="msg" id="msg"></div>
+      <div class="msg" id="msg" role="alert" aria-live="assertive"></div>
       <button class="submit" id="submitBtn">Submit Report</button>
     `;
 
     bindPills();
+    bindObservations();
     document.getElementById('area').addEventListener('change', onAreaChange);
     document.getElementById('submitBtn').addEventListener('click', submit);
+  }
+
+  function bindObservations() {
+    document.querySelectorAll('.observation-choice').forEach(button => {
+      button.addEventListener('click', () => {
+        const field = button.dataset.observation;
+        const selected = button.getAttribute('aria-pressed') !== 'true';
+        button.setAttribute('aria-pressed', String(selected));
+        if (!selected) delete vals[field];
+        renderObservationRatings();
+      });
+    });
+  }
+
+  function renderObservationRatings() {
+    const selected = observations.filter(([field]) => document.querySelector(`[data-observation="${field}"]`)?.getAttribute('aria-pressed') === 'true');
+    const container = document.getElementById('observationRatings');
+    container.innerHTML = selected.map(([field, label]) => `<div class="observation-rating"><label for="rating-${field}">${esc(label)}</label><select id="rating-${field}" data-rating-field="${field}"><option value="">Select rating</option>${observationRatings.map(rating => `<option value="${esc(rating)}"${vals[field] === rating ? ' selected' : ''}>${esc(rating)}</option>`).join('')}</select></div>`).join('');
+    container.querySelectorAll('[data-rating-field]').forEach(select => select.addEventListener('change', () => { vals[select.dataset.ratingField] = select.value; select.removeAttribute('aria-invalid'); updateOverallRating(); }));
+    updateOverallRating();
+  }
+
+  function updateOverallRating() {
+    const selectedFields = observations.filter(([field]) => document.querySelector(`[data-observation="${field}"]`)?.getAttribute('aria-pressed') === 'true').map(([field]) => field);
+    const completed = selectedFields.map(field => vals[field]).filter(Boolean);
+    const target = document.getElementById('overallRating');
+    if (!selectedFields.length) { vals.overallRating = ''; target.innerHTML = 'Select any observations you want to include. You can submit without rating an observation.'; return; }
+    if (completed.length !== selectedFields.length) { vals.overallRating = ''; target.innerHTML = `Choose a rating for each selected observation (${completed.length}/${selectedFields.length} completed).`; return; }
+    const scores = { 'Excellent': 4, 'Very Good': 3, 'Good': 2, 'Poor': 1 };
+    const average = completed.reduce((sum, rating) => sum + scores[rating], 0) / completed.length;
+    vals.overallRating = average >= 3.5 ? 'Excellent' : average >= 2.5 ? 'Very Good' : average >= 1.5 ? 'Good' : 'Poor';
+    target.innerHTML = `Overall rating (auto-calculated): <strong>${vals.overallRating}</strong> from ${completed.length}/${selectedFields.length} rated.`;
   }
 
   function bindPills() {
@@ -276,8 +327,15 @@
     if (!document.getElementById('service').value) { fail('Please select a service.'); return; }
     if (!document.getElementById('name').value.trim()) { fail('Please enter your full name.'); return; }
     if (!document.getElementById('area').value) { fail('Please select an observation area.'); return; }
-    const requiredRatings = ['preparedness', 'neatness', 'orderliness', 'conduct', 'compliance', 'coordination', 'overallRating'];
-    if (requiredRatings.some(field => !vals[field])) { fail('Please complete every required observation rating.'); return; }
+    const selectedObservationFields = observations.filter(([field]) => document.querySelector(`[data-observation="${field}"]`)?.getAttribute('aria-pressed') === 'true').map(([field]) => field);
+    const missingObservationField = selectedObservationFields.find(field => !vals[field]);
+    if (missingObservationField) {
+      const missingSelect = document.getElementById(`rating-${missingObservationField}`);
+      missingSelect?.setAttribute('aria-invalid', 'true');
+      fail('Choose a rating for each observation you selected, or deselect it.');
+      missingSelect?.focus();
+      return;
+    }
     if (vals.incidentFlag === 'Yes' && !document.getElementById('incidentDescribe').value.trim()) { fail('Please describe the incident requiring leadership attention.'); return; }
     const selectedArea = document.getElementById('area').value;
     if (selectedArea.startsWith('Mighty Arrows') && !document.getElementById('maTopic').value.trim()) { fail('Please enter the Mighty Arrows topic taught.'); return; }

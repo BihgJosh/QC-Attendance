@@ -95,7 +95,7 @@ export async function appendServicePostReport(report: ServicePostReport) {
       service: report.service,
       category: "Service Post",
       actor: `${report.name} <${report.email}>`,
-      summary: `${report.area}: ${report.adultsHeadcount + report.childrenHeadcount} worshippers, ${report.overallRating} overall`,
+      summary: `${report.area}: ${report.adultsHeadcount + report.childrenHeadcount} worshippers${report.overallRating ? `, ${report.overallRating} overall` : ""}`,
     }),
     sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
