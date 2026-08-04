@@ -51,6 +51,17 @@ interface AttendanceRecord {
 type SortField = "memberName" | "time" | "distance" | "date";
 type SortDir = "asc" | "desc";
 
+function attendanceDateKey(value: string) {
+  const trimmed = value.trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (iso) return trimmed;
+
+  const displayDate = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(trimmed);
+  if (!displayDate) return "";
+  const [, day, month, year] = displayDate;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
 export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
@@ -148,7 +159,7 @@ export function Dashboard() {
       if (sortField === "memberName") cmp = a.memberName.localeCompare(b.memberName);
       else if (sortField === "time") cmp = timeToMinutes(a.time) - timeToMinutes(b.time);
       else if (sortField === "distance") cmp = parseFloat(a.distance || "0") - parseFloat(b.distance || "0");
-      else if (sortField === "date") cmp = a.date.localeCompare(b.date);
+      else if (sortField === "date") cmp = attendanceDateKey(a.date).localeCompare(attendanceDateKey(b.date));
       return sortDir === "asc" ? cmp : -cmp;
     });
   };
@@ -204,11 +215,15 @@ export function Dashboard() {
   const filterByDate = (list: AttendanceRecord[]) => {
     if (!dateFrom && !dateTo) return list;
     return list.filter((r) => {
-      if (dateFrom && r.date < dateFrom) return false;
-      if (dateTo && r.date > dateTo) return false;
+      const recordDate = attendanceDateKey(r.date);
+      if (!recordDate) return false;
+      if (dateFrom && recordDate < dateFrom) return false;
+      if (dateTo && recordDate > dateTo) return false;
       return true;
     });
   };
+
+  const invalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
   /* ---------- Data processing ---------- */
   let approved = records.filter((r) => r.status === "Approved");
@@ -220,8 +235,8 @@ export function Dashboard() {
     rejected = rejected.filter((r) => r.service === serviceFilter);
   }
 
-  approved = filterByDate(approved);
-  rejected = filterByDate(rejected);
+  approved = invalidDateRange ? [] : filterByDate(approved);
+  rejected = invalidDateRange ? [] : filterByDate(rejected);
 
   const approvalRate = (approved.length + rejected.length) > 0
     ? Math.round((approved.length / (approved.length + rejected.length)) * 100)
@@ -545,7 +560,7 @@ export function Dashboard() {
             <div className="flex flex-wrap items-end gap-4">
               {/* Service filter */}
               <div className="space-y-1.5">
-                <Label className="text-[10px] uppercase tracking-wide text-muted-foreground">Service</Label>
+                <Label htmlFor="attendance-service-filter" className="text-[10px] uppercase tracking-wide text-muted-foreground">Service</Label>
                 <CustomSelect
                   id="attendance-service-filter"
                   ariaLabel="Filter by service"
@@ -567,6 +582,8 @@ export function Dashboard() {
                   id="dateFrom"
                   type="date"
                   value={dateFrom}
+                  max={dateTo || undefined}
+                  aria-invalid={invalidDateRange}
                   onChange={(e) => { setDateFrom(e.target.value); setPageApproved(1); setPageRejected(1); }}
                   className="h-9 text-xs w-40"
                 />
@@ -577,6 +594,8 @@ export function Dashboard() {
                   id="dateTo"
                   type="date"
                   value={dateTo}
+                  min={dateFrom || undefined}
+                  aria-invalid={invalidDateRange}
                   onChange={(e) => { setDateTo(e.target.value); setPageApproved(1); setPageRejected(1); }}
                   className="h-9 text-xs w-40"
                 />
@@ -586,12 +605,17 @@ export function Dashboard() {
                   variant="ghost"
                   size="sm"
                   className="h-9 text-xs"
-                  onClick={() => { setServiceFilter("All"); setDateFrom(""); setDateTo(""); }}
+                  onClick={() => { setServiceFilter("All"); setDateFrom(""); setDateTo(""); setPageApproved(1); setPageRejected(1); }}
                 >
                   Clear filters
                 </Button>
               )}
             </div>
+            {invalidDateRange && (
+              <p className="mt-3 text-xs font-medium text-destructive" role="alert">
+                The From date must be on or before the To date.
+              </p>
+            )}
           </CardContent>
         </Card>
 
