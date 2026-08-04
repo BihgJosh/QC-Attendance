@@ -53,7 +53,7 @@ async function managerRequest(body: Record<string, string>) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return response.json() as Promise<{
+  const result = await response.json() as {
     ok: boolean;
     message?: string;
     data?: DashboardData;
@@ -62,12 +62,57 @@ async function managerRequest(body: Record<string, string>) {
     logRecordId?: string;
     emailLogId?: string;
     includedServices?: string[];
-  }>;
+  };
+  return { ...result, data: normalizeDashboardData(result.data) || undefined };
 }
 
 function numberValue(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function recordValue(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function textValue(value: unknown) {
+  return typeof value === "string" || typeof value === "number" ? String(value) : undefined;
+}
+
+function normalizeDashboardData(value: unknown): DashboardData | null {
+  const source = recordValue(value);
+  if (!source) return null;
+  const headcount = recordValue(source.headcount);
+  const timer = recordValue(source.timer);
+  const observer = recordValue(source.observer);
+  const ratings = recordValue(source.ratings);
+  const unitReports = recordValue(observer?.unitReports);
+  return {
+    headcount: headcount ? {
+      grandTotal: numberValue(headcount.grandTotal),
+      byDepartment: Array.isArray(headcount.byDepartment) ? headcount.byDepartment.flatMap((item) => {
+        const row = recordValue(item);
+        return row ? [{ department: textValue(row.department), adults: numberValue(row.adults), children: numberValue(row.children), total: numberValue(row.total) }] : [];
+      }) : [],
+    } : undefined,
+    incidentCount: numberValue(source.incidentCount),
+    emergencies: Array.isArray(source.emergencies) ? source.emergencies.flatMap((item) => {
+      const emergency = recordValue(item);
+      return emergency ? [{ location: textValue(emergency.location), description: textValue(emergency.description), reportedBy: textValue(emergency.reportedBy), submittedAt: textValue(emergency.submittedAt), status: textValue(emergency.status) }] : [];
+    }) : [],
+    ratings: ratings ? Object.fromEntries(Object.entries(ratings).map(([key, rating]) => [key, typeof rating === "number" ? rating : textValue(rating) || "Not provided"])) : {},
+    timer: timer ? {
+      timerName: textValue(timer.timerName), serviceStart: textValue(timer.serviceStart), serviceEnd: textValue(timer.serviceEnd), generalObservation: textValue(timer.generalObservation),
+      segments: Array.isArray(timer.segments) ? timer.segments.flatMap((item) => {
+        const segment = recordValue(item);
+        return segment ? [{ label: textValue(segment.label), status: textValue(segment.status), min: numberValue(segment.min), sec: numberValue(segment.sec) }] : [];
+      }) : [],
+    } : null,
+    observer: observer ? {
+      observerName: textValue(observer.observerName), generalObservations: textValue(observer.generalObservations), recommendations: textValue(observer.recommendations), conclusion: textValue(observer.conclusion),
+      unitReports: unitReports ? Object.fromEntries(Object.entries(unitReports).map(([key, text]) => [key, textValue(text) || "Not provided"])) : {},
+    } : null,
+  };
 }
 
 export function ServiceManagerDashboard() {
