@@ -23,6 +23,7 @@ GEOFENCE_RADIUS=100
 GOOGLE_SHEET_ID=your_google_spreadsheet_id_here
 GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account-email@your-project.iam.gserviceaccount.com
 GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY_HERE\n-----END PRIVATE KEY-----\n"
+HEADCOUNT_GOOGLE_DOC_ID=1_RWF0qv-cF0MoLz53OxaxHmeVt1ODbEsYtyMwzxTLE0
 BREVO_API_KEY=your_brevo_api_key
 BREVO_SENDER_EMAIL=verified-sender@yourdomain.com
 BREVO_SENDER_NAME=QC Unit
@@ -74,13 +75,17 @@ The `Device ID` column is used to prevent the same device from signing in twice 
 ## Google Cloud Credentials
 
 1. Go to Google Cloud Console.
-2. Enable the Google Sheets API.
+2. Enable the Google Sheets API and Google Docs API.
 3. Create a Service Account.
 4. Create a JSON key for the Service Account.
 5. Use the JSON `client_email` as `GOOGLE_SERVICE_ACCOUNT_EMAIL`.
 6. Use the JSON `private_key` as `GOOGLE_PRIVATE_KEY`.
 7. Share the Google Sheet with the Service Account email and give it Editor access.
 8. Copy the spreadsheet ID into `GOOGLE_SHEET_ID`.
+9. Share the configured headcount Google Doc with the Service Account email and give it Editor access.
+10. Set `HEADCOUNT_GOOGLE_DOC_ID` to the document ID. The default is the QC headcount document shown above.
+
+Generating a headcount updates this shared document in place. The latest individual-service or all-services generation replaces its previous contents.
 
 ## Deploy on Vercel
 
@@ -97,6 +102,7 @@ GEOFENCE_RADIUS=
 GOOGLE_SHEET_ID=
 GOOGLE_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_PRIVATE_KEY=
+HEADCOUNT_GOOGLE_DOC_ID=1_RWF0qv-cF0MoLz53OxaxHmeVt1ODbEsYtyMwzxTLE0
 BREVO_API_KEY=
 BREVO_SENDER_EMAIL=
 BREVO_SENDER_NAME=QC Unit

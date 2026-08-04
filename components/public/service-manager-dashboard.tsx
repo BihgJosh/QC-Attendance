@@ -61,6 +61,7 @@ async function managerRequest(body: Record<string, string>) {
     workbookUrl?: string;
     logRecordId?: string;
     emailLogId?: string;
+    includedServices?: string[];
   }>;
 }
 
@@ -79,6 +80,8 @@ export function ServiceManagerDashboard() {
   const [results, setResults] = useState<ServiceResult[]>([]);
   const [selectedService, setSelectedService] = useState<ServiceName | null>(null);
   const [reportLoading, setReportLoading] = useState<ServiceName | null>(null);
+  const [headcountLoading, setHeadcountLoading] = useState<ServiceName | "All services" | null>(null);
+  const [headcountDocument, setHeadcountDocument] = useState<{ scope: string; url: string; services: string[] } | null>(null);
   const [generatedLog, setGeneratedLog] = useState<{ service: ServiceName; workbookUrl: string; recordId: string } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [recipient, setRecipient] = useState("");
@@ -183,6 +186,36 @@ export function ServiceManagerDashboard() {
     }
   };
 
+  const generateHeadcount = async (scope: ServiceName | "All services") => {
+    const documentWindow = window.open("about:blank", "_blank");
+    if (documentWindow) documentWindow.opener = null;
+    setHeadcountLoading(scope);
+    setError("");
+    setHeadcountDocument(null);
+    try {
+      const result = await managerRequest({ action: "generateHeadcount", token, date, service: scope });
+      if (!result.ok || !result.url) {
+        documentWindow?.close();
+        setError(result.message || "The headcount document could not be generated.");
+        return;
+      }
+      const documentUrl = new URL(result.url);
+      if (documentUrl.protocol !== "https:" || documentUrl.hostname !== "docs.google.com") throw new Error("Unsafe document URL");
+      setHeadcountDocument({
+        scope,
+        url: documentUrl.toString(),
+        services: result.includedServices || [],
+      });
+      if (documentWindow) documentWindow.location.href = documentUrl.toString();
+      else setError("The headcount is ready, but the browser blocked the new tab. Use the document link below.");
+    } catch {
+      documentWindow?.close();
+      setError("The headcount document could not be generated. Check the available service reports and try again.");
+    } finally {
+      setHeadcountLoading(null);
+    }
+  };
+
   const shareReport = async (event: React.FormEvent, service: ServiceName) => {
     event.preventDefault();
     const normalizedRecipient = recipient.trim().toLowerCase();
@@ -252,6 +285,9 @@ export function ServiceManagerDashboard() {
             <button type="button" onClick={() => { setShareOpen((open) => !open); setShareMessage(null); }} aria-expanded={shareOpen} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-cyan-100 px-5 text-sm font-black text-cyan-900 transition hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 sm:w-auto">
               <Mail className="h-4 w-4" /> Share by email
             </button>
+            <button type="button" onClick={() => generateHeadcount(selectedService)} disabled={headcountLoading !== null} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-violet-100 px-5 text-sm font-black text-violet-950 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
+              {headcountLoading === selectedService ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />} Generate headcount
+            </button>
             <button type="button" onClick={() => generateReport(selectedService)} disabled={reportLoading === selectedService} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 text-sm font-black text-slate-950 disabled:opacity-60 sm:w-auto">
               {reportLoading === selectedService ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Generate document
             </button>
@@ -259,6 +295,7 @@ export function ServiceManagerDashboard() {
         </div>
 
         {error && <p role="alert" className="mt-5 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-800 ring-1 ring-inset ring-red-200">{error}</p>}
+        {headcountDocument?.scope === selectedService && <HeadcountDocumentNotice document={headcountDocument} />}
         {shareOpen && <form onSubmit={(event) => shareReport(event, selectedService)} className="mt-5 rounded-2xl bg-cyan-50 p-4 ring-1 ring-inset ring-cyan-200 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
             <div className="min-w-0 flex-1">
@@ -312,10 +349,16 @@ export function ServiceManagerDashboard() {
           <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">All services at a glance.</h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Compare attendance, incidents and report coverage before opening any individual service.</p>
         </div>
-        <label className="min-w-48 text-xs font-bold text-slate-700"><span className="mb-2 flex items-center gap-2"><CalendarDays className="h-4 w-4 text-cyan-700" /> Report date</span><input type="date" value={date} onChange={(event) => { setDate(event.target.value); if (event.target.value) void loadAllServices(token, event.target.value); }} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-200" /></label>
+        <div className="flex w-full flex-col gap-3 sm:w-auto">
+          <label className="min-w-48 text-xs font-bold text-slate-700"><span className="mb-2 flex items-center gap-2"><CalendarDays className="h-4 w-4 text-cyan-700" /> Report date</span><input type="date" value={date} onChange={(event) => { setDate(event.target.value); setHeadcountDocument(null); if (event.target.value) void loadAllServices(token, event.target.value); }} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-200" /></label>
+          <button type="button" onClick={() => generateHeadcount("All services")} disabled={headcountLoading !== null || summary.loaded === 0} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 text-sm font-black text-white transition hover:bg-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600">
+            {headcountLoading === "All services" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Generate all headcounts
+          </button>
+        </div>
       </div>
 
       {error && <p role="alert" className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">{error}</p>}
+      {headcountDocument?.scope === "All services" && <HeadcountDocumentNotice document={headcountDocument} />}
 
       <div className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Total worshippers" value={summary.worshippers} icon={Users} prominent />
@@ -337,7 +380,12 @@ export function ServiceManagerDashboard() {
               <h4 className="mt-5 text-lg font-black tracking-tight text-slate-950">{service}</h4>
               <p className="mt-1 text-xs font-semibold text-slate-600">{date}</p>
               <div className="mt-5 grid grid-cols-2 gap-2"><MiniMetric label="Worshippers" value={numberValue(data?.headcount?.grandTotal)} /><MiniMetric label="Incidents" value={numberValue(data?.incidentCount)} /><MiniMetric label="Emergency" value={data?.emergencies?.length || 0} /><MiniMetric label="Coverage" value={`${coverage}/3`} /></div>
-              <button type="button" disabled={!data} onClick={() => setSelectedService(service)} className="mt-auto flex min-h-11 items-center justify-between rounded-xl bg-blue-700 px-4 text-sm font-black text-white shadow-[0_6px_16px_rgba(29,78,216,0.24)] transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-white disabled:text-slate-600 disabled:ring-1 disabled:ring-inset disabled:ring-slate-300 disabled:shadow-none">View report <ChevronRight className="h-4 w-4" /></button>
+              <div className="mt-auto grid gap-2 pt-5">
+                <button type="button" disabled={!data || headcountLoading !== null} onClick={() => generateHeadcount(service)} className="flex min-h-10 items-center justify-center gap-2 rounded-xl bg-violet-100 px-3 text-xs font-black text-violet-950 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
+                  {headcountLoading === service ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />} Headcount doc
+                </button>
+                <button type="button" disabled={!data} onClick={() => setSelectedService(service)} className="flex min-h-11 items-center justify-between rounded-xl bg-blue-700 px-4 text-sm font-black text-white shadow-[0_6px_16px_rgba(29,78,216,0.24)] transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-white disabled:text-slate-600 disabled:ring-1 disabled:ring-inset disabled:ring-slate-300 disabled:shadow-none">View report <ChevronRight className="h-4 w-4" /></button>
+              </div>
               {!data && result?.message && <p className="mt-2 text-[10px] font-medium leading-4 text-slate-600">{result.message}</p>}
             </article>;
           })}
@@ -345,6 +393,13 @@ export function ServiceManagerDashboard() {
       )}
     </div>
   );
+}
+
+function HeadcountDocumentNotice({ document }: { document: { scope: string; url: string; services: string[] } }) {
+  return <div role="status" className="mt-5 flex flex-col gap-3 rounded-xl bg-violet-100 p-4 text-sm text-violet-950 sm:flex-row sm:items-center sm:justify-between">
+    <div><p className="font-black">Shared headcount document updated</p><p className="mt-1 text-xs font-semibold text-violet-900">{document.services.length} service{document.services.length === 1 ? "" : "s"} included. Generating another headcount will replace the current contents.</p></div>
+    <a href={document.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 font-black text-white transition hover:bg-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-700 focus-visible:ring-offset-2"><FileText className="h-4 w-4" /> Open Google Doc</a>
+  </div>;
 }
 
 function Metric({ label, value, icon: Icon, prominent = false }: { label: string; value: number | string; icon: typeof Users; prominent?: boolean }) {

@@ -7,11 +7,12 @@ import {
   SERVICE_REPORT_WORKBOOK_URL,
 } from "@/lib/service-report-workbook";
 import { isIsoCalendarDate } from "@/lib/validation";
+import { updateHeadcountGoogleDocument, type HeadcountService } from "@/lib/headcount-google-doc";
 
 const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycby9y-TP-NfdLurUyqW9hXg5WaHIyl-bW4kJoAOoUpW-ObemJLjmRV0RVS1kwtPJCx9iFg/exec";
 const API_URL = process.env.QC_SUITE_API_URL || DEFAULT_API_URL;
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
-const ACTIONS = new Set(["checkPassword", "getDashboard", "generateReport", "sendEmail"]);
+const ACTIONS = new Set(["checkPassword", "getDashboard", "generateReport", "generateHeadcount", "sendEmail"]);
 
 type SuiteResult = {
   ok?: boolean;
@@ -141,8 +142,51 @@ export async function POST(request: Request) {
     if (!ACTIONS.has(action) || !token || token.length > 200) {
       return NextResponse.json({ ok: false, message: "Invalid request." }, { status: 400 });
     }
-    if (action !== "checkPassword" && (!isIsoCalendarDate(date) || !SERVICES.has(service))) {
+    const isAllServicesHeadcount = action === "generateHeadcount" && service === "All services";
+    if (action !== "checkPassword" && (!isIsoCalendarDate(date) || (!SERVICES.has(service) && !isAllServicesHeadcount))) {
       return NextResponse.json({ ok: false, message: "Choose a valid date and service." }, { status: 400 });
+    }
+
+    if (action === "generateHeadcount") {
+      const requestedServices = isAllServicesHeadcount ? Array.from(SERVICES) : [service];
+      const dashboards = await Promise.all(requestedServices.map(async (serviceName) => ({
+        service: serviceName,
+        result: await callSuite("getDashboard", token, date, serviceName),
+      })));
+      const available: HeadcountService[] = dashboards.flatMap(({ service: serviceName, result }) => {
+        if (!result.ok || !result.data) return [];
+        const rawHeadcount = result.data.headcount;
+        const headcount = rawHeadcount && typeof rawHeadcount === "object" ? rawHeadcount as HeadcountService["headcount"] : {};
+        const rows = Array.isArray(headcount.byDepartment) ? headcount.byDepartment : [];
+        if (!rows.length && Number(headcount.grandTotal || 0) <= 0) return [];
+        return [{ service: serviceName, headcount }];
+      });
+      if (!available.length) {
+        return NextResponse.json({ ok: false, message: "No submitted headcount data is available for this selection." }, { status: 404 });
+      }
+      let document: Awaited<ReturnType<typeof updateHeadcountGoogleDocument>>;
+      try {
+        document = await updateHeadcountGoogleDocument(date, available);
+      } catch (error) {
+        console.error("[service-manager] Shared headcount document update failed", error instanceof Error ? error.message : "Unknown error");
+        return NextResponse.json({ ok: false, message: "The shared headcount Google Doc could not be updated. Confirm that the service account has Editor access and the Google Docs API is enabled." }, { status: 502 });
+      }
+      try {
+        await appendGeneratedDocumentLog({
+          date,
+          service: isAllServicesHeadcount ? "All services" : service,
+          url: document.url,
+          actor: "Service Manager · Shared headcount",
+        });
+      } catch (error) {
+        console.error("[service-manager] Shared headcount document logging failed", error instanceof Error ? error.message : "Unknown error");
+      }
+      return NextResponse.json({
+        ok: true,
+        url: document.url,
+        includedServices: available.map((item) => item.service),
+        message: `Shared headcount document updated for ${available.length} service${available.length === 1 ? "" : "s"}.`,
+      }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }
 
     if (action === "sendEmail") {
