@@ -41,6 +41,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Complete the date, service, area and headcounts correctly." }, { status: 400 });
     }
     const selectedRatings = observationFields.map((field) => text(body[field], 30)).filter(Boolean);
+    if (selectedRatings.length === 0) {
+      return NextResponse.json({ ok: false, message: "Select and rate at least one observation before submitting." }, { status: 400 });
+    }
     if (selectedRatings.some((rating) => !RATINGS.has(rating))) {
       return NextResponse.json({ ok: false, message: "Choose a valid rating for each selected observation." }, { status: 400 });
     }

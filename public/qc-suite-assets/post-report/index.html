@@ -198,13 +198,13 @@
       <label>Children Headcount <span style="font-weight:400;color:var(--muted);">(incl. kids with parents outside children's classes)</span></label>
       <input type="number" min="0" id="childrenHeadcount" value="0">
 
-      <div class="section-label">Observation <span style="font-weight:500;letter-spacing:0;text-transform:none;color:var(--muted);">Optional</span></div>
-      <label id="observationPrompt">Which aspects would you like to rate?</label>
+      <div class="section-label">Observation <span style="font-weight:700;letter-spacing:0;text-transform:none;color:var(--danger-text);">Required *</span></div>
+      <label id="observationPrompt">Which aspects would you like to rate? *</label>
       <div class="observation-picker" role="group" aria-labelledby="observationPrompt">
         ${observations.map(([field, label]) => `<button type="button" class="observation-choice" data-observation="${field}" aria-pressed="false">${esc(label)}</button>`).join('')}
       </div>
       <div class="observation-ratings" id="observationRatings"></div>
-      <div class="overall-rating" id="overallRating">Select any observations you want to include. You can submit without rating an observation.</div>
+      <div class="overall-rating" id="overallRating">Select and rate at least one observation to submit this report.</div>
 
       <div class="section-label">Comments</div>
       <label>What went well?</label><textarea id="whatWentWell"></textarea>
@@ -254,7 +254,7 @@
     const selectedFields = observations.filter(([field]) => document.querySelector(`[data-observation="${field}"]`)?.getAttribute('aria-pressed') === 'true').map(([field]) => field);
     const completed = selectedFields.map(field => vals[field]).filter(Boolean);
     const target = document.getElementById('overallRating');
-    if (!selectedFields.length) { vals.overallRating = ''; target.innerHTML = 'Select any observations you want to include. You can submit without rating an observation.'; return; }
+    if (!selectedFields.length) { vals.overallRating = ''; target.innerHTML = 'Select and rate at least one observation to submit this report.'; return; }
     if (completed.length !== selectedFields.length) { vals.overallRating = ''; target.innerHTML = `Choose a rating for each selected observation (${completed.length}/${selectedFields.length} completed).`; return; }
     const scores = { 'Excellent': 4, 'Very Good': 3, 'Good': 2, 'Poor': 1 };
     const average = completed.reduce((sum, rating) => sum + scores[rating], 0) / completed.length;
@@ -328,6 +328,11 @@
     if (!document.getElementById('name').value.trim()) { fail('Please enter your full name.'); return; }
     if (!document.getElementById('area').value) { fail('Please select an observation area.'); return; }
     const selectedObservationFields = observations.filter(([field]) => document.querySelector(`[data-observation="${field}"]`)?.getAttribute('aria-pressed') === 'true').map(([field]) => field);
+    if (!selectedObservationFields.length) {
+      fail('Select and rate at least one observation before submitting.');
+      document.querySelector('.observation-choice')?.focus();
+      return;
+    }
     const missingObservationField = selectedObservationFields.find(field => !vals[field]);
     if (missingObservationField) {
       const missingSelect = document.getElementById(`rating-${missingObservationField}`);
