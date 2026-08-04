@@ -223,6 +223,15 @@ Deno.serve(async (request) => {
       }
       const lockedUntil = credential.locked_until ? new Date(String(credential.locked_until)).getTime() : 0;
       if (lockedUntil > Date.now()) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
+      if (!PROTECTED_BOOTSTRAP_EMAILS.has(email) && Boolean(credential.must_change_password) && safeEqual(password, DEFAULT_MEMBER_PASSWORD)) {
+        const passwordHash = await hashPassword(DEFAULT_MEMBER_PASSWORD);
+        await rest(`member_credentials?email=eq.${encodeURIComponent(email)}`, {
+          method: "PATCH",
+          headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ password_hash: passwordHash, failed_attempts: 0, locked_until: null, updated_at: new Date().toISOString() }),
+        });
+        credential = { ...credential, password_hash: passwordHash, failed_attempts: 0, locked_until: null };
+      }
       const valid = await verifyPassword(password, String(credential.password_hash || ""));
       if (!valid) {
         const failures = Number(credential.failed_attempts || 0) + 1;
@@ -261,6 +270,7 @@ Deno.serve(async (request) => {
       const email = normalizeEmail(body.email);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "A valid member email is required." }, 400);
       if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return json({ error: "Privileged administrator passwords require secure recovery and cannot use the shared team password." }, 403);
+      if (!DEFAULT_MEMBER_PASSWORD) return json({ error: "Member password resets are temporarily unavailable." }, 503);
       const now = new Date().toISOString();
       await rest("member_credentials?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, password_hash: await hashPassword(DEFAULT_MEMBER_PASSWORD), must_change_password: true, failed_attempts: 0, locked_until: null, reset_at: now, updated_at: now }) });
       await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });

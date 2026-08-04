@@ -4,7 +4,7 @@ import { ChangePasswordForm } from "@/components/member/change-password-form";
 import { readMemberSession } from "@/lib/member-auth";
 
 export default async function ChangeMemberPasswordPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const session = await readMemberSession();
+  const session = await readMemberSession({ allowPasswordChange: true });
   if (!session) redirect("/member/login");
   if (!session.mustChangePassword) redirect("/");
   const requested = (await searchParams).next;

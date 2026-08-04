@@ -22,12 +22,14 @@ export async function clearMemberSession() {
   store.delete(MEMBER_SESSION_COOKIE);
 }
 
-export async function readMemberSession() {
+export async function readMemberSession(options: { allowPasswordChange?: boolean } = {}) {
   const store = await cookies();
   const token = store.get(MEMBER_SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
-    return { token, ...(await getMemberSession(token)) };
+    const session = { token, ...(await getMemberSession(token)) };
+    if (session.mustChangePassword && !options.allowPasswordChange) return null;
+    return session;
   } catch {
     return null;
   }

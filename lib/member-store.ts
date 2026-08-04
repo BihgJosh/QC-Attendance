@@ -96,8 +96,12 @@ async function callMemberGateway<T>(operation: MemberOperation, payload: Record<
   throw new MemberStoreError("Member authentication is temporarily unavailable. Please try again.", 503);
 }
 
-export function authenticateMember(email: string, password: string) {
-  return callMemberGateway<{ token: string; mustChangePassword: boolean }>("member.authenticate", { email, password });
+export async function authenticateMember(email: string, password: string) {
+  const result = await callMemberGateway<{ token?: unknown; mustChangePassword?: unknown }>("member.authenticate", { email, password });
+  if (typeof result.token !== "string" || result.token.length < 32 || result.token.length > 512 || typeof result.mustChangePassword !== "boolean") {
+    throw new MemberStoreError("Member authentication returned an invalid session.", 503);
+  }
+  return { token: result.token, mustChangePassword: result.mustChangePassword };
 }
 
 export function getMemberSession(token: string) {
