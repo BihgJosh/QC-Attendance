@@ -11,7 +11,7 @@ export function ChangePasswordForm({ nextPath = "/" }: { nextPath?: string }) {
   const router = useRouter();
   const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false); const [error, setError] = useState("");
-  const rules = [{ label: "8 or more characters", ok: password.length >= 8 }, { label: "Uppercase and lowercase", ok: /[A-Z]/.test(password) && /[a-z]/.test(password) }, { label: "At least one number", ok: /\d/.test(password) }];
+  const rules = [{ label: "10 or more characters", ok: password.length >= 10 }, { label: "Uppercase and lowercase", ok: /[A-Z]/.test(password) && /[a-z]/.test(password) }, { label: "At least one number", ok: /\d/.test(password) }];
   async function submit(event: React.FormEvent) {
     event.preventDefault(); setError("");
     if (password !== confirm) return setError("The passwords do not match.");

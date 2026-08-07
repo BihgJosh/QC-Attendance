@@ -2,7 +2,7 @@ const GATEWAY_SECRET_HASH = "e961e32016c41f358eac3f9e1546b93d78bae0b9b30a446ccce
 const allowedOperations = new Set([
   "status.get", "status.update", "settings.get", "settings.update", "members.list",
   "attendance.device-check", "attendance.insert", "attendance.list", "migration.import",
-  "member.authenticate", "member.session", "member.change-password", "member.logout",
+  "member.status", "member.setup-request", "member.setup-complete", "member.authenticate", "member.session", "member.change-password", "member.logout",
   "member.list", "member.reset", "admin.list", "admin.add", "admin.remove",
   "push.subscribe", "push.unsubscribe", "push.list", "push.deactivate",
 ]);
@@ -52,10 +52,10 @@ async function rest(path: string, init: RequestInit = {}) {
   return payload;
 }
 
-const DEFAULT_MEMBER_PASSWORD = Deno.env.get("MEMBER_DEFAULT_PASSWORD") || "";
 const PROTECTED_BOOTSTRAP_EMAILS = new Set(["joshuaagusa001@gmail.com"]);
 const PASSWORD_ITERATIONS = 210_000;
-const SESSION_DAYS = 7;
+const STANDARD_SESSION_HOURS = 12;
+const REMEMBERED_SESSION_DAYS = 180;
 
 function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
@@ -94,13 +94,13 @@ async function verifyPassword(password: string, stored: string) {
   return safeEqual(bytesToBase64Url(actual), expectedText);
 }
 
-async function createMemberSession(email: string) {
+async function createMemberSession(email: string, rememberMe = false) {
   const token = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash = await sha256(token);
-  const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + (rememberMe ? REMEMBERED_SESSION_DAYS * 24 : STANDARD_SESSION_HOURS) * 60 * 60 * 1000).toISOString();
   await rest("member_sessions", {
     method: "POST", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ email, token_hash: tokenHash, expires_at: expiresAt }),
+    body: JSON.stringify({ email, token_hash: tokenHash, expires_at: expiresAt, remember_me: rememberMe }),
   });
   return token;
 }
@@ -110,19 +110,23 @@ async function resolveMemberSession(tokenValue: unknown) {
   if (token.length < 32) return null;
   const tokenHash = await sha256(token);
   const now = new Date().toISOString();
-  const sessions = await rest(`member_sessions?select=email,expires_at&token_hash=eq.${encodeURIComponent(tokenHash)}&expires_at=gt.${encodeURIComponent(now)}&limit=1`) as Json[];
+  const sessions = await rest(`member_sessions?select=email,expires_at,remember_me&token_hash=eq.${encodeURIComponent(tokenHash)}&expires_at=gt.${encodeURIComponent(now)}&limit=1`) as Json[];
   if (!sessions[0]) return null;
   const email = String(sessions[0].email);
   const credentials = await rest(`member_credentials?select=email,must_change_password&email=eq.${encodeURIComponent(email)}&limit=1`) as Json[];
   if (!credentials[0]) return null;
+  const rememberMe = sessions[0].remember_me === true;
+  const rollingExpiry = rememberMe && new Date(String(sessions[0].expires_at)).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000
+    ? new Date(Date.now() + REMEMBERED_SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString()
+    : undefined;
   await rest(`member_sessions?token_hash=eq.${encodeURIComponent(tokenHash)}`, {
-    method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ last_seen_at: now }),
+    method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ last_seen_at: now, ...(rollingExpiry ? { expires_at: rollingExpiry } : {}) }),
   });
-  return { email, tokenHash, mustChangePassword: Boolean(credentials[0].must_change_password) };
+  return { email, tokenHash, rememberMe, mustChangePassword: Boolean(credentials[0].must_change_password) };
 }
 
 function validNewPassword(password: string) {
-  return password.length >= 8 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password) && password !== DEFAULT_MEMBER_PASSWORD;
+  return password.length >= 10 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password);
 }
 
 async function allRecords() {
@@ -203,6 +207,40 @@ Deno.serve(async (request) => {
       if (records.length > 0) await rest("attendance_records?on_conflict=source_fingerprint", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(records) });
       return json({ success: true, members: members.length, records: records.length });
     }
+    if (operation === "member.status") {
+      const email = normalizeEmail(body.email);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
+      const rows = await rest(`member_credentials?select=email&email=eq.${encodeURIComponent(email)}&limit=1`) as Json[];
+      return json({ hasPrivatePassword: Boolean(rows[0]) });
+    }
+    if (operation === "member.setup-request") {
+      const email = normalizeEmail(body.email);
+      const code = String(body.code || "");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{6}$/.test(code)) return json({ error: "Invalid setup request." }, 400);
+      const existing = await rest(`member_setup_challenges?select=requested_at&email=eq.${encodeURIComponent(email)}&limit=1`) as Json[];
+      if (existing[0] && Date.now() - new Date(String(existing[0].requested_at)).getTime() < 60_000) return json({ error: "Please wait before requesting another code." }, 429);
+      await rest("member_setup_challenges?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, code_hash: await sha256(`${email}:${code}`), expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), attempts: 0, requested_at: new Date().toISOString(), consumed_at: null }) });
+      return json({ success: true });
+    }
+    if (operation === "member.setup-complete") {
+      const email = normalizeEmail(body.email);
+      const code = String(body.code || "");
+      const password = String(body.password || "");
+      const rememberMe = body.rememberMe === true;
+      if (!validNewPassword(password) || !/^\d{6}$/.test(code)) return json({ error: "Use a valid verification code and a private password of at least 10 characters with uppercase, lowercase and a number." }, 400);
+      const rows = await rest(`member_setup_challenges?select=code_hash,expires_at,attempts&email=eq.${encodeURIComponent(email)}&consumed_at=is.null&limit=1`) as Json[];
+      const challenge = rows[0];
+      if (!challenge || new Date(String(challenge.expires_at)).getTime() <= Date.now() || Number(challenge.attempts || 0) >= 5) return json({ error: "The verification code has expired. Request a new one." }, 410);
+      if (!safeEqual(await sha256(`${email}:${code}`), String(challenge.code_hash))) {
+        await rest(`member_setup_challenges?email=eq.${encodeURIComponent(email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attempts: Number(challenge.attempts || 0) + 1 }) });
+        return json({ error: "The verification code is incorrect." }, 401);
+      }
+      const now = new Date().toISOString();
+      await rest("member_credentials?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, password_hash: await hashPassword(password), must_change_password: false, failed_attempts: 0, locked_until: null, password_changed_at: now, updated_at: now }) });
+      await rest(`member_setup_challenges?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      return json({ token: await createMemberSession(email, rememberMe), mustChangePassword: false });
+    }
     if (operation === "member.authenticate") {
       const email = normalizeEmail(body.email);
       const password = String(body.password || "");
@@ -210,29 +248,10 @@ Deno.serve(async (request) => {
         return json({ error: "Invalid email or password." }, 401);
       }
       const rows = await rest(`member_credentials?select=email,password_hash,must_change_password,failed_attempts,locked_until&email=eq.${encodeURIComponent(email)}&limit=1`) as Json[];
-      let credential = rows[0];
-      if (!credential) {
-        if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return json({ error: "This administrator account must be activated with its private temporary password." }, 401);
-        if (!DEFAULT_MEMBER_PASSWORD) {
-          console.error("MEMBER_DEFAULT_PASSWORD is required before new member credentials can be provisioned.");
-          return json({ error: "Member sign-in is temporarily unavailable." }, 503);
-        }
-        if (!safeEqual(password, DEFAULT_MEMBER_PASSWORD)) return json({ error: "Invalid email or password." }, 401);
-        const passwordHash = await hashPassword(DEFAULT_MEMBER_PASSWORD);
-        await rest("member_credentials", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ email, password_hash: passwordHash, must_change_password: true }) });
-        credential = { email, password_hash: passwordHash, must_change_password: true, failed_attempts: 0, locked_until: null };
-      }
+      const credential = rows[0];
+      if (!credential) return json({ error: "Private password setup is required for this account.", code: "ACCOUNT_SETUP_REQUIRED" }, 409);
       const lockedUntil = credential.locked_until ? new Date(String(credential.locked_until)).getTime() : 0;
       if (lockedUntil > Date.now()) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
-      if (!PROTECTED_BOOTSTRAP_EMAILS.has(email) && Boolean(credential.must_change_password) && safeEqual(password, DEFAULT_MEMBER_PASSWORD)) {
-        const passwordHash = await hashPassword(DEFAULT_MEMBER_PASSWORD);
-        await rest(`member_credentials?email=eq.${encodeURIComponent(email)}`, {
-          method: "PATCH",
-          headers: { Prefer: "return=minimal" },
-          body: JSON.stringify({ password_hash: passwordHash, failed_attempts: 0, locked_until: null, updated_at: new Date().toISOString() }),
-        });
-        credential = { ...credential, password_hash: passwordHash, failed_attempts: 0, locked_until: null };
-      }
       const valid = await verifyPassword(password, String(credential.password_hash || ""));
       if (!valid) {
         const failures = Number(credential.failed_attempts || 0) + 1;
@@ -241,22 +260,22 @@ Deno.serve(async (request) => {
         return json({ error: lock ? "Too many attempts. Try again in 15 minutes." : "Invalid email or password." }, lock ? 429 : 401);
       }
       await rest(`member_credentials?email=eq.${encodeURIComponent(email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ failed_attempts: 0, locked_until: null, last_login_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
-      return json({ token: await createMemberSession(email), mustChangePassword: Boolean(credential.must_change_password) });
+      return json({ token: await createMemberSession(email, body.rememberMe === true), mustChangePassword: false });
     }
     if (operation === "member.session") {
       const session = await resolveMemberSession(body.token);
       if (!session) return json({ error: "Your session has expired." }, 401);
-      return json({ email: session.email, mustChangePassword: session.mustChangePassword });
+      return json({ email: session.email, rememberMe: session.rememberMe, mustChangePassword: session.mustChangePassword });
     }
     if (operation === "member.change-password") {
       const session = await resolveMemberSession(body.token);
       if (!session) return json({ error: "Your session has expired." }, 401);
       const password = String(body.password || "");
-      if (!validNewPassword(password)) return json({ error: "Use at least 8 characters with uppercase, lowercase and a number." }, 400);
+      if (!validNewPassword(password)) return json({ error: "Use at least 10 characters with uppercase, lowercase and a number." }, 400);
       const now = new Date().toISOString();
       await rest(`member_credentials?email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ password_hash: await hashPassword(password), must_change_password: false, password_changed_at: now, failed_attempts: 0, locked_until: null, updated_at: now }) });
       await rest(`member_sessions?email=eq.${encodeURIComponent(session.email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
-      return json({ token: await createMemberSession(session.email), mustChangePassword: false });
+      return json({ token: await createMemberSession(session.email, session.rememberMe), mustChangePassword: false });
     }
     if (operation === "member.logout") {
       const token = String(body.token || "");
@@ -270,10 +289,9 @@ Deno.serve(async (request) => {
     if (operation === "member.reset") {
       const email = normalizeEmail(body.email);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "A valid member email is required." }, 400);
-      if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return json({ error: "Privileged administrator passwords require secure recovery and cannot use the shared team password." }, 403);
-      if (!DEFAULT_MEMBER_PASSWORD) return json({ error: "Member password resets are temporarily unavailable." }, 503);
-      const now = new Date().toISOString();
-      await rest("member_credentials?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, password_hash: await hashPassword(DEFAULT_MEMBER_PASSWORD), must_change_password: true, failed_attempts: 0, locked_until: null, reset_at: now, updated_at: now }) });
+      if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return json({ error: "Privileged administrator passwords require secure recovery." }, 403);
+      await rest(`member_credentials?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      await rest(`member_setup_challenges?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       return json({ success: true });
     }

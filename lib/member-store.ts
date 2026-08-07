@@ -3,6 +3,9 @@ import "server-only";
 import { getEnv, getSupabaseEnv } from "@/lib/env";
 
 type MemberOperation =
+  | "member.status"
+  | "member.setup-request"
+  | "member.setup-complete"
   | "member.authenticate"
   | "member.session"
   | "member.change-password"
@@ -96,16 +99,30 @@ async function callMemberGateway<T>(operation: MemberOperation, payload: Record<
   throw new MemberStoreError("Member authentication is temporarily unavailable. Please try again.", 503);
 }
 
-export async function authenticateMember(email: string, password: string) {
-  const result = await callMemberGateway<{ token?: unknown; mustChangePassword?: unknown }>("member.authenticate", { email, password });
+export async function authenticateMember(email: string, password: string, rememberMe = false) {
+  const result = await callMemberGateway<{ token?: unknown; mustChangePassword?: unknown }>("member.authenticate", { email, password, rememberMe });
   if (typeof result.token !== "string" || result.token.length < 32 || result.token.length > 512 || typeof result.mustChangePassword !== "boolean") {
     throw new MemberStoreError("Member authentication returned an invalid session.", 503);
   }
   return { token: result.token, mustChangePassword: result.mustChangePassword };
 }
 
+export function getMemberPasswordStatus(email: string) {
+  return callMemberGateway<{ hasPrivatePassword: boolean }>("member.status", { email });
+}
+
+export function requestMemberSetup(email: string, code: string) {
+  return callMemberGateway<{ success: boolean }>("member.setup-request", { email, code });
+}
+
+export async function completeMemberSetup(email: string, code: string, password: string, rememberMe = false) {
+  const result = await callMemberGateway<{ token?: unknown; mustChangePassword?: unknown }>("member.setup-complete", { email, code, password, rememberMe });
+  if (typeof result.token !== "string" || result.token.length < 32 || result.token.length > 512) throw new MemberStoreError("Private password setup returned an invalid session.", 503);
+  return { token: result.token, mustChangePassword: false as const };
+}
+
 export function getMemberSession(token: string) {
-  return callMemberGateway<{ email: string; mustChangePassword: boolean }>("member.session", { token });
+  return callMemberGateway<{ email: string; rememberMe?: boolean; mustChangePassword: boolean }>("member.session", { token });
 }
 
 export function changeMemberPassword(token: string, password: string) {

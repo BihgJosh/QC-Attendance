@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 from playwright.sync_api import sync_playwright
+import json
 
 ROOT = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 OUT = Path("artifacts/member-auth")
@@ -18,13 +19,17 @@ with sync_playwright() as playwright:
         page = browser.new_page(viewport={"width": width, "height": height})
         console_errors = []
         page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
+        page.route("**/api/member/login", lambda route, request: route.fulfill(status=200, content_type="application/json", body=json.dumps({"nextStep": "password"}) if json.loads(request.post_data or "{}").get("action") == "identify" else json.dumps({"success": True})))
         page.goto(f"{ROOT}/member/login", wait_until="networkidle")
         assert page.get_by_role("heading", name="Welcome back").is_visible()
         assert page.get_by_label("Team email").is_visible()
-        assert page.get_by_label("Password", exact=True).is_visible()
-        assert page.get_by_role("button", name="Sign in").is_visible()
+        assert page.get_by_role("button", name="Continue").is_visible()
         page.get_by_label("Team email").fill("member@example.com")
-        page.get_by_label("Password", exact=True).fill("VisiblePass1")
+        page.get_by_role("button", name="Continue").click()
+        page.get_by_label("Private password").wait_for(state="visible")
+        assert page.get_by_label("Keep me logged in on this device").is_checked()
+        page.get_by_label("Private password").fill("VisiblePass1")
+        assert page.get_by_role("button", name="Sign in").is_visible()
         email_style = page.get_by_label("Team email").evaluate("el => ({ color: getComputedStyle(el).color, background: getComputedStyle(el).backgroundColor })")
         assert email_style["color"] == "rgb(15, 23, 42)", email_style
         assert email_style["background"] == "rgb(255, 255, 255)", email_style

@@ -30,7 +30,7 @@ export function MemberPasswordManager() {
   async function reset(email: string) {
     if (confirming !== email) { setConfirming(email); return; }
     setResetting(email);
-    try { const response = await fetch("/api/admin/member-passwords", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error); toast.success("Temporary password restored. The member must change it after signing in."); setConfirming(null); await load(); }
+    try { const response = await fetch("/api/admin/member-passwords", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error); toast.success("Private password removed. The member will verify their email and create a new one."); setConfirming(null); await load(); }
     catch (error) { toast.error((error as Error).message || "Password reset failed."); }
     finally { setResetting(null); }
   }
