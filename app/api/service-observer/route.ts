@@ -9,6 +9,8 @@ import { isIsoCalendarDate } from "@/lib/validation";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const UNITS = new Set<string>(SERVICE_OBSERVER_UNITS);
+const REPORTER_ROLES = new Set(["An observer", "A team member posted"]);
+const REPORTING_LOCATIONS = new Set(["Outside", "Emporium", "Toilet", "Children Section", "Vendors", "Overflow", "Main Auditorium"]);
 
 function text(value: unknown, max = 2_000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -37,6 +39,12 @@ export async function POST(request: Request) {
       ? body.unitReports as Record<string, unknown>
       : {};
     const unitReports = Object.fromEntries(unitsReported.map((unit) => [unit, text(rawReports[unit])]));
+    const reporterRole = text(body.reporterRole, 40);
+    const postedLocation = text(body.postedLocation, 80);
+    const reportingLocation = text(body.reportingLocation, 80);
+    if (!REPORTER_ROLES.has(reporterRole) || !REPORTING_LOCATIONS.has(reportingLocation) || (reporterRole === "A team member posted" && !UNITS.has(postedLocation))) {
+      return NextResponse.json({ ok: false, message: "Complete the reporter and location details correctly." }, { status: 400 });
+    }
 
     await appendServiceObserverReport({
       date, service, observerName: member.name,
@@ -44,6 +52,7 @@ export async function POST(request: Request) {
       unitsReported, unitReports,
       recommendations: text(body.recommendations),
       conclusion: text(body.conclusion),
+      reporterRole, postedLocation, reportingLocation,
     });
     return NextResponse.json({ ok: true, message: "Service Observer report saved successfully." });
   } catch (error) {

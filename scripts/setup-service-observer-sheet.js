@@ -5,7 +5,7 @@ const SPREADSHEET_ID = "1N2kyYbaOFDryoukMGrxyJplrDTvgXHUSPnBG_8jo7Q4";
 const SHEET_GID = 1227078310;
 const HEADERS = [
   "Date", "Service", "Observer Name", "General Observations", "Units Reported On",
-  "Unit Reports JSON", "Recommendations", "Conclusion", "Submitted At",
+  "Unit Reports JSON", "Recommendations", "Conclusion", "Who Are You", "Posted Location", "Reporting Location", "Submitted At",
 ];
 
 function loadEnv(path) {

@@ -89,7 +89,6 @@
   const OBSERVER_API_URL = '/api/service-observer';
 
   let ctx = null;
-  let selectedUnits = [];
   const unitTexts = {};
 
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -108,12 +107,13 @@
       <label>Observer Name *</label><input type="text" id="observerName" placeholder="Your name">
 
       <div class="section-label">Observation</div>
+      <label>Who are you? *</label><select id="reporterRole"><option value="">Select</option><option value="An observer">An observer</option><option value="A team member posted">A team member posted</option></select>
+      <div id="postedLocationWrap" hidden><label>Where were you posted? *</label><select id="postedLocation"><option value="">Select</option>${ctx.units.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('')}</select></div>
+      <label>What location are you reporting? *</label><select id="reportingLocation"><option value="">Select</option>${['Outside', 'Emporium', 'Toilet', 'Children Section', 'Vendors', 'Overflow', 'Main Auditorium'].map(location => `<option value="${esc(location)}">${esc(location)}</option>`).join('')}</select>
       <label>General Observations</label>
       <textarea id="generalObservations" placeholder="Anything not tied to one specific unit — weather, parking, general atmosphere, etc."></textarea>
       <label>Which units are you reporting on today?</label>
-      <div class="pill-row" id="unitPicker" role="group" aria-label="Units observed">
-        ${ctx.units.map(u => `<button type="button" class="pill" data-unit="${esc(u)}" aria-pressed="false">${esc(u)}</button>`).join('')}
-      </div>
+      <select id="unitPicker" aria-label="Unit observed"><option value="">Select a unit</option>${ctx.units.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('')}</select>
       <div id="unitWriteups"></div>
       <label>Recommendations</label><textarea id="recommendations"></textarea>
       <label>Conclusion / Commendations</label><textarea id="conclusion"></textarea>
@@ -122,29 +122,19 @@
       <button class="submit" id="submitBtn">Submit Observer Report</button>
     `;
 
-    bindUnitPicker();
+    document.getElementById('reporterRole').addEventListener('change', e => {
+      const posted = e.target.value === 'A team member posted';
+      document.getElementById('postedLocationWrap').hidden = !posted;
+      document.getElementById('postedLocation').required = posted;
+    });
+    document.getElementById('unitPicker').addEventListener('change', renderUnitWriteups);
     document.getElementById('submitBtn').addEventListener('click', submit);
   }
 
-  function bindUnitPicker() {
-    document.getElementById('unitPicker').addEventListener('click', e => {
-      const pill = e.target.closest('.pill');
-      if (!pill) return;
-      const unit = pill.getAttribute('data-unit');
-      pill.classList.toggle('active');
-      pill.setAttribute('aria-pressed', pill.classList.contains('active') ? 'true' : 'false');
-      if (selectedUnits.includes(unit)) selectedUnits = selectedUnits.filter(u => u !== unit);
-      else selectedUnits.push(unit);
-      renderUnitWriteups();
-    });
-  }
-
   function renderUnitWriteups() {
+    const unit = document.getElementById('unitPicker').value;
     const wrap = document.getElementById('unitWriteups');
-    wrap.innerHTML = selectedUnits.map(u => `
-      <div class="seg-card"><div class="seg-title">${esc(u)}</div>
-        <textarea class="unit-text" data-unit="${esc(u)}" placeholder="Observation for ${esc(u)}">${esc(unitTexts[u] || '')}</textarea>
-      </div>`).join('');
+    wrap.innerHTML = unit ? `<div class="seg-card"><div class="seg-title">${esc(unit)}</div><textarea class="unit-text" data-unit="${esc(unit)}" placeholder="Observation for ${esc(unit)}">${esc(unitTexts[unit] || '')}</textarea></div>` : '';
     wrap.querySelectorAll('.unit-text').forEach(ta => {
       ta.addEventListener('input', () => { unitTexts[ta.getAttribute('data-unit')] = ta.value; });
     });
@@ -157,14 +147,21 @@
     const date = document.getElementById('date').value;
     const service = document.getElementById('service').value;
     const observerName = document.getElementById('observerName').value;
+    const reporterRole = document.getElementById('reporterRole').value;
+    const postedLocation = document.getElementById('postedLocation').value;
+    const reportingLocation = document.getElementById('reportingLocation').value;
+    const unit = document.getElementById('unitPicker').value;
 
     if (!service) { msg.className = 'msg err'; msg.textContent = 'Please select a service.'; msg.style.display = 'block'; return; }
     if (!observerName.trim()) { msg.className = 'msg err'; msg.textContent = "Please enter your name."; msg.style.display = 'block'; return; }
+    if (!reporterRole) { msg.className = 'msg err'; msg.textContent = 'Please choose who you are.'; msg.style.display = 'block'; return; }
+    if (reporterRole === 'A team member posted' && !postedLocation) { msg.className = 'msg err'; msg.textContent = 'Please select where you were posted.'; msg.style.display = 'block'; return; }
+    if (!reportingLocation) { msg.className = 'msg err'; msg.textContent = 'Please select the location you are reporting.'; msg.style.display = 'block'; return; }
 
     const payload = {
-      date, service, observerName,
+      date, service, observerName, reporterRole, postedLocation, reportingLocation,
       generalObservations: document.getElementById('generalObservations').value,
-      unitsReported: selectedUnits,
+      unitsReported: unit ? [unit] : [],
       unitReports: unitTexts,
       recommendations: document.getElementById('recommendations').value,
       conclusion: document.getElementById('conclusion').value

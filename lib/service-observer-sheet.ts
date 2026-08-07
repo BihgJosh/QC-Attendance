@@ -16,7 +16,7 @@ export const SERVICE_OBSERVER_UNITS = [
 
 export const SERVICE_OBSERVER_HEADERS = [
   "Date", "Service", "Observer Name", "General Observations", "Units Reported On",
-  "Unit Reports JSON", "Recommendations", "Conclusion", "Submitted At",
+  "Unit Reports JSON", "Recommendations", "Conclusion", "Who Are You", "Posted Location", "Reporting Location", "Submitted At",
 ];
 
 export type ServiceObserverReport = {
@@ -28,6 +28,9 @@ export type ServiceObserverReport = {
   unitReports: Record<string, string>;
   recommendations: string;
   conclusion: string;
+  reporterRole: string;
+  postedLocation: string;
+  reportingLocation: string;
 };
 
 function escapeTitle(title: string) {
@@ -51,24 +54,24 @@ export async function appendServiceObserverReport(report: ServiceObserverReport)
   const sheet = escapeTitle(title);
   const headerResponse = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${sheet}!A1:I1`,
+    range: `${sheet}!A1:L1`,
   });
   const currentHeaders = (headerResponse.data.values?.[0] || []).map((value) => String(value).trim());
   if (!currentHeaders.some(Boolean)) {
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheet}!A1:I1`,
+      range: `${sheet}!A1:L1`,
       valueInputOption: "RAW",
       requestBody: { values: [SERVICE_OBSERVER_HEADERS] },
     });
-  } else if (SERVICE_OBSERVER_HEADERS.some((header, index) => currentHeaders[index] !== header)) {
+  } else if (currentHeaders.some((header, index) => header && SERVICE_OBSERVER_HEADERS[index] !== header)) {
     throw new Error("The Service Observer sheet headers do not match the required observer columns.");
   }
 
   const row = [
     report.date, report.service, report.observerName, report.generalObservations,
     report.unitsReported.join(", "), JSON.stringify(report.unitReports),
-    report.recommendations, report.conclusion,
+    report.recommendations, report.conclusion, report.reporterRole, report.postedLocation, report.reportingLocation,
   ];
   const submittedAt = new Date().toISOString();
   const [dashboardResult, primaryResult] = await Promise.allSettled([appendCategorizedReport({
@@ -82,7 +85,7 @@ export async function appendServiceObserverReport(report: ServiceObserverReport)
     summary: `${report.unitsReported.length} unit${report.unitsReported.length === 1 ? "" : "s"} observed`,
   }), sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${sheet}!A:I`,
+    range: `${sheet}!A:L`,
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
     requestBody: {

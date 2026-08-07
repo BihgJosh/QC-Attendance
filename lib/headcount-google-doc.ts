@@ -31,6 +31,10 @@ function numberValue(value: unknown) {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : 0;
 }
 
+function adjustedTotal(value: number) {
+  return Math.ceil(value * 1.02);
+}
+
 function normalize(value: unknown) {
   return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -52,7 +56,7 @@ export function organizeHeadcount(rows: HeadcountRow[]) {
 function serviceText(input: HeadcountService) {
   const organized = organizeHeadcount(Array.isArray(input.headcount.byDepartment) ? input.headcount.byDepartment : []);
   const reported = numberValue(input.headcount.grandTotal);
-  const displayedGrandTotal = organized.grandTotal || reported;
+  const displayedGrandTotal = adjustedTotal(organized.grandTotal || reported);
   const sections = organized.sections.map((section) => `${section.title}\n${section.rows.map((row) => `${row.label}\nAdult = ${row.adults}  |  Children = ${row.children}`).join("\n\n")}`).join("\n\n");
   const warning = organized.grandTotal > 0 && reported > 0 && reported !== organized.grandTotal ? `\nReconciliation notice: submitted area rows total ${organized.grandTotal}, while the service report records ${reported}. Please verify the source entries.` : "";
   const splitNote = organized.grandTotal === 0 && reported > 0 ? "\nAdult/children breakdown was not submitted for this service." : "";
@@ -62,7 +66,7 @@ function serviceText(input: HeadcountService) {
 function documentText(date: string, services: HeadcountService[]) {
   const combined = services.reduce((sum, service) => {
     const organized = organizeHeadcount(Array.isArray(service.headcount.byDepartment) ? service.headcount.byDepartment : []);
-    return { adults: sum.adults + organized.totals.adults, children: sum.children + organized.totals.children, grand: sum.grand + (organized.grandTotal || numberValue(service.headcount.grandTotal)) };
+    return { adults: sum.adults + organized.totals.adults, children: sum.children + organized.totals.children, grand: sum.grand + adjustedTotal(organized.grandTotal || numberValue(service.headcount.grandTotal)) };
   }, { adults: 0, children: 0, grand: 0 });
   const summary = services.length > 1 ? `ALL SERVICES COMBINED\nAdults: ${combined.adults}  |  Children: ${combined.children}\nGrand Total = ${combined.grand}\n\n` : "";
   return `QC SERVICE HEADCOUNT\nService date: ${date}  ·  Updated: ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n${summary}${services.map(serviceText).join("\n\n────────────────────────────────────────\n\n")}\n`;
