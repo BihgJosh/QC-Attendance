@@ -4,7 +4,6 @@ import { getEnv, getSupabaseEnv } from "@/lib/env";
 
 type MemberOperation =
   | "member.status"
-  | "member.setup-request"
   | "member.setup-complete"
   | "member.authenticate"
   | "member.session"
@@ -111,12 +110,8 @@ export function getMemberPasswordStatus(email: string) {
   return callMemberGateway<{ hasPrivatePassword: boolean }>("member.status", { email });
 }
 
-export function requestMemberSetup(email: string, code: string) {
-  return callMemberGateway<{ success: boolean }>("member.setup-request", { email, code });
-}
-
-export async function completeMemberSetup(email: string, code: string, password: string, rememberMe = false) {
-  const result = await callMemberGateway<{ token?: unknown; mustChangePassword?: unknown }>("member.setup-complete", { email, code, password, rememberMe });
+export async function completeMemberSetup(email: string, password: string, rememberMe = false) {
+  const result = await callMemberGateway<{ token?: unknown; mustChangePassword?: unknown }>("member.setup-complete", { email, password, rememberMe });
   if (typeof result.token !== "string" || result.token.length < 32 || result.token.length > 512) throw new MemberStoreError("Private password setup returned an invalid session.", 503);
   return { token: result.token, mustChangePassword: false as const };
 }

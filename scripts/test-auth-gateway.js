@@ -22,7 +22,13 @@ async function main() {
   };
   const list = await call("member.list");
   const status = await call("member.status", { email: list.members[0]?.email || "nobody@example.com" });
-  console.log(JSON.stringify({ memberListOk: Array.isArray(list.members), privateCredentialCount: list.members.length, memberStatusOk: typeof status.hasPrivatePassword === "boolean" }));
+  const protectedEmail = list.members[0]?.email;
+  let existingCredentialProtected = false;
+  if (protectedEmail) {
+    const response = await fetch(`${env.SUPABASE_URL}/functions/v1/qcu-attendance`, { method: "POST", headers: { "Content-Type": "application/json", apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`, "x-qcu-operation-secret": env.SUPABASE_GATEWAY_SECRET }, body: JSON.stringify({ operation: "member.setup-complete", email: protectedEmail, password: "OverwriteBlocked1", rememberMe: false }) });
+    existingCredentialProtected = response.status === 409;
+  }
+  console.log(JSON.stringify({ memberListOk: Array.isArray(list.members), privateCredentialCount: list.members.length, memberStatusOk: typeof status.hasPrivatePassword === "boolean", existingCredentialProtected }));
 }
 
 main().catch((error) => { console.error(error.message); process.exitCode = 1; });

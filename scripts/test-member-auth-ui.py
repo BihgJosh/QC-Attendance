@@ -30,6 +30,14 @@ with sync_playwright() as playwright:
         assert page.get_by_label("Keep me logged in on this device").is_checked()
         page.get_by_label("Private password").fill("VisiblePass1")
         assert page.get_by_role("button", name="Sign in").is_visible()
+        page.get_by_role("button", name="Use another email").click()
+        page.route("**/api/member/login", lambda route, request: route.fulfill(status=200, content_type="application/json", body=json.dumps({"nextStep": "setup"}) if json.loads(request.post_data or "{}").get("action") == "identify" else json.dumps({"success": True})))
+        page.get_by_label("Team email").fill("new-member@example.com")
+        page.get_by_role("button", name="Continue").click()
+        page.get_by_label("Create private password").wait_for(state="visible")
+        assert page.get_by_label("Confirm private password").is_visible()
+        assert page.get_by_label("Verification code").count() == 0
+        assert page.get_by_role("button", name="Create password and sign in").is_visible()
         email_style = page.get_by_label("Team email").evaluate("el => ({ color: getComputedStyle(el).color, background: getComputedStyle(el).backgroundColor })")
         assert email_style["color"] == "rgb(15, 23, 42)", email_style
         assert email_style["background"] == "rgb(255, 255, 255)", email_style
