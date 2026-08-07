@@ -90,6 +90,7 @@
 
   let ctx = null;
   const unitTexts = {};
+  const postingLocations = ['Outside', 'Emporium', 'Toilet', 'Children Section', 'Vendors', 'Overflow Tent', 'Main Auditorium', 'Timers', 'Service Manager'];
 
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -108,7 +109,7 @@
 
       <div class="section-label">Observation</div>
       <label>Who are you? *</label><select id="reporterRole"><option value="">Select</option><option value="An observer">An observer</option><option value="A team member posted">A team member posted</option></select>
-      <div id="postedLocationWrap" hidden><label>Where were you posted? *</label><select id="postedLocation"><option value="">Select</option>${ctx.units.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('')}</select></div>
+      <div id="postedLocationWrap" hidden><label>Where were you posted? *</label><select id="postedLocation"><option value="">Select</option>${postingLocations.map(location => `<option value="${esc(location)}">${esc(location)}</option>`).join('')}</select></div>
       <label>What location are you reporting? *</label><select id="reportingLocation"><option value="">Select</option>${['Outside', 'Emporium', 'Toilet', 'Children Section', 'Vendors', 'Overflow', 'Main Auditorium'].map(location => `<option value="${esc(location)}">${esc(location)}</option>`).join('')}</select>
       <label>General Observations</label>
       <textarea id="generalObservations" placeholder="Anything not tied to one specific unit — weather, parking, general atmosphere, etc."></textarea>

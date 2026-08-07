@@ -11,6 +11,7 @@ const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Serv
 const UNITS = new Set<string>(SERVICE_OBSERVER_UNITS);
 const REPORTER_ROLES = new Set(["An observer", "A team member posted"]);
 const REPORTING_LOCATIONS = new Set(["Outside", "Emporium", "Toilet", "Children Section", "Vendors", "Overflow", "Main Auditorium"]);
+const POSTING_LOCATIONS = new Set(["Outside", "Emporium", "Toilet", "Children Section", "Vendors", "Overflow Tent", "Main Auditorium", "Timers", "Service Manager"]);
 
 function text(value: unknown, max = 2_000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
     const reporterRole = text(body.reporterRole, 40);
     const postedLocation = text(body.postedLocation, 80);
     const reportingLocation = text(body.reportingLocation, 80);
-    if (!REPORTER_ROLES.has(reporterRole) || !REPORTING_LOCATIONS.has(reportingLocation) || (reporterRole === "A team member posted" && !UNITS.has(postedLocation))) {
+    if (!REPORTER_ROLES.has(reporterRole) || !REPORTING_LOCATIONS.has(reportingLocation) || (reporterRole === "A team member posted" && !POSTING_LOCATIONS.has(postedLocation))) {
       return NextResponse.json({ ok: false, message: "Complete the reporter and location details correctly." }, { status: 400 });
     }
 
