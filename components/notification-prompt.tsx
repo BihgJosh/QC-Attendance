@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Bell, BellRing, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -19,6 +20,7 @@ async function persistSubscription(subscription: PushSubscription) {
 }
 
 export function NotificationPrompt() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState("");
@@ -27,10 +29,19 @@ export function NotificationPrompt() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window) || Notification.permission === "denied") return;
+    setVisible(false);
+    setMessage("");
+    setIsError(false);
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
     void (async () => {
       const eligibility = await fetch("/api/member/session", { cache: "no-store" });
       if (!eligibility.ok || cancelled) return;
+      if (Notification.permission === "denied") {
+        setMessage("Notifications are blocked in this browser. Allow them in your site settings, then reload this page.");
+        setIsError(true);
+        setVisible(true);
+        return;
+      }
       const keyResponse = await fetch("/api/notifications/public-key", { cache: "no-store" });
       if (!keyResponse.ok || cancelled) return;
       const registration = await navigator.serviceWorker.ready;
@@ -39,17 +50,14 @@ export function NotificationPrompt() {
         try { await persistSubscription(subscription); return; }
         catch { if (!cancelled) { setMessage("Reconnect this device to team notifications."); setIsError(true); setVisible(true); } return; }
       }
-      let hiddenUntil = 0;
-      try { hiddenUntil = Number(localStorage.getItem("qcu-notification-prompt-hidden-until") || 0); } catch { /* storage may be unavailable */ }
-      if (!cancelled && hiddenUntil <= Date.now()) setVisible(true);
+      if (!cancelled) setVisible(true);
     })().catch(() => undefined);
     return () => { cancelled = true; };
-  }, []);
+  }, [pathname]);
 
   useEffect(() => { if (visible) allowButton.current?.focus(); }, [visible]);
 
   const dismiss = () => {
-    try { localStorage.setItem("qcu-notification-prompt-hidden-until", String(Date.now() + 7 * 24 * 60 * 60 * 1000)); } catch { /* storage may be unavailable */ }
     setVisible(false);
   };
 

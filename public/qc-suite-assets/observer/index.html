@@ -110,8 +110,8 @@
       <label for="observerName">Observer Name *</label><input type="text" id="observerName" placeholder="Your name" required>
 
       <div class="section-label">Observation</div>
-      <label for="reporterRole">Who are you? *</label><select id="reporterRole" required><option value="">Select</option><option value="An observer">An observer</option><option value="A team member posted">A team member posted</option></select>
-      <div id="postedLocationWrap" hidden><label for="postedLocation">Where were you posted? *</label><select id="postedLocation"><option value="">Select</option>${postingLocations.map(location => `<option value="${esc(location)}">${esc(location)}</option>`).join('')}</select></div>
+      <label for="reporterRole">Who are you? *</label><select id="reporterRole" required><option value="">Select</option><option value="Service Observer">Service Observer</option><option value="QC member">QC member</option></select>
+      <div id="postedLocationWrap" hidden><label for="postedLocation">Select your posting location *</label><select id="postedLocation"><option value="">Select posting location</option>${postingLocations.map(location => `<option value="${esc(location)}">${esc(location)}</option>`).join('')}</select></div>
       <label for="reportingLocation">What location are you reporting? *</label><select id="reportingLocation" required><option value="">Select</option>${['Outside', 'Emporium', 'Toilet', 'Children Section', 'Vendors', 'Overflow', 'Main Auditorium'].map(location => `<option value="${esc(location)}">${esc(location)}</option>`).join('')}</select>
       <label for="generalObservations">General Observations</label>
       <textarea id="generalObservations" placeholder="Anything not tied to one specific unit — weather, parking, general atmosphere, etc."></textarea>
@@ -126,9 +126,10 @@
     `;
 
     document.getElementById('reporterRole').addEventListener('change', e => {
-      const posted = e.target.value === 'A team member posted';
+      const posted = e.target.value === 'QC member';
       document.getElementById('postedLocationWrap').hidden = !posted;
       document.getElementById('postedLocation').required = posted;
+      if (!posted) document.getElementById('postedLocation').value = '';
     });
     document.getElementById('unitPicker').addEventListener('change', renderUnitWriteups);
     document.getElementById('submitBtn').addEventListener('click', submit);
@@ -156,7 +157,7 @@
     if (!service) { msg.className = 'msg err'; msg.textContent = 'Please select a service.'; msg.style.display = 'block'; return; }
     if (!observerName.trim()) { msg.className = 'msg err'; msg.textContent = "Please enter your name."; msg.style.display = 'block'; return; }
     if (!reporterRole) { msg.className = 'msg err'; msg.textContent = 'Please choose who you are.'; msg.style.display = 'block'; return; }
-    if (reporterRole === 'A team member posted' && !postedLocation) { msg.className = 'msg err'; msg.textContent = 'Please select where you were posted.'; msg.style.display = 'block'; return; }
+    if (reporterRole === 'QC member' && !postedLocation) { msg.className = 'msg err'; msg.textContent = 'Please select your posting location.'; msg.style.display = 'block'; return; }
     if (!reportingLocation) { msg.className = 'msg err'; msg.textContent = 'Please select the location you are reporting.'; msg.style.display = 'block'; return; }
 
     submissionId ||= crypto.randomUUID();
