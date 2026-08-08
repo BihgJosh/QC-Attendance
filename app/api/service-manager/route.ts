@@ -4,9 +4,9 @@ import { EmailConfigurationError, sendBrevoEmail } from "@/lib/brevo-email";
 import {
   appendEmailDeliveryLog,
   appendGeneratedDocumentLog,
-  findGeneratedDocument,
   SERVICE_REPORT_WORKBOOK_URL,
 } from "@/lib/service-report-workbook";
+import { FINAL_REPORT_SPREADSHEET_URL, syncFinalReportForDate } from "@/lib/final-report-sheet";
 import { isIsoCalendarDate } from "@/lib/validation";
 import { updateHeadcountGoogleDocument, type HeadcountService } from "@/lib/headcount-google-doc";
 import { updateEmergencyFlagStatus } from "@/lib/emergency-flag-sheet";
@@ -36,15 +36,6 @@ function escapeHtml(value: unknown) {
 function numberValue(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function trustedGoogleDocumentUrl(value: unknown) {
-  if (typeof value !== "string") throw new Error("The document URL is missing.");
-  const url = new URL(value);
-  if (url.protocol !== "https:" || url.hostname !== "docs.google.com") {
-    throw new Error("The generated document URL is not a trusted Google Docs link.");
-  }
-  return url.toString();
 }
 
 async function callSuite(action: "checkPassword" | "getDashboard" | "generateReport", token: string, date?: string, service?: string) {
@@ -123,7 +114,7 @@ function reportEmailHtml(input: {
   ].join("") : "";
 
   const documentCta = input.documentUrl
-    ? `<p style="margin:24px 0 0"><a href="${escapeHtml(input.documentUrl)}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:linear-gradient(90deg,#22c7ee,#c43ce4);color:#071225;text-decoration:none;font-weight:800">Open generated document</a></p>`
+    ? `<p style="margin:24px 0 0"><a href="${escapeHtml(input.documentUrl)}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:linear-gradient(90deg,#22c7ee,#c43ce4);color:#071225;text-decoration:none;font-weight:800">Open compiled service report</a></p>`
     : "";
 
   return `<!doctype html><html><body style="margin:0;background:#eef4ff;font-family:Arial,sans-serif;color:#0f172a"><div style="max-width:680px;margin:0 auto;padding:24px"><div style="padding:24px;border-radius:22px;background:#0b1738;color:white"><p style="margin:0;color:#67e8f9;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase">QC Unit · Service report</p><h1 style="margin:8px 0 4px;font-size:28px">${escapeHtml(input.service)}</h1><p style="margin:0;color:#cbd5e1">${escapeHtml(input.date)} · ${input.reportType === "full" ? "Full report" : "Summary"}</p></div><div style="margin-top:16px;padding:20px;border-radius:18px;background:white">${rows([
@@ -251,21 +242,13 @@ export async function POST(request: Request) {
       let documentUrl: string | undefined;
       let documentLoggingFailed = false;
       if (reportType === "full") {
-        const existing = await findGeneratedDocument(date, service);
-        if (existing) {
-          documentUrl = trustedGoogleDocumentUrl(existing.url);
-        } else {
-          const generated = await callSuite("generateReport", token, date, service);
-          if (!generated.ok) {
-            return NextResponse.json({ ok: false, message: typeof generated.message === "string" ? generated.message : "The full report document could not be generated." }, { status: 502 });
-          }
-          documentUrl = trustedGoogleDocumentUrl(generated.url);
-          try {
-            await appendGeneratedDocumentLog({ date, service, url: documentUrl, actor: `Email delivery to ${recipient}`, requestId });
-          } catch (error) {
-            documentLoggingFailed = true;
-            console.error("[service-manager] Generated email document logging failed", error instanceof Error ? error.message : "Unknown error");
-          }
+        await syncFinalReportForDate(date);
+        documentUrl = FINAL_REPORT_SPREADSHEET_URL;
+        try {
+          await appendGeneratedDocumentLog({ date, service, url: documentUrl, actor: `Email delivery to ${recipient}`, requestId });
+        } catch (error) {
+          documentLoggingFailed = true;
+          console.error("[service-manager] Compiled email report logging failed", error instanceof Error ? error.message : "Unknown error");
         }
       }
 
@@ -300,28 +283,23 @@ export async function POST(request: Request) {
     }
 
     if (action === "generateReport") {
-      const existing = await findGeneratedDocument(date, service);
-      if (existing) return NextResponse.json({ ok: true, url: trustedGoogleDocumentUrl(existing.url), reused: true, message: "Existing report opened." }, { headers: { "Cache-Control": "no-store, max-age=0" } });
-    }
-    const result = await callSuite(action as "checkPassword" | "getDashboard" | "generateReport", token, date || undefined, service || undefined);
-    if (action === "generateReport" && result.ok) {
-      const documentUrl = trustedGoogleDocumentUrl(result.url);
+      await syncFinalReportForDate(date);
       try {
-        const log = await appendGeneratedDocumentLog({ date, service, url: documentUrl, requestId });
-        return NextResponse.json({ ...result, url: documentUrl, workbookUrl: log.workbookUrl, logRecordId: log.recordId }, {
+        const log = await appendGeneratedDocumentLog({ date, service, url: FINAL_REPORT_SPREADSHEET_URL, requestId });
+        return NextResponse.json({ ok: true, url: FINAL_REPORT_SPREADSHEET_URL, workbookUrl: log.workbookUrl, logRecordId: log.recordId, message: "Compiled service report refreshed." }, {
           headers: { "Cache-Control": "no-store, max-age=0" },
         });
       } catch (error) {
-        console.error("[service-manager] Generated document logging failed", error instanceof Error ? error.message : "Unknown error");
+        console.error("[service-manager] Compiled report logging failed", error instanceof Error ? error.message : "Unknown error");
         return NextResponse.json({
-          ...result,
           ok: true,
-          url: documentUrl,
-          message: "Document generated successfully. Its audit log will be retried separately.",
+          url: FINAL_REPORT_SPREADSHEET_URL,
+          message: "Compiled service report refreshed. Its audit log will be retried separately.",
           warning: "logging_failed",
         }, { headers: { "Cache-Control": "no-store, max-age=0" } });
       }
     }
+    const result = await callSuite(action as "checkPassword" | "getDashboard", token, date || undefined, service || undefined);
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

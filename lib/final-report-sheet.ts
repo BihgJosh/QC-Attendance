@@ -5,6 +5,8 @@ import { getGoogleEnv } from "@/lib/env";
 import { callServiceReportGateway } from "@/lib/service-report-store";
 
 export const FINAL_REPORT_SPREADSHEET_ID = "1eZPJiAX4tCTX8huAAFCRrUSRr5na34VqmzXFCiqjGu0";
+export const FINAL_REPORT_SHEET_ID = 1635578956;
+export const FINAL_REPORT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${FINAL_REPORT_SPREADSHEET_ID}/edit?pli=1&gid=${FINAL_REPORT_SHEET_ID}#gid=${FINAL_REPORT_SHEET_ID}`;
 const TEMPLATE_TITLE = "TEMPLATE";
 const COLUMN_COUNT = 8;
 const SERVICES = ["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"];
@@ -36,6 +38,11 @@ function timestamp(value: unknown) {
   return Number.isNaN(parsed.valueOf()) ? String(value) : new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Africa/Lagos" }).format(parsed);
 }
 
+function serviceName(value: unknown) {
+  const name = String(value || "").trim();
+  return SERVICES.find((service) => service.toLowerCase() === name.toLowerCase()) || name;
+}
+
 function buildRows(data: DailyReport) {
   const rows: unknown[][] = [];
   const styles: Array<{ row: number; style: Style }> = [];
@@ -52,7 +59,7 @@ function buildRows(data: DailyReport) {
     add([display(value)], "note", true);
   };
 
-  const reportedServices = new Set([...data.posts, ...data.timers, ...data.observers].map((row) => String(row.service || "")).filter(Boolean));
+  const reportedServices = new Set([...data.posts, ...data.timers, ...data.observers].map((row) => serviceName(row.service)).filter(Boolean));
   const totalAdults = data.posts.reduce((sum, row) => sum + Number(row.adults_headcount || 0), 0);
   const totalChildren = data.posts.reduce((sum, row) => sum + Number(row.children_headcount || 0), 0);
   const incidents = data.posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length;
@@ -66,9 +73,9 @@ function buildRows(data: DailyReport) {
 
   const serviceOrder = [...SERVICES, ...[...reportedServices].filter((service) => !SERVICES.includes(service))];
   for (const service of serviceOrder) {
-    const posts = data.posts.filter((row) => row.service === service);
-    const timers = data.timers.filter((row) => row.service === service);
-    const observers = data.observers.filter((row) => row.service === service);
+    const posts = data.posts.filter((row) => serviceName(row.service) === service);
+    const timers = data.timers.filter((row) => serviceName(row.service) === service);
+    const observers = data.observers.filter((row) => serviceName(row.service) === service);
     if (!posts.length && !timers.length && !observers.length) continue;
     const adults = posts.reduce((sum, row) => sum + Number(row.adults_headcount || 0), 0);
     const children = posts.reduce((sum, row) => sum + Number(row.children_headcount || 0), 0);
@@ -195,9 +202,9 @@ export async function syncFinalReportForDate(date: string) {
   const response = await callServiceReportGateway<{ data?: DailyReport }>("manager.daily-report", { date });
   if (!response.data) throw new Error("Supabase did not return the daily service reports.");
   const sheets = google.sheets({ version: "v4", auth: authClient() });
-  await setupFinalReportTemplate();
-  const title = tabTitle(date);
-  const sheetId = await ensureSheet(sheets, title);
-  await paintSheet(sheets, sheetId, title, response.data);
-  return { title, url: `https://docs.google.com/spreadsheets/d/${FINAL_REPORT_SPREADSHEET_ID}/edit#gid=${sheetId}` };
+  const metadata = await sheets.spreadsheets.get({ spreadsheetId: FINAL_REPORT_SPREADSHEET_ID, fields: "sheets.properties(sheetId,title)" });
+  const target = metadata.data.sheets?.find((sheet) => sheet.properties?.sheetId === FINAL_REPORT_SHEET_ID)?.properties;
+  if (!target?.title) throw new Error("The configured final report tab could not be found.");
+  await paintSheet(sheets, FINAL_REPORT_SHEET_ID, target.title, response.data);
+  return { title: target.title, url: FINAL_REPORT_SPREADSHEET_URL };
 }
