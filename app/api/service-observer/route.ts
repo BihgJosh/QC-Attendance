@@ -6,12 +6,14 @@ import {
   SERVICE_OBSERVER_UNITS,
 } from "@/lib/service-observer-sheet";
 import { isIsoCalendarDate } from "@/lib/validation";
+import { randomUUID } from "crypto";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const UNITS = new Set<string>(SERVICE_OBSERVER_UNITS);
 const REPORTER_ROLES = new Set(["An observer", "A team member posted"]);
 const REPORTING_LOCATIONS = new Set(["Outside", "Emporium", "Toilet", "Children Section", "Vendors", "Overflow", "Main Auditorium"]);
 const POSTING_LOCATIONS = new Set(["Outside", "Emporium", "Toilet", "Children Section", "Vendors", "Overflow Tent", "Main Auditorium", "Timers", "Service Manager"]);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function text(value: unknown, max = 2_000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -19,6 +21,8 @@ function text(value: unknown, max = 2_000) {
 
 export async function POST(request: Request) {
   try {
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > 100_000) return NextResponse.json({ ok: false, message: "The observer report is too large." }, { status: 413 });
     const session = await readMemberSession();
     if (!session) return NextResponse.json({ ok: false, message: "Your member session has expired." }, { status: 401 });
     const member = await getTeamMemberByEmail(session.email);
@@ -32,6 +36,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Complete the date and service correctly." }, { status: 400 });
     }
     const rawUnits = Array.isArray(body.unitsReported) ? body.unitsReported : [];
+    if (rawUnits.length > SERVICE_OBSERVER_UNITS.length) {
+      return NextResponse.json({ ok: false, message: "Too many observer units were submitted." }, { status: 400 });
+    }
     const unitsReported = [...new Set(rawUnits.map((unit) => text(unit, 80)).filter((unit) => UNITS.has(unit)))];
     if (unitsReported.length !== rawUnits.length) {
       return NextResponse.json({ ok: false, message: "One or more selected units are invalid." }, { status: 400 });
@@ -48,6 +55,7 @@ export async function POST(request: Request) {
     }
 
     await appendServiceObserverReport({
+      submissionId: UUID_PATTERN.test(text(body.submissionId, 36)) ? text(body.submissionId, 36) : randomUUID(),
       date, service, observerName: member.name,
       generalObservations: text(body.generalObservations),
       unitsReported, unitReports,
