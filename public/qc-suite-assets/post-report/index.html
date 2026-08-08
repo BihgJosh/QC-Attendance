@@ -164,7 +164,7 @@
     ['orderliness', 'Orderliness'], ['conduct', "Workers' Conduct"],
     ['compliance', 'Compliance'], ['coordination', 'Coordination']
   ];
-  const observationRatings = ['Excellent', 'Very Good', 'Good', 'Poor'];
+  const reportRatings = ['Excellent', 'Good', 'Needs Improvement', 'Poor'];
 
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -207,9 +207,9 @@
       <div class="overall-rating" id="overallRating">Select and rate at least one observation to submit this report.</div>
 
       <div class="section-label">Comments</div>
-      <label>What went well?</label><textarea id="whatWentWell"></textarea>
+      <label for="whatWentWell">What went well? *</label><textarea id="whatWentWell" required></textarea>
       <label>Areas that need improvement</label><textarea id="areasForImprovement"></textarea>
-      <label>Recommendations</label><textarea id="recommendations"></textarea>
+      <label for="recommendations">Recommendations *</label><textarea id="recommendations" required></textarea>
       <label>Incidents requiring leadership's attention?</label>${pillGroup('incidentFlag', ['Yes','No'], 'No')}
       <div id="incidentWrap" style="display:none;"><label>Describe the incident</label><textarea id="incidentDescribe"></textarea></div>
 
@@ -245,7 +245,7 @@
   function renderObservationRatings() {
     const selected = observations.filter(([field]) => document.querySelector(`[data-observation="${field}"]`)?.getAttribute('aria-pressed') === 'true');
     const container = document.getElementById('observationRatings');
-    container.innerHTML = selected.map(([field, label]) => `<div class="observation-rating"><label for="rating-${field}">${esc(label)}</label><select id="rating-${field}" data-rating-field="${field}"><option value="">Select rating</option>${observationRatings.map(rating => `<option value="${esc(rating)}"${vals[field] === rating ? ' selected' : ''}>${esc(rating)}</option>`).join('')}</select></div>`).join('');
+    container.innerHTML = selected.map(([field, label]) => `<div class="observation-rating"><label for="rating-${field}">${esc(label)}</label><select id="rating-${field}" data-rating-field="${field}"><option value="">Select rating</option>${reportRatings.map(rating => `<option value="${esc(rating)}"${vals[field] === rating ? ' selected' : ''}>${esc(rating)}</option>`).join('')}</select></div>`).join('');
     container.querySelectorAll('[data-rating-field]').forEach(select => select.addEventListener('change', () => { vals[select.dataset.ratingField] = select.value; select.removeAttribute('aria-invalid'); updateOverallRating(); }));
     updateOverallRating();
   }
@@ -256,9 +256,9 @@
     const target = document.getElementById('overallRating');
     if (!selectedFields.length) { vals.overallRating = ''; target.innerHTML = 'Select and rate at least one observation to submit this report.'; return; }
     if (completed.length !== selectedFields.length) { vals.overallRating = ''; target.innerHTML = `Choose a rating for each selected observation (${completed.length}/${selectedFields.length} completed).`; return; }
-    const scores = { 'Excellent': 4, 'Very Good': 3, 'Good': 2, 'Poor': 1 };
+    const scores = { 'Excellent': 4, 'Good': 3, 'Needs Improvement': 2, 'Poor': 1 };
     const average = completed.reduce((sum, rating) => sum + scores[rating], 0) / completed.length;
-    vals.overallRating = average >= 3.5 ? 'Excellent' : average >= 2.5 ? 'Very Good' : average >= 1.5 ? 'Good' : 'Poor';
+    vals.overallRating = average >= 3.5 ? 'Excellent' : average >= 2.5 ? 'Good' : average >= 1.5 ? 'Needs Improvement' : 'Poor';
     target.innerHTML = `Overall rating (auto-calculated): <strong>${vals.overallRating}</strong> from ${completed.length}/${selectedFields.length} rated.`;
   }
 
@@ -298,9 +298,9 @@
     document.getElementById('arrowsPanel').innerHTML = isArrows ? `
       <div class="unit-card"><div class="unit-title">Mighty Arrows — ${esc(area)}</div>
         <label>Topic Taught *</label><textarea id="maTopic"></textarea>
-        <label>Teacher/Archer Preparedness</label>${pillGroup('ma.teacherPreparedness', ctx.ratings, '')}
-        <label>Children's Participation</label>${pillGroup('ma.childrenParticipation', ctx.ratings, '')}
-        <label>Children's Behaviour</label>${pillGroup('ma.childrenBehaviour', ctx.ratings, '')}
+        <label>Teacher/Archer Preparedness</label>${pillGroup('ma.teacherPreparedness', reportRatings, '')}
+        <label>Children's Participation</label>${pillGroup('ma.childrenParticipation', reportRatings, '')}
+        <label>Children's Behaviour</label>${pillGroup('ma.childrenBehaviour', reportRatings, '')}
         <label>Safety Concerns Observed?</label>${pillGroup('ma.safetyFlag', ['Yes','No'], 'No')}
         <div id="maSafetyWrap" style="display:none;"><label>Describe</label><textarea id="maSafetyDescribe"></textarea></div>
       </div>` : '';
@@ -308,9 +308,9 @@
     document.getElementById('teensPanel').innerHTML = isTeens ? `
       <div class="unit-card"><div class="unit-title">${esc(area)}</div>
         <label>Lesson Topic *</label><textarea id="teensTopic"></textarea>
-        <label>Teacher Preparedness</label>${pillGroup('teens.teacherPreparedness', ctx.ratings, '')}
-        <label>Teen Engagement</label>${pillGroup('teens.engagement', ctx.ratings, '')}
-        <label>Classroom Management</label>${pillGroup('teens.classroomMgmt', ctx.ratings, '')}
+        <label>Teacher Preparedness</label>${pillGroup('teens.teacherPreparedness', reportRatings, '')}
+        <label>Teen Engagement</label>${pillGroup('teens.engagement', reportRatings, '')}
+        <label>Classroom Management</label>${pillGroup('teens.classroomMgmt', reportRatings, '')}
       </div>` : '';
 
     bindPills();
@@ -342,6 +342,8 @@
       return;
     }
     if (vals.incidentFlag === 'Yes' && !document.getElementById('incidentDescribe').value.trim()) { fail('Please describe the incident requiring leadership attention.'); return; }
+    if (!document.getElementById('whatWentWell').value.trim()) { fail('Please describe what went well.'); document.getElementById('whatWentWell').focus(); return; }
+    if (!document.getElementById('recommendations').value.trim()) { fail('Please provide a recommendation.'); document.getElementById('recommendations').focus(); return; }
     const selectedArea = document.getElementById('area').value;
     if (selectedArea.startsWith('Mighty Arrows') && !document.getElementById('maTopic').value.trim()) { fail('Please enter the Mighty Arrows topic taught.'); return; }
     if (selectedArea.startsWith('Teens') && !document.getElementById('teensTopic').value.trim()) { fail('Please enter the Teens lesson topic.'); return; }

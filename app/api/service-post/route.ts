@@ -5,8 +5,8 @@ import { appendServicePostReport } from "@/lib/service-post-sheet";
 import { isIsoCalendarDate } from "@/lib/validation";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
-const RATINGS = new Set(["Excellent", "Very Good", "Good", "Poor"]);
-const RATING_SCORES: Record<string, number> = { Excellent: 4, "Very Good": 3, Good: 2, Poor: 1 };
+const RATINGS = new Set(["Excellent", "Good", "Needs Improvement", "Poor"]);
+const RATING_SCORES: Record<string, number> = { Excellent: 4, Good: 3, "Needs Improvement": 2, Poor: 1 };
 
 function text(value: unknown, max = 2_000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -48,7 +48,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Choose a valid rating for each selected observation." }, { status: 400 });
     }
     const averageRating = selectedRatings.length ? selectedRatings.reduce((sum, rating) => sum + RATING_SCORES[rating], 0) / selectedRatings.length : 0;
-    const overallRating = !selectedRatings.length ? "" : averageRating >= 3.5 ? "Excellent" : averageRating >= 2.5 ? "Very Good" : averageRating >= 1.5 ? "Good" : "Poor";
+    const overallRating = !selectedRatings.length ? "" : averageRating >= 3.5 ? "Excellent" : averageRating >= 2.5 ? "Good" : averageRating >= 1.5 ? "Needs Improvement" : "Poor";
+    const whatWentWell = text(body.whatWentWell);
+    const recommendations = text(body.recommendations);
+    if (!whatWentWell || !recommendations) {
+      return NextResponse.json({ ok: false, message: "Describe what went well and provide a recommendation before submitting." }, { status: 400 });
+    }
     if (body.confirmAccurate !== true) {
       return NextResponse.json({ ok: false, message: "Confirm that the report is accurate." }, { status: 400 });
     }
@@ -59,8 +64,8 @@ export async function POST(request: Request) {
       preparedness: text(body.preparedness, 30), neatness: text(body.neatness, 30),
       orderliness: text(body.orderliness, 30), conduct: text(body.conduct, 30),
       compliance: text(body.compliance, 30), coordination: text(body.coordination, 30),
-      overallRating, whatWentWell: text(body.whatWentWell),
-      areasForImprovement: text(body.areasForImprovement), recommendations: text(body.recommendations),
+      overallRating, whatWentWell,
+      areasForImprovement: text(body.areasForImprovement), recommendations,
       incidentFlag: text(body.incidentFlag, 10), incidentDescribe: text(body.incidentDescribe),
       ma: stringRecord(body.ma), teens: stringRecord(body.teens),
       additionalComments: text(body.additionalComments), confirmAccurate: true,
