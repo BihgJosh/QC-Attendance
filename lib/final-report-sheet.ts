@@ -58,7 +58,7 @@ function buildRows(data: DailyReport) {
   const incidents = data.posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length;
 
   add(["QC DAILY SERVICE REPORT"], "title", true);
-  add([`Streams of Joy International  •  ${tabTitle(data.date)}`], "subtitle", true);
+  add([`Streams of Joy International  •  ${data.date === "YYYY-MM-DD" ? "REPORT DATE" : tabTitle(data.date)}`], "subtitle", true);
   add([`Last refreshed ${timestamp(new Date().toISOString())}`], "note", true);
   add([]);
   add(["TOTAL WORSHIPPERS", totalAdults + totalChildren, "SERVICES REPORTED", reportedServices.size, "INCIDENTS", incidents, "EMERGENCIES", data.emergencies.length], "kpi");
