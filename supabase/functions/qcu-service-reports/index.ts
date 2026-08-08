@@ -1,5 +1,5 @@
 const GATEWAY_SECRET_HASH = "e961e32016c41f358eac3f9e1546b93d78bae0b9b30a446ccceecea47533fa41";
-const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "manager.dashboard", "document.insert", "activity.insert", "email.insert"]);
+const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "manager.dashboard", "manager.daily-report", "document.find", "document.insert", "activity.insert", "email.insert"]);
 type Json = Record<string, unknown>;
 
 function json(body: unknown, status = 200) {
@@ -84,6 +84,17 @@ async function dashboard(date: string, service: string) {
   return { headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), timer, observer, emergencies: emergencies.map((row) => ({ location: row.location, description: row.description, reportedBy: row.reported_by, submittedAt: row.submitted_at, status: row.status })) };
 }
 
+async function dailyReport(date: string) {
+  const filter = `report_date=eq.${encodeURIComponent(date)}&order=service.asc,submitted_at.asc.nullslast,created_at.asc`;
+  const [posts, timers, observers, emergencies] = await Promise.all([
+    rest(`service_post_reports?select=*&${filter}`) as Promise<Json[]>,
+    rest(`service_timer_logs?select=*&${filter}`) as Promise<Json[]>,
+    rest(`service_observer_reports?select=*&${filter}`) as Promise<Json[]>,
+    rest(`service_emergency_flags?select=*&${filter}`) as Promise<Json[]>,
+  ]);
+  return { date, posts, timers, observers, emergencies };
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
   try {
@@ -98,6 +109,13 @@ Deno.serve(async (request) => {
       return json({ success: true });
     }
     if (operation === "manager.dashboard") return json({ ok: true, data: await dashboard(String(body.date || ""), String(body.service || "")) });
+    if (operation === "manager.daily-report") return json({ ok: true, data: await dailyReport(String(body.date || "")) });
+    if (operation === "document.find") {
+      const date = encodeURIComponent(String(body.date || ""));
+      const service = encodeURIComponent(String(body.service || ""));
+      const rows = await rest(`service_generated_documents?select=id,document_url,status,generated_at&report_date=eq.${date}&service=eq.${service}&status=eq.Ready&order=generated_at.desc&limit=1`) as Json[];
+      return json({ ok: true, row: rows[0] || null });
+    }
     const table = ({ "report.insert": "service_post_reports", "timer.insert": "service_timer_logs", "observer.insert": "service_observer_reports", "emergency.insert": "service_emergency_flags", "document.insert": "service_generated_documents", "activity.insert": "service_activity_log", "email.insert": "service_email_log" } as Record<string, string>)[operation];
     const rows = await insert(table, body.row, String((body.row as Json)?.source_fingerprint || "") ? "source_fingerprint" : "id") as Json[];
     return json({ success: true, row: rows[0] || null });

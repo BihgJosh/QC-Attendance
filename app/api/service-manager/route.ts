@@ -4,6 +4,7 @@ import { EmailConfigurationError, sendBrevoEmail } from "@/lib/brevo-email";
 import {
   appendEmailDeliveryLog,
   appendGeneratedDocumentLog,
+  findGeneratedDocument,
   SERVICE_REPORT_WORKBOOK_URL,
 } from "@/lib/service-report-workbook";
 import { isIsoCalendarDate } from "@/lib/validation";
@@ -217,16 +218,21 @@ export async function POST(request: Request) {
       let documentUrl: string | undefined;
       let documentLoggingFailed = false;
       if (reportType === "full") {
-        const generated = await callSuite("generateReport", token, date, service);
-        if (!generated.ok) {
-          return NextResponse.json({ ok: false, message: typeof generated.message === "string" ? generated.message : "The full report document could not be generated." }, { status: 502 });
-        }
-        documentUrl = trustedGoogleDocumentUrl(generated.url);
-        try {
-          await appendGeneratedDocumentLog({ date, service, url: documentUrl, actor: `Email delivery to ${recipient}`, requestId });
-        } catch (error) {
-          documentLoggingFailed = true;
-          console.error("[service-manager] Generated email document logging failed", error instanceof Error ? error.message : "Unknown error");
+        const existing = await findGeneratedDocument(date, service);
+        if (existing) {
+          documentUrl = trustedGoogleDocumentUrl(existing.url);
+        } else {
+          const generated = await callSuite("generateReport", token, date, service);
+          if (!generated.ok) {
+            return NextResponse.json({ ok: false, message: typeof generated.message === "string" ? generated.message : "The full report document could not be generated." }, { status: 502 });
+          }
+          documentUrl = trustedGoogleDocumentUrl(generated.url);
+          try {
+            await appendGeneratedDocumentLog({ date, service, url: documentUrl, actor: `Email delivery to ${recipient}`, requestId });
+          } catch (error) {
+            documentLoggingFailed = true;
+            console.error("[service-manager] Generated email document logging failed", error instanceof Error ? error.message : "Unknown error");
+          }
         }
       }
 
@@ -260,6 +266,10 @@ export async function POST(request: Request) {
       }
     }
 
+    if (action === "generateReport") {
+      const existing = await findGeneratedDocument(date, service);
+      if (existing) return NextResponse.json({ ok: true, url: trustedGoogleDocumentUrl(existing.url), reused: true, message: "Existing report opened." }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    }
     const result = await callSuite(action as "checkPassword" | "getDashboard" | "generateReport", token, date || undefined, service || undefined);
     if (action === "generateReport" && result.ok) {
       const documentUrl = trustedGoogleDocumentUrl(result.url);

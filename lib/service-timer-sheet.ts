@@ -3,6 +3,8 @@ import "server-only";
 import { google } from "googleapis";
 import { getGoogleEnv } from "@/lib/env";
 import { appendCategorizedReport } from "@/lib/service-report-workbook";
+import { callServiceReportGateway } from "@/lib/service-report-store";
+import { syncFinalReportForDate } from "@/lib/final-report-sheet";
 
 const SPREADSHEET_ID = "1BeoEcYvTGtVhBCp4SxX8mlfFscQD5rBrZ2tnPUdKP-8";
 const SHEET_GID = 810317383;
@@ -47,6 +49,21 @@ function escapeTitle(title: string) {
 }
 
 export async function appendServiceTimerLog(log: ServiceTimerLog) {
+  const submittedAt = new Date().toISOString();
+  const recordId = crypto.randomUUID();
+  await callServiceReportGateway("timer.insert", {
+    id: recordId,
+    report_date: log.date,
+    service: log.service,
+    timer_name: log.name,
+    service_start: log.serviceStart,
+    service_end: log.serviceEnd,
+    segments: log.segments,
+    extra_segment: log.extra,
+    general_observation: log.generalObservation,
+    submitted_at: submittedAt,
+    source_fingerprint: `live:${recordId}`,
+  });
   const env = getGoogleEnv();
   const auth = new google.auth.JWT({
     email: env.serviceAccountEmail,
@@ -86,7 +103,6 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
     log.extra.name, log.extra.status, log.extra.min, log.extra.sec,
     log.generalObservation,
   ];
-  const submittedAt = new Date().toISOString();
   const [dashboardResult, primaryResult] = await Promise.allSettled([appendCategorizedReport({
     tab: "Timer Logs",
     headers: ["Record ID", ...SERVICE_TIMER_HEADERS],
@@ -105,7 +121,5 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
   })]);
   if (dashboardResult.status === "rejected") console.error("[service-timer] Dashboard write failed", dashboardResult.reason);
   if (primaryResult.status === "rejected") console.error("[service-timer] Primary write failed", primaryResult.reason);
-  if (dashboardResult.status === "rejected" && primaryResult.status === "rejected") {
-    throw new AggregateError([dashboardResult.reason, primaryResult.reason], "Both timer report destinations failed.");
-  }
+  await syncFinalReportForDate(log.date).catch((error) => console.error("[service-timer] Final daily report refresh failed", error instanceof Error ? error.message : error));
 }

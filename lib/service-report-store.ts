@@ -3,7 +3,12 @@ import "server-only";
 import { getEnv, getSupabaseEnv } from "@/lib/env";
 
 type ServiceReportOperation =
+  | "report.insert"
+  | "timer.insert"
   | "observer.insert"
+  | "emergency.insert"
+  | "manager.daily-report"
+  | "document.find"
   | "document.insert"
   | "activity.insert"
   | "email.insert";
@@ -12,7 +17,7 @@ const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 
 export async function callServiceReportGateway<T>(
   operation: ServiceReportOperation,
-  row: Record<string, unknown>,
+  payload: Record<string, unknown>,
 ) {
   const { url, anonKey } = getSupabaseEnv();
   const gatewaySecret = getEnv("SUPABASE_GATEWAY_SECRET");
@@ -31,7 +36,9 @@ export async function callServiceReportGateway<T>(
           Authorization: `Bearer ${anonKey}`,
           "x-qcu-operation-secret": gatewaySecret,
         },
-        body: JSON.stringify({ operation, row }),
+        body: JSON.stringify(operation === "manager.daily-report" || operation === "document.find"
+          ? { operation, ...payload }
+          : { operation, row: payload }),
       });
       const data = await response.json().catch(() => ({})) as { error?: unknown };
       if (response.ok) return data as T;

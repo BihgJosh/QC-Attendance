@@ -84,7 +84,7 @@ export async function appendGeneratedDocumentLog(input: {
   requestId?: string;
 }) {
   const loggedAt = new Date().toISOString();
-  const fingerprint = `document:${input.requestId || input.url}`;
+  const fingerprint = `document:full:${input.date}:${input.service}`;
   const result = await callServiceReportGateway<{ row?: { id?: unknown } }>("document.insert", {
     source_record_id: input.requestId || null,
     report_date: input.date,
@@ -110,6 +110,12 @@ export async function appendGeneratedDocumentLog(input: {
     source_fingerprint: `activity:${fingerprint}`,
   }).catch((error) => console.error("[service-report] Document activity logging failed", error instanceof Error ? error.message : error));
   return { recordId, workbookUrl: SERVICE_REPORT_WORKBOOK_URL };
+}
+
+export async function findGeneratedDocument(date: string, service: string) {
+  const result = await callServiceReportGateway<{ row?: { id?: unknown; document_url?: unknown; status?: unknown } }>("document.find", { date, service });
+  if (!result.row || result.row.status !== "Ready" || typeof result.row.document_url !== "string") return null;
+  return { id: typeof result.row.id === "string" ? result.row.id : "", url: result.row.document_url };
 }
 
 export async function appendEmailDeliveryLog(input: {

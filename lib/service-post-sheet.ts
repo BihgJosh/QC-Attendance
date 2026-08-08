@@ -3,6 +3,8 @@ import "server-only";
 import { google } from "googleapis";
 import { getGoogleEnv } from "@/lib/env";
 import { appendCategorizedReport } from "@/lib/service-report-workbook";
+import { callServiceReportGateway } from "@/lib/service-report-store";
+import { syncFinalReportForDate } from "@/lib/final-report-sheet";
 
 const SPREADSHEET_ID = "1B-tojwzi1WFsXWRuKdJ4g9M01tiZClDFCISndxTR7gg";
 const SHEET_GID = 1234691256;
@@ -49,6 +51,30 @@ function escapeTitle(title: string) {
 }
 
 export async function appendServicePostReport(report: ServicePostReport) {
+  const submittedAt = new Date().toISOString();
+  const recordId = crypto.randomUUID();
+  await callServiceReportGateway("report.insert", {
+    id: recordId,
+    report_date: report.date,
+    service: report.service,
+    reporter_name: report.name,
+    reporter_email: report.email,
+    area: report.area,
+    adults_headcount: report.adultsHeadcount,
+    children_headcount: report.childrenHeadcount,
+    ratings: { preparedness: report.preparedness, neatness: report.neatness, orderliness: report.orderliness, conduct: report.conduct, compliance: report.compliance, coordination: report.coordination },
+    overall_rating: report.overallRating,
+    what_went_well: report.whatWentWell,
+    areas_for_improvement: report.areasForImprovement,
+    recommendations: report.recommendations,
+    incident_flag: report.incidentFlag,
+    incident_description: report.incidentDescribe,
+    mighty_arrows: report.ma,
+    teens: report.teens,
+    additional_comments: report.additionalComments,
+    submitted_at: submittedAt,
+    source_fingerprint: `live:${recordId}`,
+  });
   const env = getGoogleEnv();
   const auth = new google.auth.JWT({
     email: env.serviceAccountEmail,
@@ -85,7 +111,6 @@ export async function appendServicePostReport(report: ServicePostReport) {
     report.ma.safetyDescribe || "", report.teens.lessonTopic || "", report.teens.teacherPreparedness || "",
     report.teens.engagement || "", report.teens.classroomMgmt || "", report.additionalComments,
   ];
-  const submittedAt = new Date().toISOString();
   const [dashboardResult, primaryResult] = await Promise.allSettled([
     appendCategorizedReport({
       tab: "Post Reports",
@@ -112,10 +137,5 @@ export async function appendServicePostReport(report: ServicePostReport) {
   if (primaryResult.status === "rejected") {
     console.error("[service-post] Primary workbook write failed", primaryResult.reason);
   }
-  if (dashboardResult.status === "rejected" && primaryResult.status === "rejected") {
-    throw new AggregateError(
-      [dashboardResult.reason, primaryResult.reason],
-      "Both Service Post report destinations rejected the submission.",
-    );
-  }
+  await syncFinalReportForDate(report.date).catch((error) => console.error("[service-post] Final daily report refresh failed", error instanceof Error ? error.message : error));
 }

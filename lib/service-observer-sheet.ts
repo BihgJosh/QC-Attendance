@@ -1,6 +1,7 @@
 import "server-only";
 
 import { callServiceReportGateway } from "@/lib/service-report-store";
+import { syncFinalReportForDate } from "@/lib/final-report-sheet";
 
 export const SERVICE_OBSERVER_UNITS = [
   "Teens Ministries", "Mighty Arrows", "Chabod Ministrels", "Ushering", "Protocol",
@@ -46,4 +47,5 @@ export async function appendServiceObserverReport(report: ServiceObserverReport)
     conclusion: report.conclusion,
     submitted_at: submittedAt,
   });
+  await syncFinalReportForDate(report.date).catch((error) => console.error("[service-observer] Final daily report refresh failed", error instanceof Error ? error.message : error));
 }

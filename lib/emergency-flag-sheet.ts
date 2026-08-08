@@ -2,6 +2,8 @@ import "server-only";
 
 import { google } from "googleapis";
 import { getGoogleEnv } from "@/lib/env";
+import { callServiceReportGateway } from "@/lib/service-report-store";
+import { syncFinalReportForDate } from "@/lib/final-report-sheet";
 
 const SPREADSHEET_ID = "1AODePttGGYTO9VWRX2Pmwziy-9_Za7W0aravOvTQwdE";
 const SHEET_GID = 562930473;
@@ -22,6 +24,26 @@ function escapeTitle(title: string) {
 }
 
 export async function appendEmergencyFlag(flag: EmergencyFlag) {
+  const now = new Date();
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  const recordId = crypto.randomUUID();
+  await callServiceReportGateway("emergency.insert", {
+    id: recordId,
+    report_date: date,
+    service: "",
+    location: flag.location,
+    reported_by: flag.reportedBy,
+    description: flag.description,
+    status: "Active",
+    submitted_at: now.toISOString(),
+    submitted_at_ms: now.getTime(),
+    source_fingerprint: `live:${recordId}`,
+  });
   const env = getGoogleEnv();
   const auth = new google.auth.JWT({
     email: env.serviceAccountEmail,
@@ -52,13 +74,6 @@ export async function appendEmergencyFlag(flag: EmergencyFlag) {
     throw new Error("The Emergency Flag sheet headers do not match the required emergency columns.");
   }
 
-  const now = new Date();
-  const date = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Lagos",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
     range: `${sheet}!A:H`,
@@ -70,5 +85,6 @@ export async function appendEmergencyFlag(flag: EmergencyFlag) {
         "Active", now.toISOString(), now.getTime(),
       ]],
     },
-  });
+  }).catch((error) => console.error("[emergency-flag] Legacy workbook write failed", error instanceof Error ? error.message : error));
+  await syncFinalReportForDate(date).catch((error) => console.error("[emergency-flag] Final daily report refresh failed", error instanceof Error ? error.message : error));
 }
