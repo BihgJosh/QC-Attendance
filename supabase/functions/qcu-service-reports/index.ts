@@ -1,5 +1,5 @@
 const GATEWAY_SECRET_HASH = "e961e32016c41f358eac3f9e1546b93d78bae0b9b30a446ccceecea47533fa41";
-const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "manager.dashboard", "manager.daily-report", "document.find", "document.insert", "activity.insert", "email.insert"]);
+const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "document.find", "document.insert", "activity.insert", "email.insert"]);
 type Json = Record<string, unknown>;
 
 function json(body: unknown, status = 200) {
@@ -45,7 +45,7 @@ async function importSource(source: Json) {
 }
 
 function ratingSummary(rows: Json[]) {
-  const scores: Record<string, number> = { Excellent: 4, "Very Good": 3, Good: 2, Poor: 1 };
+  const scores: Record<string, number> = { Excellent: 4, Good: 3, "Needs Improvement": 2, Poor: 1 };
   const labels = ["Preparedness", "Neatness", "Orderliness", "Conduct", "Compliance", "Coordination"];
   const result: Record<string, string> = {};
   for (const label of labels) {
@@ -57,7 +57,7 @@ function ratingSummary(rows: Json[]) {
     });
     if (!values.length) continue;
     const average = values.reduce((sum, value) => sum + value, 0) / values.length;
-    result[label] = average >= 3.5 ? "Excellent" : average >= 2.5 ? "Very Good" : average >= 1.5 ? "Good" : "Poor";
+    result[label] = average >= 3.5 ? "Excellent" : average >= 2.5 ? "Good" : average >= 1.5 ? "Needs Improvement" : "Poor";
   }
   return result;
 }
@@ -110,6 +110,20 @@ Deno.serve(async (request) => {
     }
     if (operation === "manager.dashboard") return json({ ok: true, data: await dashboard(String(body.date || ""), String(body.service || "")) });
     if (operation === "manager.daily-report") return json({ ok: true, data: await dailyReport(String(body.date || "")) });
+    if (operation === "emergency.list") {
+      const date = encodeURIComponent(String(body.date || ""));
+      const rows = await rest(`service_emergency_flags?select=id,report_date,service,location,reported_by,description,status,submitted_at,submitted_at_ms&report_date=eq.${date}&order=submitted_at.desc.nullslast,created_at.desc`) as Json[];
+      return json({ ok: true, rows });
+    }
+    if (operation === "emergency.update") {
+      const id = encodeURIComponent(String(body.id || ""));
+      const date = encodeURIComponent(String(body.date || ""));
+      const status = String(body.status || "");
+      if (!id || !date || !["Resolved", "Escalated"].includes(status)) return json({ error: "Invalid emergency update." }, 400);
+      const rows = await rest(`service_emergency_flags?id=eq.${id}&report_date=eq.${date}&status=eq.Active`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ status }) }) as Json[];
+      if (!rows.length) return json({ error: "Emergency flag not found or already accounted for." }, 409);
+      return json({ ok: true, row: rows[0] });
+    }
     if (operation === "document.find") {
       const date = encodeURIComponent(String(body.date || ""));
       const service = encodeURIComponent(String(body.service || ""));

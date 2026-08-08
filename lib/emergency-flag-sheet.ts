@@ -88,3 +88,30 @@ export async function appendEmergencyFlag(flag: EmergencyFlag) {
   }).catch((error) => console.error("[emergency-flag] Legacy workbook write failed", error instanceof Error ? error.message : error));
   await syncFinalReportForDate(date).catch((error) => console.error("[emergency-flag] Final daily report refresh failed", error instanceof Error ? error.message : error));
 }
+
+export async function updateEmergencyFlagStatus(input: { id: string; date: string; status: "Resolved" | "Escalated" }) {
+  const result = await callServiceReportGateway<{ row?: Record<string, unknown> }>("emergency.update", input);
+  if (!result.row) throw new Error("The emergency flag could not be found.");
+
+  try {
+    const env = getGoogleEnv();
+    const auth = new google.auth.JWT({ email: env.serviceAccountEmail, key: env.privateKey, scopes: ["https://www.googleapis.com/auth/spreadsheets"] });
+    const sheets = google.sheets({ version: "v4", auth });
+    const metadata = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID, fields: "sheets.properties(sheetId,title)" });
+    const title = metadata.data.sheets?.find((sheet) => sheet.properties?.sheetId === SHEET_GID)?.properties?.title;
+    if (!title) throw new Error("The configured Emergency Flag sheet tab was not found.");
+    const sheet = escapeTitle(title);
+    const values = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${sheet}!A2:H` });
+    const submittedAtMs = String(result.row.submitted_at_ms || "");
+    const submittedAt = String(result.row.submitted_at || "");
+    const rowIndex = (values.data.values || []).findIndex((row) => String(row[7] || "") === submittedAtMs || String(row[6] || "") === submittedAt);
+    if (rowIndex >= 0) {
+      await sheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range: `${sheet}!F${rowIndex + 2}`, valueInputOption: "RAW", requestBody: { values: [[input.status]] } });
+    }
+  } catch (error) {
+    console.error("[emergency-flag] Legacy status sync failed", error instanceof Error ? error.message : error);
+  }
+
+  await syncFinalReportForDate(input.date);
+  return result.row;
+}

@@ -93,6 +93,7 @@ self.addEventListener("push", (event) => {
     badge: data.badge || "/icons/icon-192.png",
     tag: data.tag || "qc-team-update",
     renotify: true,
+    requireInteraction: data.requireInteraction === true,
     data: { url: data.url || "/" },
   }));
 });

@@ -9,11 +9,13 @@ import {
 } from "@/lib/service-report-workbook";
 import { isIsoCalendarDate } from "@/lib/validation";
 import { updateHeadcountGoogleDocument, type HeadcountService } from "@/lib/headcount-google-doc";
+import { updateEmergencyFlagStatus } from "@/lib/emergency-flag-sheet";
+import { callServiceReportGateway } from "@/lib/service-report-store";
 
 const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycby9y-TP-NfdLurUyqW9hXg5WaHIyl-bW4kJoAOoUpW-ObemJLjmRV0RVS1kwtPJCx9iFg/exec";
 const API_URL = process.env.QC_SUITE_API_URL || DEFAULT_API_URL;
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
-const ACTIONS = new Set(["checkPassword", "getDashboard", "generateReport", "generateHeadcount", "sendEmail"]);
+const ACTIONS = new Set(["checkPassword", "getDashboard", "getEmergencies", "updateEmergency", "generateReport", "generateHeadcount", "sendEmail"]);
 
 type SuiteResult = {
   ok?: boolean;
@@ -147,8 +149,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Invalid request." }, { status: 400 });
     }
     const isAllServicesHeadcount = action === "generateHeadcount" && service === "All services";
-    if (action !== "checkPassword" && (!isIsoCalendarDate(date) || (!SERVICES.has(service) && !isAllServicesHeadcount))) {
+    const isEmergencyAction = action === "getEmergencies" || action === "updateEmergency";
+    if (action !== "checkPassword" && (!isIsoCalendarDate(date) || (!isEmergencyAction && !SERVICES.has(service) && !isAllServicesHeadcount))) {
       return NextResponse.json({ ok: false, message: "Choose a valid date and service." }, { status: 400 });
+    }
+
+    if (isEmergencyAction) {
+      const access = await callSuite("checkPassword", token);
+      if (!access.ok) return NextResponse.json({ ok: false, message: "Service Manager access has expired." }, { status: 401 });
+      if (action === "getEmergencies") {
+        const result = await callServiceReportGateway<{ rows?: Record<string, unknown>[] }>("emergency.list", { date });
+        return NextResponse.json({ ok: true, data: { emergencies: result.rows || [] } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+      }
+
+      const emergencyId = typeof body.emergencyId === "string" ? body.emergencyId : "";
+      const emergencyStatus = body.status === "Resolved" ? "Resolved" : body.status === "Escalated" ? "Escalated" : "";
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(emergencyId) || !emergencyStatus) {
+        return NextResponse.json({ ok: false, message: "Choose a valid emergency action." }, { status: 400 });
+      }
+      const emergency = await updateEmergencyFlagStatus({ id: emergencyId, date, status: emergencyStatus });
+      await callServiceReportGateway("activity.insert", {
+        source_event_id: requestId,
+        logged_at: new Date().toISOString(),
+        report_date: date,
+        service: String(emergency.service || ""),
+        category: "Emergency",
+        action: emergencyStatus,
+        actor: "Service Manager",
+        summary: `${emergencyStatus}: ${String(emergency.location || "Emergency flag")}`,
+        source_record_id: emergencyId,
+        status: "Success",
+        source_fingerprint: `activity:emergency:${emergencyId}:${emergencyStatus}`,
+      }).catch((error) => console.error("[service-manager] Emergency activity logging failed", error instanceof Error ? error.message : error));
+      return NextResponse.json({ ok: true, message: `Emergency marked as ${emergencyStatus.toLowerCase()} and added to the daily report.` }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }
 
     if (action === "generateHeadcount") {

@@ -9,6 +9,9 @@ export type TeamNotification = {
   body: string;
   url: string;
   tag: string;
+  urgency?: "very-low" | "low" | "normal" | "high";
+  ttlSeconds?: number;
+  requireInteraction?: boolean;
 };
 
 export async function notifyTeam(notification: TeamNotification) {
@@ -20,7 +23,7 @@ export async function notifyTeam(notification: TeamNotification) {
   for (let offset = 0; offset < subscriptions.length; offset += batchSize) {
     const results = await Promise.all(subscriptions.slice(offset, offset + batchSize).map(async (subscription) => {
     try {
-      await webPush.sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, payload, { TTL: 60 * 60 * 24, urgency: "normal", topic: notification.tag });
+      await webPush.sendNotification({ endpoint: subscription.endpoint, keys: { p256dh: subscription.p256dh, auth: subscription.auth } }, payload, { TTL: notification.ttlSeconds ?? 60 * 60 * 24, urgency: notification.urgency ?? "normal", topic: notification.tag });
       return { delivered: true, expired: false, endpoint: subscription.endpoint };
     } catch (cause) {
       const statusCode = typeof cause === "object" && cause && "statusCode" in cause ? Number(cause.statusCode) : 0;

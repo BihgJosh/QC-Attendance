@@ -7,6 +7,8 @@ type ServiceReportOperation =
   | "timer.insert"
   | "observer.insert"
   | "emergency.insert"
+  | "emergency.list"
+  | "emergency.update"
   | "manager.daily-report"
   | "document.find"
   | "document.insert"
@@ -36,7 +38,7 @@ export async function callServiceReportGateway<T>(
           Authorization: `Bearer ${anonKey}`,
           "x-qcu-operation-secret": gatewaySecret,
         },
-        body: JSON.stringify(operation === "manager.daily-report" || operation === "document.find"
+        body: JSON.stringify(operation === "manager.daily-report" || operation === "document.find" || operation === "emergency.list" || operation === "emergency.update"
           ? { operation, ...payload }
           : { operation, row: payload }),
       });

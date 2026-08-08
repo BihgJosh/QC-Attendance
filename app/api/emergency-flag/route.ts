@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { appendEmergencyFlag } from "@/lib/emergency-flag-sheet";
+import { notifyTeam } from "@/lib/web-push";
 
 const LEGACY_EMERGENCY_API_URL =
   "https://script.google.com/macros/s/AKfycbzZJ5LEnQGUAC8ChcZ--oxUfUkJMYG8jg-IRUu2i_KcqFD6GByKk5ahTIrbMXz8sjDNMQ/exec";
@@ -37,9 +38,31 @@ export async function POST(request: Request) {
       throw new Error("The emergency alert broadcast was not accepted.");
     }
 
+    let notificationWarning = "";
+    try {
+      const notificationResult = await notifyTeam({
+        title: `Emergency — ${location}`,
+        body: `${description} — reported by ${member.name}`,
+        url: "/qc-tools/emergency",
+        tag: `qc-emergency-${Date.now()}`,
+        urgency: "high",
+        ttlSeconds: 60 * 60 * 24,
+        requireInteraction: true,
+      });
+      if (notificationResult.total === 0) notificationWarning = "no_subscribed_devices";
+      else if (notificationResult.failed > 0) notificationWarning = "partial_notification_delivery";
+    } catch (error) {
+      notificationWarning = "notification_delivery_failed";
+      console.error("[emergency-flag] Device notification broadcast failed", error instanceof Error ? error.message : "Unknown error");
+    }
+
     try {
       await appendEmergencyFlag(flag);
-      return NextResponse.json({ ok: true, message: "Emergency flag sent and saved successfully." });
+      return NextResponse.json({
+        ok: true,
+        message: notificationWarning ? "Emergency flag sent and saved. Some devices may not have received the notification." : "Emergency flag sent to subscribed user devices and saved successfully.",
+        ...(notificationWarning ? { warning: notificationWarning } : {}),
+      });
     } catch (error) {
       console.error("[emergency-flag] Alert sent but sheet logging failed", error instanceof Error ? error.message : "Unknown error");
       return NextResponse.json({ ok: true, message: "Emergency alert sent. The report log will need follow-up.", warning: "logging_failed" });

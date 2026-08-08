@@ -24,7 +24,7 @@ const SERVICES = ["1st Service", "2nd Service", "3rd Service", "4th Service", "T
 type ServiceName = (typeof SERVICES)[number];
 
 type HeadcountRow = { department?: string; adults?: number; children?: number; total?: number };
-type Emergency = { location?: string; description?: string; reportedBy?: string; submittedAt?: string; status?: string };
+type Emergency = { id?: string; service?: string; location?: string; description?: string; reportedBy?: string; submittedAt?: string; status?: string };
 type TimerSegment = { label?: string; status?: string; min?: number; sec?: number };
 type DashboardData = {
   headcount?: { grandTotal?: number; byDepartment?: HeadcountRow[] };
@@ -107,7 +107,7 @@ function normalizeDashboardData(value: unknown): DashboardData | null {
     incidentCount: numberValue(source.incidentCount),
     emergencies: Array.isArray(source.emergencies) ? source.emergencies.flatMap((item) => {
       const emergency = recordValue(item);
-      return emergency ? [{ location: textValue(emergency.location), description: textValue(emergency.description), reportedBy: textValue(emergency.reportedBy), submittedAt: textValue(emergency.submittedAt), status: textValue(emergency.status) }] : [];
+      return emergency ? [{ id: textValue(emergency.id), service: textValue(emergency.service), location: textValue(emergency.location), description: textValue(emergency.description), reportedBy: textValue(emergency.reportedBy ?? emergency.reported_by), submittedAt: textValue(emergency.submittedAt ?? emergency.submitted_at), status: textValue(emergency.status) }] : [];
     }) : [],
     ratings: ratings ? Object.fromEntries(Object.entries(ratings).map(([key, rating]) => [key, typeof rating === "number" ? rating : textValue(rating) || "Not provided"])) : {},
     timer: timer ? {
@@ -132,6 +132,10 @@ export function ServiceManagerDashboard() {
   const [unlocking, setUnlocking] = useState(false);
   const [error, setError] = useState("");
   const [results, setResults] = useState<ServiceResult[]>([]);
+  const [emergencies, setEmergencies] = useState<Emergency[]>([]);
+  const [emergenciesLoading, setEmergenciesLoading] = useState(false);
+  const [emergencyUpdating, setEmergencyUpdating] = useState<string | null>(null);
+  const [emergencyMessage, setEmergencyMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [selectedService, setSelectedService] = useState<ServiceName | null>(null);
   const [reportLoading, setReportLoading] = useState<ServiceName | null>(null);
   const [headcountLoading, setHeadcountLoading] = useState<ServiceName | "All services" | null>(null);
@@ -146,23 +150,44 @@ export function ServiceManagerDashboard() {
   const emailRequest = useRef<{ signature: string; id: string } | null>(null);
   const documentRequest = useRef<{ signature: string; id: string } | null>(null);
   const headcountRequest = useRef<{ signature: string; id: string } | null>(null);
+  const emergencyRequest = useRef(0);
+
+  const loadEmergencies = async (accessToken: string, selectedDate: string) => {
+    const requestId = ++emergencyRequest.current;
+    setEmergenciesLoading(true);
+    try {
+      const result = await managerRequest({ action: "getEmergencies", token: accessToken, date: selectedDate });
+      if (requestId !== emergencyRequest.current) return;
+      if (!result.ok) {
+        setEmergencyMessage({ kind: "error", text: result.message || "Emergency flags could not be loaded." });
+        return;
+      }
+      setEmergencies(result.data?.emergencies || []);
+    } catch {
+      if (requestId === emergencyRequest.current) setEmergencyMessage({ kind: "error", text: "Emergency flags could not be loaded." });
+    } finally {
+      if (requestId === emergencyRequest.current) setEmergenciesLoading(false);
+    }
+  };
 
   const loadAllServices = async (accessToken: string, selectedDate: string) => {
     const requestId = ++summaryRequest.current;
     setLoading(true);
     setError("");
+    setEmergencyMessage(null);
     setSelectedService(null);
     try {
-      const responses = await Promise.all(
-        SERVICES.map(async (service): Promise<ServiceResult> => {
+      const [responses] = await Promise.all([
+        Promise.all(SERVICES.map(async (service): Promise<ServiceResult> => {
           try {
             const result = await managerRequest({ action: "getDashboard", token: accessToken, date: selectedDate, service });
             return { service, data: result.ok ? result.data || null : null, message: result.message };
           } catch {
             return { service, data: null, message: "Could not load this service." };
           }
-        }),
-      );
+        })),
+        loadEmergencies(accessToken, selectedDate),
+      ]);
       if (requestId === summaryRequest.current) setResults(responses);
     } catch {
       if (requestId === summaryRequest.current) setError("The service summary could not be loaded. Try again.");
@@ -194,23 +219,42 @@ export function ServiceManagerDashboard() {
   };
 
   const summary = useMemo(() => {
-    return results.reduce(
+    const totals = results.reduce(
       (total, result) => {
         const data = result.data;
         if (!data) return total;
         total.worshippers += numberValue(data.headcount?.grandTotal);
         total.incidents += numberValue(data.incidentCount);
-        total.emergencies += data.emergencies?.length || 0;
         total.loaded += 1;
         if (data.timer) total.timerLogs += 1;
         if (data.observer) total.observerLogs += 1;
         return total;
       },
-      { worshippers: 0, incidents: 0, emergencies: 0, loaded: 0, timerLogs: 0, observerLogs: 0 },
+      { worshippers: 0, incidents: 0, loaded: 0, timerLogs: 0, observerLogs: 0 },
     );
-  }, [results]);
+    return { ...totals, emergencies: emergencies.length };
+  }, [results, emergencies]);
 
   const selected = results.find((result) => result.service === selectedService);
+
+  const updateEmergency = async (emergency: Emergency, status: "Resolved" | "Escalated") => {
+    if (!emergency.id || emergency.status === status) return;
+    setEmergencyUpdating(emergency.id);
+    setEmergencyMessage(null);
+    try {
+      const result = await managerRequest({ action: "updateEmergency", token, date, emergencyId: emergency.id, status, requestId: crypto.randomUUID() });
+      if (!result.ok) {
+        setEmergencyMessage({ kind: "error", text: result.message || "The emergency status could not be updated." });
+        return;
+      }
+      setEmergencyMessage({ kind: "success", text: result.message || `Emergency marked as ${status.toLowerCase()}.` });
+      await loadEmergencies(token, date);
+    } catch {
+      setEmergencyMessage({ kind: "error", text: "The emergency status could not be updated. Try again." });
+    } finally {
+      setEmergencyUpdating(null);
+    }
+  };
 
   const generateReport = async (service: ServiceName) => {
     const signature = `${date}|${service}`;
@@ -382,6 +426,8 @@ export function ServiceManagerDashboard() {
           <Metric label="Emergency flags" value={data.emergencies?.length || 0} icon={ShieldCheck} />
         </div>
 
+        <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} />
+
         {!!data.emergencies?.length && <ReportSection title="Emergency flags" icon={AlertTriangle} danger>{data.emergencies.map((item, index) => <div key={`${item.location}-${index}`} className="rounded-xl bg-red-100 p-4"><p className="font-bold text-red-950">{item.location || "Location not provided"}</p><p className="mt-1 text-sm leading-6 text-red-900">{item.description || "No description"}</p><p className="mt-2 text-xs font-medium text-red-800">{item.reportedBy || "Unknown reporter"} · {item.submittedAt || "Time unavailable"} · {item.status || "Status unavailable"}</p></div>)}</ReportSection>}
 
         <ReportSection title="Worshipper headcount" icon={Users}>
@@ -433,6 +479,8 @@ export function ServiceManagerDashboard() {
 
       <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-full bg-cyan-50 px-3 py-1.5 text-cyan-900 ring-1 ring-inset ring-cyan-200">Timer logs {summary.timerLogs}/{SERVICES.length}</span><span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-900 ring-1 ring-inset ring-violet-200">Observer logs {summary.observerLogs}/{SERVICES.length}</span></div>
 
+      <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} />
+
       {loading ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-cyan-700" /><span className="ml-3 text-sm font-semibold text-slate-600">Compiling every service…</span></div> : (
         <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {SERVICES.map((service) => {
@@ -457,6 +505,20 @@ export function ServiceManagerDashboard() {
       )}
     </div>
   );
+}
+
+function EmergencyActionQueue({ emergencies, loading, updatingId, message, onUpdate }: { emergencies: Emergency[]; loading: boolean; updatingId: string | null; message: { kind: "success" | "error"; text: string } | null; onUpdate: (emergency: Emergency, status: "Resolved" | "Escalated") => void }) {
+  const ordered = [...emergencies].sort((left, right) => Number(right.status === "Active") - Number(left.status === "Active"));
+  return <section className="mt-6 rounded-2xl bg-rose-50 p-4 ring-1 ring-inset ring-rose-200 sm:p-5" aria-labelledby="emergency-action-title">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id="emergency-action-title" className="flex items-center gap-2 text-sm font-black text-rose-950"><AlertTriangle className="h-4 w-4" /> Emergency actions</h4><p className="mt-1 text-xs leading-5 text-rose-800">Account for each flagged emergency. Updates are added to the daily report.</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-rose-900 ring-1 ring-inset ring-rose-200">{emergencies.length} flagged</span></div>
+    {message && <p role={message.kind === "error" ? "alert" : "status"} className={`mt-3 rounded-xl px-3 py-2 text-xs font-bold ${message.kind === "error" ? "bg-red-100 text-red-900" : "bg-emerald-100 text-emerald-900"}`}>{message.text}</p>}
+    {loading ? <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-rose-800"><Loader2 className="h-4 w-4 animate-spin" /> Loading emergency flags</p> : ordered.length ? <div className="mt-4 grid gap-3">{ordered.map((emergency, index) => {
+      const active = !emergency.status || emergency.status === "Active";
+      const busy = emergency.id === updatingId;
+      const statusTone = emergency.status === "Resolved" ? "bg-emerald-100 text-emerald-900" : emergency.status === "Escalated" ? "bg-amber-100 text-amber-950" : "bg-rose-100 text-rose-900";
+      return <article key={emergency.id || `${emergency.location}-${index}`} className="rounded-xl bg-white p-4 shadow-[0_6px_18px_rgba(127,29,29,0.08)]"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="font-black text-slate-950">{emergency.location || "Location not provided"}</p><p className="mt-1 text-sm leading-5 text-slate-700">{emergency.description || "No description provided."}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${statusTone}`}>{emergency.status || "Active"}</span></div><p className="mt-2 text-xs font-semibold text-slate-500">{emergency.reportedBy || "Unknown reporter"}{emergency.submittedAt ? ` · ${new Date(emergency.submittedAt).toLocaleString()}` : ""}</p>{active && emergency.id && <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Resolved")} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Mark resolved</button><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Escalated")} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-black text-amber-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"><AlertTriangle className="h-4 w-4" /> Escalate</button></div>}</article>;
+    })}</div> : <p className="mt-4 rounded-xl bg-white p-3 text-sm font-semibold text-slate-700">No emergency has been flagged for this date.</p>}
+  </section>;
 }
 
 function HeadcountDocumentNotice({ document }: { document: { scope: string; url: string; services: string[]; message?: string; warning?: string } }) {

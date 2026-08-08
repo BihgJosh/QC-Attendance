@@ -153,13 +153,13 @@ export default function HomePage() {
         <div className="mx-auto grid w-full max-w-7xl items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-primary">
-              <Sparkles className="h-3.5 w-3.5" /> Excellence is our culture
+              <Sparkles className="h-3.5 w-3.5" /> Love in action. Order with purpose.
             </div>
             <h1 className="max-w-3xl text-[clamp(2.65rem,7vw,5.5rem)] font-bold leading-[0.96] tracking-[-0.055em]">
-              We guard the <span className="brand-gradient-text">standard</span> behind every service.
+              We embrace all with <span className="brand-gradient-text">love</span> and serve with purpose.
             </h1>
             <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-              The Quality Control Unit helps every Streams of Joy experience feel orderly, welcoming and excellent—from the first arrival to the final handover.
+              With a strong passion to serve selflessly, the Quality Control Unit helps set order and decency while saturating every service with the presence and power of God.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Button asChild variant="gradient" size="lg" className="h-12 rounded-full px-6">
