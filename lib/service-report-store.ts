@@ -2,7 +2,11 @@ import "server-only";
 
 import { getEnv, getSupabaseEnv } from "@/lib/env";
 
-type ServiceReportOperation = "observer.insert";
+type ServiceReportOperation =
+  | "observer.insert"
+  | "document.insert"
+  | "activity.insert"
+  | "email.insert";
 
 const RETRYABLE_STATUS_CODES = new Set([408, 429, 500, 502, 503, 504]);
 

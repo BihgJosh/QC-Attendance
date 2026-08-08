@@ -93,7 +93,13 @@ async function performUpdate(date: string, services: HeadcountService[]) {
     requests.push({ insertText: { location: { index: 1 }, text: content } });
     requests.push({ updateTextStyle: { range: { startIndex: 1, endIndex: content.length + 1 }, textStyle: { weightedFontFamily: { fontFamily: "Arial" }, fontSize: { magnitude: 10, unit: "PT" }, foregroundColor: { color: { rgbColor: { red: 0.09, green: 0.13, blue: 0.2 } } } }, fields: "weightedFontFamily,fontSize,foregroundColor" } });
     try {
-      await docs.documents.batchUpdate({ documentId, requestBody: { requests } }, { timeout: 15_000 });
+      await docs.documents.batchUpdate({
+        documentId,
+        requestBody: {
+          requests,
+          ...(current.data.revisionId ? { writeControl: { requiredRevisionId: current.data.revisionId } } : {}),
+        },
+      }, { timeout: 15_000 });
       break;
     } catch (error) {
       if (attempt === 1) throw error;

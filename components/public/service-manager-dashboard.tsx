@@ -10,7 +10,6 @@ import {
   ClipboardList,
   Clock3,
   Eye,
-  FileSpreadsheet,
   FileText,
   Loader2,
   LockKeyhole,
@@ -37,6 +36,18 @@ type DashboardData = {
 };
 
 type ServiceResult = { service: ServiceName; data: DashboardData | null; message?: string };
+type ManagerResult = {
+  ok: boolean;
+  message?: string;
+  data?: DashboardData;
+  url?: string;
+  workbookUrl?: string;
+  logRecordId?: string;
+  emailLogId?: string;
+  includedServices?: string[];
+  skippedServices?: string[];
+  warning?: string;
+};
 
 function abujaToday() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -47,23 +58,20 @@ function abujaToday() {
   }).format(new Date());
 }
 
-async function managerRequest(body: Record<string, string>) {
+async function managerRequest(body: Record<string, string>): Promise<ManagerResult> {
   const response = await fetch("/api/service-manager", {
     method: "POST",
+    signal: AbortSignal.timeout(30_000),
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const result = await response.json() as {
-    ok: boolean;
-    message?: string;
-    data?: DashboardData;
-    url?: string;
-    workbookUrl?: string;
-    logRecordId?: string;
-    emailLogId?: string;
-    includedServices?: string[];
-    skippedServices?: string[];
-  };
+  const responseText = await response.text();
+  let result: ManagerResult;
+  try {
+    result = JSON.parse(responseText) as typeof result;
+  } catch {
+    return { ok: false, message: response.ok ? "The operation completed but its confirmation was interrupted. Retry safely." : `The report service returned an invalid response (${response.status}).` };
+  }
   return { ...result, data: normalizeDashboardData(result.data) || undefined };
 }
 
@@ -127,15 +135,17 @@ export function ServiceManagerDashboard() {
   const [selectedService, setSelectedService] = useState<ServiceName | null>(null);
   const [reportLoading, setReportLoading] = useState<ServiceName | null>(null);
   const [headcountLoading, setHeadcountLoading] = useState<ServiceName | "All services" | null>(null);
-  const [headcountDocument, setHeadcountDocument] = useState<{ scope: string; url: string; services: string[] } | null>(null);
-  const [generatedLog, setGeneratedLog] = useState<{ service: ServiceName; workbookUrl: string; recordId: string } | null>(null);
+  const [headcountDocument, setHeadcountDocument] = useState<{ scope: string; url: string; services: string[]; message?: string; warning?: string } | null>(null);
+  const [generatedLog, setGeneratedLog] = useState<{ service: ServiceName; documentUrl: string; warning?: string } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [shareType, setShareType] = useState<"summary" | "full">("summary");
   const [shareLoading, setShareLoading] = useState(false);
-  const [shareMessage, setShareMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [shareMessage, setShareMessage] = useState<{ kind: "success" | "warning" | "error"; text: string } | null>(null);
   const summaryRequest = useRef(0);
   const emailRequest = useRef<{ signature: string; id: string } | null>(null);
+  const documentRequest = useRef<{ signature: string; id: string } | null>(null);
+  const headcountRequest = useRef<{ signature: string; id: string } | null>(null);
 
   const loadAllServices = async (accessToken: string, selectedDate: string) => {
     const requestId = ++summaryRequest.current;
@@ -203,27 +213,28 @@ export function ServiceManagerDashboard() {
   const selected = results.find((result) => result.service === selectedService);
 
   const generateReport = async (service: ServiceName) => {
+    const signature = `${date}|${service}`;
+    if (!documentRequest.current || documentRequest.current.signature !== signature) {
+      documentRequest.current = { signature, id: crypto.randomUUID() };
+    }
     const reportWindow = window.open("about:blank", "_blank");
     if (reportWindow) reportWindow.opener = null;
     setReportLoading(service);
     setError("");
     setGeneratedLog(null);
     try {
-      const result = await managerRequest({ action: "generateReport", token, date, service });
+      const result = await managerRequest({ action: "generateReport", token, date, service, requestId: documentRequest.current.id });
       if (!result.ok || !result.url) {
         reportWindow?.close();
         setError(result.message || "The report document could not be generated.");
         return;
       }
       const reportUrl = new URL(result.url);
-      if (reportUrl.protocol !== "https:") throw new Error("Unsafe report URL");
-      if (result.workbookUrl && result.logRecordId) {
-        const workbookUrl = new URL(result.workbookUrl);
-        if (workbookUrl.protocol !== "https:" || workbookUrl.hostname !== "docs.google.com") throw new Error("Unsafe workbook URL");
-        setGeneratedLog({ service, workbookUrl: workbookUrl.toString(), recordId: String(result.logRecordId) });
-      }
+      if (reportUrl.protocol !== "https:" || reportUrl.hostname !== "docs.google.com") throw new Error("Unsafe report URL");
+      setGeneratedLog({ service, documentUrl: reportUrl.toString(), warning: result.warning });
+      documentRequest.current = null;
       if (reportWindow) reportWindow.location.href = reportUrl.toString();
-      else setError("The report is ready, but the browser blocked the new tab. Allow pop-ups and try again.");
+      else setError("The report is ready. Use the document link below to open it.");
     } catch {
       reportWindow?.close();
       setError("The report document could not be generated.");
@@ -233,13 +244,17 @@ export function ServiceManagerDashboard() {
   };
 
   const generateHeadcount = async (scope: ServiceName | "All services") => {
+    const signature = `${date}|${scope}`;
+    if (!headcountRequest.current || headcountRequest.current.signature !== signature) {
+      headcountRequest.current = { signature, id: crypto.randomUUID() };
+    }
     const documentWindow = window.open("about:blank", "_blank");
     if (documentWindow) documentWindow.opener = null;
     setHeadcountLoading(scope);
     setError("");
     setHeadcountDocument(null);
     try {
-      const result = await managerRequest({ action: "generateHeadcount", token, date, service: scope });
+      const result = await managerRequest({ action: "generateHeadcount", token, date, service: scope, requestId: headcountRequest.current.id });
       if (!result.ok || !result.url) {
         documentWindow?.close();
         setError(result.message || "The headcount document could not be generated.");
@@ -251,7 +266,10 @@ export function ServiceManagerDashboard() {
         scope,
         url: documentUrl.toString(),
         services: result.includedServices || [],
+        message: result.message,
+        warning: result.warning,
       });
+      headcountRequest.current = null;
       if (documentWindow) documentWindow.location.href = documentUrl.toString();
       else setError("The headcount is ready, but the browser blocked the new tab. Use the document link below.");
     } catch {
@@ -285,7 +303,7 @@ export function ServiceManagerDashboard() {
         setShareMessage({ kind: "error", text: result.message || "The report email could not be sent." });
         return;
       }
-      setShareMessage({ kind: "success", text: result.message || "Report email sent." });
+      setShareMessage({ kind: result.warning ? "warning" : "success", text: result.message || "Report email sent." });
       emailRequest.current = null;
       setRecipient("");
     } catch {
@@ -354,9 +372,9 @@ export function ServiceManagerDashboard() {
             </div></fieldset>
             <button type="submit" disabled={shareLoading || !recipient.trim()} className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 text-sm font-black text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">{shareLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{shareLoading ? "Sending" : "Send email"}</button>
           </div>
-          {shareMessage && <p role={shareMessage.kind === "error" ? "alert" : "status"} className={`mt-4 rounded-xl px-4 py-3 text-sm font-semibold ${shareMessage.kind === "success" ? "bg-emerald-100 text-emerald-900" : "bg-red-100 text-red-900"}`}>{shareMessage.text}</p>}
+          {shareMessage && <p role={shareMessage.kind === "error" ? "alert" : "status"} className={`mt-4 rounded-xl px-4 py-3 text-sm font-semibold ${shareMessage.kind === "success" ? "bg-emerald-100 text-emerald-900" : shareMessage.kind === "warning" ? "bg-amber-100 text-amber-950" : "bg-red-100 text-red-900"}`}>{shareMessage.text}</p>}
         </form>}
-        {generatedLog?.service === selectedService && <div role="status" className="mt-5 flex flex-col gap-3 rounded-xl bg-emerald-100 p-4 text-sm font-semibold text-emerald-900 sm:flex-row sm:items-center sm:justify-between"><span>Document generated and logged under {selectedService}.</span><a href={generatedLog.workbookUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-black text-emerald-950 underline decoration-emerald-600 underline-offset-4"><FileSpreadsheet className="h-4 w-4" /> Open service workbook</a></div>}
+        {generatedLog?.service === selectedService && <div role="status" className={`mt-5 flex flex-col gap-3 rounded-xl p-4 text-sm font-semibold sm:flex-row sm:items-center sm:justify-between ${generatedLog.warning ? "bg-amber-100 text-amber-950" : "bg-emerald-100 text-emerald-900"}`}><span>{generatedLog.warning ? "Document generated; audit logging will retry separately." : `Document generated successfully for ${selectedService}.`}</span><a href={generatedLog.documentUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-black underline underline-offset-4"><FileText className="h-4 w-4" /> Open generated document</a></div>}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <Metric label="Worshippers" value={numberValue(data.headcount?.grandTotal)} icon={Users} />
@@ -441,9 +459,9 @@ export function ServiceManagerDashboard() {
   );
 }
 
-function HeadcountDocumentNotice({ document }: { document: { scope: string; url: string; services: string[] } }) {
-  return <div role="status" className="mt-5 flex flex-col gap-3 rounded-xl bg-violet-100 p-4 text-sm text-violet-950 sm:flex-row sm:items-center sm:justify-between">
-    <div><p className="font-black">Shared headcount document updated</p><p className="mt-1 text-xs font-semibold text-violet-900">{document.services.length} service{document.services.length === 1 ? "" : "s"} included. Generating another headcount will replace the current contents.</p></div>
+function HeadcountDocumentNotice({ document }: { document: { scope: string; url: string; services: string[]; message?: string; warning?: string } }) {
+  return <div role="status" className={`mt-5 flex flex-col gap-3 rounded-xl p-4 text-sm sm:flex-row sm:items-center sm:justify-between ${document.warning ? "bg-amber-100 text-amber-950" : "bg-violet-100 text-violet-950"}`}>
+    <div><p className="font-black">Headcount document generated</p><p className="mt-1 text-xs font-semibold">{document.message || `${document.services.length} service${document.services.length === 1 ? "" : "s"} included.`}</p></div>
     <a href={document.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 font-black text-white transition hover:bg-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-700 focus-visible:ring-offset-2"><FileText className="h-4 w-4" /> Open Google Doc</a>
   </div>;
 }

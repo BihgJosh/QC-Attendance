@@ -98,8 +98,8 @@ function reportEmailHtml(input: {
     ? observer.unitReports as Record<string, unknown>
     : {};
   const section = (title: string, content: string) => `<div style="margin-top:22px;padding:18px;border:1px solid #dbeafe;border-radius:16px;background:#f8fbff"><h2 style="margin:0 0 12px;color:#102044;font-size:16px">${escapeHtml(title)}</h2>${content}</div>`;
-  const rows = (items: string) => `<table role="presentation" style="width:100%;border-collapse:collapse;font-size:13px">${items}</table>`;
-  const row = (label: unknown, value: unknown) => `<tr><td style="padding:7px 4px;color:#64748b;border-bottom:1px solid #e2e8f0">${escapeHtml(label)}</td><td style="padding:7px 4px;text-align:right;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0">${escapeHtml(value)}</td></tr>`;
+  const rows = (items: string) => `<table style="width:100%;border-collapse:collapse;font-size:13px">${items}</table>`;
+  const row = (label: unknown, value: unknown) => `<tr><th scope="row" style="padding:7px 4px;text-align:left;font-weight:500;color:#64748b;border-bottom:1px solid #e2e8f0">${escapeHtml(label)}</th><td style="padding:7px 4px;text-align:right;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0">${escapeHtml(value)}</td></tr>`;
 
   const detailed = input.reportType === "full" ? [
     section("Worshipper headcount", departments.length
@@ -139,6 +139,9 @@ export async function POST(request: Request) {
     const token = typeof body.token === "string" ? body.token.trim() : "";
     const date = typeof body.date === "string" ? body.date : "";
     const service = typeof body.service === "string" ? body.service : "";
+    const requestId = typeof body.requestId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)
+      ? body.requestId
+      : randomUUID();
     if (!ACTIONS.has(action) || !token || token.length > 200) {
       return NextResponse.json({ ok: false, message: "Invalid request." }, { status: 400 });
     }
@@ -168,6 +171,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, message: "No submitted headcount data is available for this selection." }, { status: 404 });
       }
       let document: Awaited<ReturnType<typeof updateHeadcountGoogleDocument>>;
+      let headcountLoggingFailed = false;
       try {
         document = await updateHeadcountGoogleDocument(date, available);
       } catch (error) {
@@ -179,26 +183,29 @@ export async function POST(request: Request) {
           date,
           service: isAllServicesHeadcount ? "All services" : service,
           url: document.url,
+          requestId,
           actor: "Service Manager · Shared headcount",
         });
       } catch (error) {
+        headcountLoggingFailed = true;
         console.error("[service-manager] Shared headcount document logging failed", error instanceof Error ? error.message : "Unknown error");
       }
+      const skippedServices = requestedServices.filter((serviceName) => !available.some((item) => item.service === serviceName));
       return NextResponse.json({
         ok: true,
         url: document.url,
         includedServices: available.map((item) => item.service),
-        skippedServices: requestedServices.filter((serviceName) => !available.some((item) => item.service === serviceName)),
-        message: `Shared headcount document updated for ${available.length} service${available.length === 1 ? "" : "s"}.`,
+        skippedServices,
+        message: skippedServices.length
+          ? `Headcount document generated for ${available.length} service${available.length === 1 ? "" : "s"}; ${skippedServices.length} service${skippedServices.length === 1 ? " was" : "s were"} skipped because data was unavailable.`
+          : `Headcount document generated for ${available.length} service${available.length === 1 ? "" : "s"}.`,
+        ...((headcountLoggingFailed || skippedServices.length) ? { warning: headcountLoggingFailed ? "logging_failed" : "partial_data" } : {}),
       }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }
 
     if (action === "sendEmail") {
       const recipient = typeof body.recipient === "string" ? body.recipient.trim().toLowerCase() : "";
       const reportType = body.reportType === "full" ? "full" : body.reportType === "summary" ? "summary" : "";
-      const requestId = typeof body.requestId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)
-        ? body.requestId
-        : randomUUID();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 254 || !reportType) {
         return NextResponse.json({ ok: false, message: "Enter a valid recipient email and choose a report type." }, { status: 400 });
       }
@@ -216,7 +223,7 @@ export async function POST(request: Request) {
         }
         documentUrl = trustedGoogleDocumentUrl(generated.url);
         try {
-          await appendGeneratedDocumentLog({ date, service, url: documentUrl, actor: `Email delivery to ${recipient}` });
+          await appendGeneratedDocumentLog({ date, service, url: documentUrl, actor: `Email delivery to ${recipient}`, requestId });
         } catch (error) {
           documentLoggingFailed = true;
           console.error("[service-manager] Generated email document logging failed", error instanceof Error ? error.message : "Unknown error");
@@ -233,7 +240,7 @@ export async function POST(request: Request) {
       try {
         const emailLogId = await appendEmailDeliveryLog({
           date, service, recipient, reportType, subject,
-          providerMessageId: delivery.messageId, documentUrl,
+          providerMessageId: delivery.messageId, documentUrl, requestId,
         });
         return NextResponse.json({
           ok: true,
@@ -255,15 +262,21 @@ export async function POST(request: Request) {
 
     const result = await callSuite(action as "checkPassword" | "getDashboard" | "generateReport", token, date || undefined, service || undefined);
     if (action === "generateReport" && result.ok) {
+      const documentUrl = trustedGoogleDocumentUrl(result.url);
       try {
-        const documentUrl = trustedGoogleDocumentUrl(result.url);
-        const log = await appendGeneratedDocumentLog({ date, service, url: documentUrl });
+        const log = await appendGeneratedDocumentLog({ date, service, url: documentUrl, requestId });
         return NextResponse.json({ ...result, url: documentUrl, workbookUrl: log.workbookUrl, logRecordId: log.recordId }, {
           headers: { "Cache-Control": "no-store, max-age=0" },
         });
       } catch (error) {
         console.error("[service-manager] Generated document logging failed", error instanceof Error ? error.message : "Unknown error");
-        return NextResponse.json({ ok: false, message: "The document was generated but could not be logged in the service workbook." }, { status: 502 });
+        return NextResponse.json({
+          ...result,
+          ok: true,
+          url: documentUrl,
+          message: "Document generated successfully. Its audit log will be retried separately.",
+          warning: "logging_failed",
+        }, { headers: { "Cache-Control": "no-store, max-age=0" } });
       }
     }
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store, max-age=0" } });
