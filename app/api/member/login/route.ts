@@ -19,17 +19,16 @@ export async function POST(request: Request) {
       if (status.hasPrivatePassword) return NextResponse.json({ nextStep: "password" });
       return NextResponse.json({ nextStep: "setup" });
     }
-    const rememberMe = body.rememberMe === true;
     if (action === "setup") {
-      const session = await completeMemberSetup(email, String(body.password || ""), rememberMe);
-      await setMemberSession(session.token, rememberMe);
+      const session = await completeMemberSetup(email, String(body.password || ""), true);
+      await setMemberSession(session.token);
       return NextResponse.json({ success: true });
     }
     if (action !== "login") return NextResponse.json({ error: "Invalid sign-in step." }, { status: 400 });
     const password = String(body.password || "");
     if (!password || password.length > 256) return NextResponse.json({ error: "Enter your private password." }, { status: 400 });
-    const session = await authenticateMember(email, password, rememberMe);
-    await setMemberSession(session.token, rememberMe);
+    const session = await authenticateMember(email, password, true);
+    await setMemberSession(session.token);
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof TeamDataError) return NextResponse.json({ error: error.message }, { status: 503 });

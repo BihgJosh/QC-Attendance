@@ -6,14 +6,14 @@ import { getMemberSession } from "@/lib/member-store";
 export const MEMBER_SESSION_COOKIE = "qcu_member_session";
 export const MEMBER_SESSION_MAX_AGE = 60 * 60 * 24 * 180;
 
-export async function setMemberSession(token: string, rememberMe = false) {
+export async function setMemberSession(token: string) {
   const store = await cookies();
   store.set(MEMBER_SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
-    ...(rememberMe ? { maxAge: MEMBER_SESSION_MAX_AGE } : {}),
+    maxAge: MEMBER_SESSION_MAX_AGE,
   });
 }
 

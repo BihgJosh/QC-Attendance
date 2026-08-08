@@ -16,7 +16,6 @@ export function MemberLoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +35,7 @@ export function MemberLoginForm() {
       if (step === "setup" && password !== confirm) throw new Error("The passwords do not match.");
       if (step === "setup" && !passwordReady) throw new Error("Use at least 10 characters with uppercase, lowercase and a number.");
       const action = step === "email" ? "identify" : step === "password" ? "login" : "setup";
-      const response = await fetch("/api/member/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, email, password, rememberMe }) });
+      const response = await fetch("/api/member/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, email, password }) });
       const data = await response.json().catch(() => ({ error: "The sign-in service returned an invalid response." }));
       if (!response.ok) throw new Error(data.error || "Sign-in failed.");
       if (data.nextStep === "password" || data.nextStep === "setup") {
@@ -58,7 +57,7 @@ export function MemberLoginForm() {
       <div className="space-y-2"><Label htmlFor="confirm-password" className="font-semibold text-white">Confirm private password</Label><Input id="confirm-password" type="password" autoComplete="new-password" required value={confirm} onChange={(event) => setConfirm(event.target.value)} className="auth-input h-12 border-white/30" /></div>
       <p className="text-xs leading-5 text-white/80">Use at least 10 characters with uppercase, lowercase and a number.</p>
     </>}
-    {step !== "email" && <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-white"><input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} className="h-4 w-4 rounded border-white/40 accent-cyan-400" /><span>Keep me logged in on this device</span></label>}
+    {step !== "email" && <p className="text-xs font-medium leading-5 text-cyan-100">You’ll stay signed in on this device for up to 180 days.</p>}
     {error && <div role="alert" className="rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">{error}</div>}
     <Button type="submit" variant="gradient" className="h-12 w-full" disabled={loading}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}{step === "email" ? "Continue" : step === "setup" ? "Create password and sign in" : "Sign in"}</Button>
     {step === "email" && <p className="text-center text-xs font-medium leading-5 text-white/80">Enter your registered team email. First-time users will create a private password—there is no shared password.</p>}

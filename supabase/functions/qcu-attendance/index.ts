@@ -54,7 +54,6 @@ async function rest(path: string, init: RequestInit = {}) {
 
 const PROTECTED_BOOTSTRAP_EMAILS = new Set(["joshuaagusa001@gmail.com"]);
 const PASSWORD_ITERATIONS = 210_000;
-const STANDARD_SESSION_HOURS = 12;
 const REMEMBERED_SESSION_DAYS = 180;
 
 function normalizeEmail(value: unknown) {
@@ -94,13 +93,13 @@ async function verifyPassword(password: string, stored: string) {
   return safeEqual(bytesToBase64Url(actual), expectedText);
 }
 
-async function createMemberSession(email: string, rememberMe = false) {
+async function createMemberSession(email: string) {
   const token = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash = await sha256(token);
-  const expiresAt = new Date(Date.now() + (rememberMe ? REMEMBERED_SESSION_DAYS * 24 : STANDARD_SESSION_HOURS) * 60 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + REMEMBERED_SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
   await rest("member_sessions", {
     method: "POST", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ email, token_hash: tokenHash, expires_at: expiresAt, remember_me: rememberMe }),
+    body: JSON.stringify({ email, token_hash: tokenHash, expires_at: expiresAt, remember_me: true }),
   });
   return token;
 }
@@ -115,14 +114,13 @@ async function resolveMemberSession(tokenValue: unknown) {
   const email = String(sessions[0].email);
   const credentials = await rest(`member_credentials?select=email,must_change_password&email=eq.${encodeURIComponent(email)}&limit=1`) as Json[];
   if (!credentials[0]) return null;
-  const rememberMe = sessions[0].remember_me === true;
-  const rollingExpiry = rememberMe && new Date(String(sessions[0].expires_at)).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000
+  const rollingExpiry = sessions[0].remember_me !== true || new Date(String(sessions[0].expires_at)).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000
     ? new Date(Date.now() + REMEMBERED_SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString()
     : undefined;
   await rest(`member_sessions?token_hash=eq.${encodeURIComponent(tokenHash)}`, {
-    method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ last_seen_at: now, ...(rollingExpiry ? { expires_at: rollingExpiry } : {}) }),
+    method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ last_seen_at: now, remember_me: true, ...(rollingExpiry ? { expires_at: rollingExpiry } : {}) }),
   });
-  return { email, tokenHash, rememberMe, mustChangePassword: Boolean(credentials[0].must_change_password) };
+  return { email, tokenHash, rememberMe: true, mustChangePassword: Boolean(credentials[0].must_change_password) };
 }
 
 function validNewPassword(password: string) {
@@ -216,14 +214,13 @@ Deno.serve(async (request) => {
     if (operation === "member.setup-complete") {
       const email = normalizeEmail(body.email);
       const password = String(body.password || "");
-      const rememberMe = body.rememberMe === true;
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !validNewPassword(password)) return json({ error: "Use a private password of at least 10 characters with uppercase, lowercase and a number." }, 400);
       const existing = await rest(`member_credentials?select=email&email=eq.${encodeURIComponent(email)}&limit=1`) as Json[];
       if (existing[0]) return json({ error: "This account already has a private password. Sign in instead." }, 409);
       const now = new Date().toISOString();
       await rest("member_credentials?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, password_hash: await hashPassword(password), must_change_password: false, failed_attempts: 0, locked_until: null, password_changed_at: now, updated_at: now }) });
       await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
-      return json({ token: await createMemberSession(email, rememberMe), mustChangePassword: false });
+      return json({ token: await createMemberSession(email), mustChangePassword: false });
     }
     if (operation === "member.authenticate") {
       const email = normalizeEmail(body.email);
@@ -244,7 +241,7 @@ Deno.serve(async (request) => {
         return json({ error: lock ? "Too many attempts. Try again in 15 minutes." : "Invalid email or password." }, lock ? 429 : 401);
       }
       await rest(`member_credentials?email=eq.${encodeURIComponent(email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ failed_attempts: 0, locked_until: null, last_login_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
-      return json({ token: await createMemberSession(email, body.rememberMe === true), mustChangePassword: false });
+      return json({ token: await createMemberSession(email), mustChangePassword: false });
     }
     if (operation === "member.session") {
       const session = await resolveMemberSession(body.token);
@@ -259,7 +256,7 @@ Deno.serve(async (request) => {
       const now = new Date().toISOString();
       await rest(`member_credentials?email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ password_hash: await hashPassword(password), must_change_password: false, password_changed_at: now, failed_attempts: 0, locked_until: null, updated_at: now }) });
       await rest(`member_sessions?email=eq.${encodeURIComponent(session.email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
-      return json({ token: await createMemberSession(session.email, session.rememberMe), mustChangePassword: false });
+      return json({ token: await createMemberSession(session.email), mustChangePassword: false });
     }
     if (operation === "member.logout") {
       const token = String(body.token || "");
