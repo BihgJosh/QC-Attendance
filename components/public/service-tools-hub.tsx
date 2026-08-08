@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -109,7 +109,7 @@ const tools = [
     shortTitle: "Manager",
     description: "Review the compiled service picture and generate a draft leadership report.",
     icon: BarChart3,
-    href: `${SUITE_URL}/dashboard`,
+    href: "/service-tools?tool=manager#workflow",
     tone: "slate",
     details: [
       "Password-protected leadership access",
@@ -139,9 +139,24 @@ export function ServiceToolsHub() {
   const activeTool = tools.find((tool) => tool.id === activeId) || tools[0];
   const ActiveIcon = activeTool.icon;
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tool") === "manager") {
+      setActiveId("manager");
+    }
+  }, []);
+
   const showManager = () => {
     setActiveId("manager");
+    window.history.replaceState(null, "", "/service-tools?tool=manager#workflow");
     window.requestAnimationFrame(() => document.getElementById("workflow")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+
+  const selectTool = (toolId: ToolId) => {
+    if (toolId === "manager") {
+      showManager();
+      return;
+    }
+    setActiveId(toolId);
   };
 
   return (
@@ -239,7 +254,7 @@ export function ServiceToolsHub() {
                 const Icon = tool.icon;
                 const active = tool.id === activeId;
                 return (
-                  <button key={tool.id} type="button" onClick={() => setActiveId(tool.id)} className={`flex min-h-12 min-w-max items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 lg:mb-1 lg:w-full ${active ? "bg-cyan-600 text-white shadow-md shadow-cyan-900/10" : "text-cyan-950/65 hover:bg-white hover:text-cyan-950"}`} aria-pressed={active}>
+                  <button key={tool.id} type="button" onClick={() => selectTool(tool.id)} className={`flex min-h-12 min-w-max items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 lg:mb-1 lg:w-full ${active ? "bg-cyan-600 text-white shadow-md shadow-cyan-900/10" : "text-cyan-950/65 hover:bg-white hover:text-cyan-950"}`} aria-pressed={active}>
                     <Icon className={`h-4 w-4 ${active ? "text-white" : "text-slate-400"}`} />{tool.shortTitle}<ChevronRight className="ml-auto hidden h-4 w-4 lg:block" />
                   </button>
                 );

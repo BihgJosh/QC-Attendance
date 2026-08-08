@@ -8,7 +8,7 @@
     { label: 'Timer', href: '/qc-tools/timer' },
     { label: 'Observer', href: '/qc-tools/observer' },
     { label: 'Emergency', href: '/qc-tools/emergency', emergency: true },
-    { label: 'Manager', href: '/qc-tools/dashboard' }
+    { label: 'Manager', href: '/service-tools?tool=manager#workflow' }
   ];
 
   function isActive(href) {

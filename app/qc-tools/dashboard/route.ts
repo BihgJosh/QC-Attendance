@@ -1,5 +1,3 @@
-import { serveQcTool } from "@/lib/qc-tool-static";
-
-export function GET() {
-  return serveQcTool("dashboard/index.html");
+export function GET(request: Request) {
+  return Response.redirect(new URL("/service-tools?tool=manager#workflow", request.url), 307);
 }

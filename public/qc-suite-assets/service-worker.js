@@ -6,7 +6,7 @@
  * always fetched live, never served from cache.
  */
 
-const CACHE_NAME = 'soj-qc-shell-v6';
+const CACHE_NAME = 'soj-qc-shell-v7';
 
 const APP_SHELL = [
   '/qc-suite-assets/shared.css',
