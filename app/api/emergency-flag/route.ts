@@ -3,12 +3,44 @@ import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { appendEmergencyFlag } from "@/lib/emergency-flag-sheet";
 import { notifyTeam } from "@/lib/web-push";
+import { callServiceReportGateway } from "@/lib/service-report-store";
 
 const LEGACY_EMERGENCY_API_URL =
   "https://script.google.com/macros/s/AKfycbzZJ5LEnQGUAC8ChcZ--oxUfUkJMYG8jg-IRUu2i_KcqFD6GByKk5ahTIrbMXz8sjDNMQ/exec";
 
 function text(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
+}
+
+function abujaToday() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+export async function GET(request: Request) {
+  try {
+    const session = await readMemberSession();
+    if (!session) return NextResponse.json({ ok: false, message: "Your member session has expired." }, { status: 401 });
+    if (!(await getTeamMemberByEmail(session.email))) return NextResponse.json({ ok: false, message: "Your email is not registered in Team Data." }, { status: 403 });
+    const sinceValue = Number(new URL(request.url).searchParams.get("since") || 0);
+    const since = Number.isFinite(sinceValue) && sinceValue >= 0 ? sinceValue : 0;
+    const result = await callServiceReportGateway<{ rows?: Record<string, unknown>[] }>("emergency.list", { date: abujaToday() });
+    const emergencies = (result.rows || []).flatMap((row) => {
+      const submittedAtMs = Number(row.submitted_at_ms || new Date(String(row.submitted_at || "")).getTime());
+      if (!Number.isFinite(submittedAtMs) || submittedAtMs <= since) return [];
+      return [{
+        id: String(row.id || ""),
+        location: String(row.location || "Location not provided"),
+        description: String(row.description || "No description provided"),
+        reportedBy: String(row.reported_by || "Unknown reporter"),
+        submittedAt: String(row.submitted_at || ""),
+        submittedAtMs,
+      }];
+    });
+    return NextResponse.json({ ok: true, emergencies, serverNow: Date.now() }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+  } catch (error) {
+    console.error("[emergency-flag] Emergency poll failed", error instanceof Error ? error.message : "Unknown error");
+    return NextResponse.json({ ok: false, emergencies: [], serverNow: Date.now() }, { status: 502 });
+  }
 }
 
 export async function POST(request: Request) {

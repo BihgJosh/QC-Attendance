@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  var EMERGENCY_API_URL = 'https://script.google.com/macros/s/AKfycbzZJ5LEnQGUAC8ChcZ--oxUfUkJMYG8jg-IRUu2i_KcqFD6GByKk5ahTIrbMXz8sjDNMQ/exec';
+  var EMERGENCY_API_URL = '/api/emergency-flag';
   var POLL_INTERVAL_MS = 45000;
   var SINCE_KEY = 'soj-qc-emergency-since';
   var emergencyQueue = [];
@@ -241,7 +241,7 @@
 
   function poll() {
     var since = localStorage.getItem(SINCE_KEY) || '0';
-    fetch(EMERGENCY_API_URL + '?action=checkEmergency&since=' + since)
+    fetch(EMERGENCY_API_URL + '?since=' + since, { credentials: 'same-origin' })
       .then(function (response) { return response.json(); })
       .then(function (result) {
         if (!result || !result.ok) return;
@@ -260,7 +260,7 @@
       poll();
       return;
     }
-    fetch(EMERGENCY_API_URL + '?action=checkEmergency&since=0')
+    fetch(EMERGENCY_API_URL + '?since=0', { credentials: 'same-origin' })
       .then(function (response) { return response.json(); })
       .then(function (result) {
         localStorage.setItem(SINCE_KEY, String((result && result.serverNow) || Date.now()));

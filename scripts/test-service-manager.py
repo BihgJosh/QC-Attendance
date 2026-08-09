@@ -52,11 +52,9 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
         route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
     page.route("**/api/service-manager", mock_manager)
-    page.goto(f"{BASE_URL}/service-tools", wait_until="domcontentloaded")
+    page.goto(f"{BASE_URL}/service-tools?tool=manager#workflow", wait_until="domcontentloaded")
     page.get_by_text("Service tools", exact=False).first.wait_for(state="visible")
 
-    manager_card = page.get_by_role("article").filter(has_text="Service Manager")
-    manager_card.get_by_role("button", name="Open service summary").click()
     workflow = page.locator("#workflow")
     workflow.get_by_role("heading", name="Service Manager", exact=True).wait_for(state="visible")
 
