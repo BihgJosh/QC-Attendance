@@ -134,7 +134,7 @@ export function ServiceManagerDashboard() {
   const [results, setResults] = useState<ServiceResult[]>([]);
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [emergenciesLoading, setEmergenciesLoading] = useState(false);
-  const [emergencyUpdating, setEmergencyUpdating] = useState<string | null>(null);
+  const [emergencyUpdating, setEmergencyUpdating] = useState<{ id: string; status: "Resolved" | "Escalated" } | null>(null);
   const [emergencyMessage, setEmergencyMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [selectedService, setSelectedService] = useState<ServiceName | null>(null);
   const [reportLoading, setReportLoading] = useState<ServiceName | null>(null);
@@ -239,7 +239,7 @@ export function ServiceManagerDashboard() {
 
   const updateEmergency = async (emergency: Emergency, status: "Resolved" | "Escalated") => {
     if (!emergency.id || emergency.status === status) return;
-    setEmergencyUpdating(emergency.id);
+    setEmergencyUpdating({ id: emergency.id, status });
     setEmergencyMessage(null);
     try {
       const result = await managerRequest({ action: "updateEmergency", token, date, emergencyId: emergency.id, status, requestId: crypto.randomUUID() });
@@ -390,7 +390,7 @@ export function ServiceManagerDashboard() {
             <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950">{selectedService}</h3>
           </div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <button type="button" onClick={() => { setShareOpen((open) => !open); setShareMessage(null); }} aria-expanded={shareOpen} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-cyan-100 px-5 text-sm font-black text-cyan-900 transition hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 sm:w-auto">
+            <button type="button" onClick={() => { setShareOpen((open) => !open); setShareMessage(null); }} aria-expanded={shareOpen} aria-controls="service-report-email-form" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-cyan-100 px-5 text-sm font-black text-cyan-900 transition hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 sm:w-auto">
               <Mail className="h-4 w-4" /> Share by email
             </button>
             <button type="button" onClick={() => generateHeadcount(selectedService)} disabled={headcountLoading !== null} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-violet-100 px-5 text-sm font-black text-violet-950 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
@@ -404,7 +404,7 @@ export function ServiceManagerDashboard() {
 
         {error && <p role="alert" className="mt-5 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-800 ring-1 ring-inset ring-red-200">{error}</p>}
         {headcountDocument?.scope === selectedService && <HeadcountDocumentNotice document={headcountDocument} />}
-        {shareOpen && <form onSubmit={(event) => shareReport(event, selectedService)} className="mt-5 rounded-2xl bg-cyan-50 p-4 ring-1 ring-inset ring-cyan-200 sm:p-5">
+        {shareOpen && <form id="service-report-email-form" onSubmit={(event) => shareReport(event, selectedService)} className="mt-5 rounded-2xl bg-cyan-50 p-4 ring-1 ring-inset ring-cyan-200 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
             <div className="min-w-0 flex-1">
               <label htmlFor="report-recipient" className="text-xs font-black uppercase tracking-[0.12em] text-cyan-900">Recipient email</label>
@@ -423,12 +423,10 @@ export function ServiceManagerDashboard() {
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <Metric label="Worshippers" value={numberValue(data.headcount?.grandTotal)} icon={Users} />
           <Metric label="Incidents" value={numberValue(data.incidentCount)} icon={AlertTriangle} />
-          <Metric label="Emergency flags" value={data.emergencies?.length || 0} icon={ShieldCheck} />
+          <Metric label="Today's emergency flags" value={emergencies.length} icon={ShieldCheck} />
         </div>
 
         <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} />
-
-        {!!data.emergencies?.length && <ReportSection title="Emergency flags" icon={AlertTriangle} danger>{data.emergencies.map((item, index) => <div key={`${item.location}-${index}`} className="rounded-xl bg-red-100 p-4"><p className="font-bold text-red-950">{item.location || "Location not provided"}</p><p className="mt-1 text-sm leading-6 text-red-900">{item.description || "No description"}</p><p className="mt-2 text-xs font-medium text-red-800">{item.reportedBy || "Unknown reporter"} · {item.submittedAt || "Time unavailable"} · {item.status || "Status unavailable"}</p></div>)}</ReportSection>}
 
         <ReportSection title="Worshipper headcount" icon={Users}>
           <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-slate-200"><table className="w-full min-w-[34rem] text-left text-sm"><thead className="bg-slate-100 text-[10px] uppercase tracking-wider text-slate-700"><tr><th className="px-4 py-3">Department</th><th className="px-4 py-3">Adults</th><th className="px-4 py-3">Children</th><th className="px-4 py-3">Total</th></tr></thead><tbody>{(data.headcount?.byDepartment || []).map((row, index) => <tr key={`${row.department}-${index}`} className="border-t border-slate-200 text-slate-800"><td className="px-4 py-3 font-semibold text-slate-950">{row.department || "Unspecified"}</td><td className="px-4 py-3">{numberValue(row.adults)}</td><td className="px-4 py-3">{numberValue(row.children)}</td><td className="px-4 py-3 font-black text-blue-800">{numberValue(row.total)}</td></tr>)}</tbody></table></div>
@@ -507,17 +505,17 @@ export function ServiceManagerDashboard() {
   );
 }
 
-function EmergencyActionQueue({ emergencies, loading, updatingId, message, onUpdate }: { emergencies: Emergency[]; loading: boolean; updatingId: string | null; message: { kind: "success" | "error"; text: string } | null; onUpdate: (emergency: Emergency, status: "Resolved" | "Escalated") => void }) {
+function EmergencyActionQueue({ emergencies, loading, updatingId, message, onUpdate }: { emergencies: Emergency[]; loading: boolean; updatingId: { id: string; status: "Resolved" | "Escalated" } | null; message: { kind: "success" | "error"; text: string } | null; onUpdate: (emergency: Emergency, status: "Resolved" | "Escalated") => void }) {
   const ordered = [...emergencies].sort((left, right) => Number(right.status === "Active") - Number(left.status === "Active"));
   return <section className="mt-6 rounded-2xl bg-rose-50 p-4 ring-1 ring-inset ring-rose-200 sm:p-5" aria-labelledby="emergency-action-title">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id="emergency-action-title" className="flex items-center gap-2 text-sm font-black text-rose-950"><AlertTriangle className="h-4 w-4" /> Emergency actions</h4><p className="mt-1 text-xs leading-5 text-rose-800">Account for each flagged emergency. Updates are added to the daily report.</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-rose-900 ring-1 ring-inset ring-rose-200">{emergencies.length} flagged</span></div>
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id="emergency-action-title" className="flex items-center gap-2 text-sm font-black text-rose-950"><AlertTriangle className="h-4 w-4" /> Today&apos;s emergency actions</h4><p className="mt-1 text-xs leading-5 text-rose-800">Account for emergencies flagged today. Previous-day flags are not shown.</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-rose-900 ring-1 ring-inset ring-rose-200">{emergencies.length} flagged</span></div>
     {message && <p role={message.kind === "error" ? "alert" : "status"} className={`mt-3 rounded-xl px-3 py-2 text-xs font-bold ${message.kind === "error" ? "bg-red-100 text-red-900" : "bg-emerald-100 text-emerald-900"}`}>{message.text}</p>}
     {loading ? <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-rose-800"><Loader2 className="h-4 w-4 animate-spin" /> Loading emergency flags</p> : ordered.length ? <div className="mt-4 grid gap-3">{ordered.map((emergency, index) => {
       const active = !emergency.status || emergency.status === "Active";
-      const busy = emergency.id === updatingId;
+      const busy = emergency.id === updatingId?.id;
       const statusTone = emergency.status === "Resolved" ? "bg-emerald-100 text-emerald-900" : emergency.status === "Escalated" ? "bg-amber-100 text-amber-950" : "bg-rose-100 text-rose-900";
-      return <article key={emergency.id || `${emergency.location}-${index}`} className="rounded-xl bg-white p-4 shadow-[0_6px_18px_rgba(127,29,29,0.08)]"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="font-black text-slate-950">{emergency.location || "Location not provided"}</p><p className="mt-1 text-sm leading-5 text-slate-700">{emergency.description || "No description provided."}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${statusTone}`}>{emergency.status || "Active"}</span></div><p className="mt-2 text-xs font-semibold text-slate-500">{emergency.reportedBy || "Unknown reporter"}{emergency.submittedAt ? ` · ${new Date(emergency.submittedAt).toLocaleString()}` : ""}</p>{active && emergency.id && <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Resolved")} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Mark resolved</button><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Escalated")} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-black text-amber-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"><AlertTriangle className="h-4 w-4" /> Escalate</button></div>}</article>;
-    })}</div> : <p className="mt-4 rounded-xl bg-white p-3 text-sm font-semibold text-slate-700">No emergency has been flagged for this date.</p>}
+      return <article key={emergency.id || `${emergency.location}-${index}`} className="rounded-xl bg-white p-4 shadow-[0_6px_18px_rgba(127,29,29,0.08)]"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><p className="font-black text-slate-950">{emergency.location || "Location not provided"}</p><p className="mt-1 text-sm leading-5 text-slate-700">{emergency.description || "No description provided."}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${statusTone}`}>{emergency.status || "Active"}</span></div><p className="mt-2 break-words text-xs font-semibold text-slate-500">{emergency.reportedBy || "Unknown reporter"}{emergency.submittedAt ? ` · ${new Date(emergency.submittedAt).toLocaleString()}` : ""}</p>{active && emergency.id && <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Resolved")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Resolved" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} {busy && updatingId?.status === "Resolved" ? "Resolving" : "Mark resolved"}</button><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Escalated")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-black text-amber-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Escalated" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />} {busy && updatingId?.status === "Escalated" ? "Escalating" : "Escalate"}</button></div>}</article>;
+    })}</div> : <p className="mt-4 rounded-xl bg-white p-3 text-sm font-semibold text-slate-700">No emergency has been flagged today.</p>}
   </section>;
 }
 

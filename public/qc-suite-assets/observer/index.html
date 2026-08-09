@@ -192,13 +192,18 @@
 
   async function init() {
     try {
-      const res = await fetch(API_URL + '?action=getContext');
+      const res = await fetch(API_URL + '?action=getContext', { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error('Context unavailable');
       ctx = await res.json();
       document.getElementById('loading').style.display = 'none';
       document.getElementById('content').style.display = 'block';
       render();
     } catch (err) {
-      document.getElementById('loading').innerHTML = 'Could not load the form. Check the API_URL is set correctly.';
+      const now = new Date();
+      ctx = { date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now), time: new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit' }).format(now), units: ['Protocol', 'Choir', 'Media', 'Children', 'Ushers', 'Security', 'Medical', 'Traffic', 'Technical', 'Hospitality'] };
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      render();
     }
   }
   init();

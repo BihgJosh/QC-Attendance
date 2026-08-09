@@ -21,6 +21,7 @@ export const SERVICE_POST_HEADERS = [
 ];
 
 export type ServicePostReport = {
+  submissionId: string;
   date: string;
   service: string;
   name: string;
@@ -52,7 +53,7 @@ function escapeTitle(title: string) {
 
 export async function appendServicePostReport(report: ServicePostReport) {
   const submittedAt = new Date().toISOString();
-  const recordId = crypto.randomUUID();
+  const recordId = report.submissionId;
   await callServiceReportGateway("report.insert", {
     id: recordId,
     report_date: report.date,
@@ -75,6 +76,7 @@ export async function appendServicePostReport(report: ServicePostReport) {
     submitted_at: submittedAt,
     source_fingerprint: `live:${recordId}`,
   });
+  try {
   const env = getGoogleEnv();
   const auth = new google.auth.JWT({
     email: env.serviceAccountEmail,
@@ -136,6 +138,9 @@ export async function appendServicePostReport(report: ServicePostReport) {
   }
   if (primaryResult.status === "rejected") {
     console.error("[service-post] Primary workbook write failed", primaryResult.reason);
+  }
+  } catch (error) {
+    console.error("[service-post] Google workbook mirror failed", error instanceof Error ? error.message : error);
   }
   await syncFinalReportForDate(report.date).catch((error) => console.error("[service-post] Final daily report refresh failed", error instanceof Error ? error.message : error));
 }

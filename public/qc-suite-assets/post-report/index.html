@@ -158,6 +158,7 @@
   // ==========================================================================
 
   let ctx = null;
+  let submissionId = null;
   const vals = { ma: { safetyFlag: 'No' }, teens: {}, incidentFlag: 'No' };
   const observations = [
     ['preparedness', 'Prepared before service?'], ['neatness', 'Neatness & Appearance'],
@@ -349,7 +350,9 @@
     if (selectedArea.startsWith('Teens') && !document.getElementById('teensTopic').value.trim()) { fail('Please enter the Teens lesson topic.'); return; }
     if (!document.getElementById('confirmAccurate').checked) { fail('Confirm that the report is accurate before submitting.'); return; }
 
+    submissionId ||= crypto.randomUUID();
     const payload = {
+      submissionId,
       date: document.getElementById('date').value,
       service: document.getElementById('service').value,
       name: document.getElementById('name').value,
@@ -376,6 +379,7 @@
       const res = await fetch(REPORT_API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const result = await res.json();
       if (result.ok) {
+        submissionId = null;
         QCSubmissionResult.show({ status: 'success', title: 'Post report submitted', message: result.message || 'Your service post report has been saved successfully.' });
       } else {
         QCSubmissionResult.show({ status: 'error', title: 'Post report not saved', message: result.message || 'The server could not save this report. Please retry.', onRetry: submit });
@@ -388,13 +392,18 @@
 
   async function init() {
     try {
-      const res = await fetch(API_URL + '?action=getContext');
+      const res = await fetch(API_URL + '?action=getContext', { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error('Context unavailable');
       ctx = await res.json();
       document.getElementById('loading').style.display = 'none';
       document.getElementById('content').style.display = 'block';
       render();
     } catch (err) {
-      document.getElementById('loading').innerHTML = 'Could not load the form. Check the API_URL is set correctly in script.js.';
+      const now = new Date();
+      ctx = { date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now), time: new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit' }).format(now), areas: ['Main Auditorium', 'Overflow', 'Children Section', 'Outside', 'Observation', 'Timers'] };
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      render();
     }
   }
   init();

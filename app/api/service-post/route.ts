@@ -32,12 +32,13 @@ export async function POST(request: Request) {
     if (!body) return NextResponse.json({ ok: false, message: "Invalid report." }, { status: 400 });
 
     const service = text(body.service, 40);
+    const submissionId = text(body.submissionId, 36);
     const date = text(body.date, 10);
     const area = text(body.area, 160);
     const adultsHeadcount = count(body.adultsHeadcount);
     const childrenHeadcount = count(body.childrenHeadcount);
     const observationFields = ["preparedness", "neatness", "orderliness", "conduct", "compliance", "coordination"] as const;
-    if (!isIsoCalendarDate(date) || !SERVICES.has(service) || !area || adultsHeadcount === null || childrenHeadcount === null) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId) || !isIsoCalendarDate(date) || !SERVICES.has(service) || !area || adultsHeadcount === null || childrenHeadcount === null) {
       return NextResponse.json({ ok: false, message: "Complete the date, service, area and headcounts correctly." }, { status: 400 });
     }
     const selectedRatings = observationFields.map((field) => text(body[field], 30)).filter(Boolean);
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
     }
 
     await appendServicePostReport({
-      date, service, area, adultsHeadcount, childrenHeadcount,
+      submissionId, date, service, area, adultsHeadcount, childrenHeadcount,
       name: member.name, email: member.email,
       preparedness: text(body.preparedness, 30), neatness: text(body.neatness, 30),
       orderliness: text(body.orderliness, 30), conduct: text(body.conduct, 30),

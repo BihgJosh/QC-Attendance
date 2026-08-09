@@ -17,6 +17,15 @@ const API_URL = process.env.QC_SUITE_API_URL || DEFAULT_API_URL;
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const ACTIONS = new Set(["checkPassword", "getDashboard", "getEmergencies", "updateEmergency", "generateReport", "generateHeadcount", "sendEmail"]);
 
+function abujaToday() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 type SuiteResult = {
   ok?: boolean;
   url?: unknown;
@@ -71,6 +80,10 @@ async function callSuite(action: "checkPassword" | "getDashboard" | "generateRep
     }
   }
   throw new Error("QC suite did not respond.");
+}
+
+async function loadDashboard(date: string, service: string) {
+  return callServiceReportGateway<SuiteResult>("manager.dashboard", { date, service });
 }
 
 function reportEmailHtml(input: {
@@ -146,10 +159,11 @@ export async function POST(request: Request) {
     }
 
     if (isEmergencyAction) {
+      const emergencyDate = abujaToday();
       const access = await callSuite("checkPassword", token);
       if (!access.ok) return NextResponse.json({ ok: false, message: "Service Manager access has expired." }, { status: 401 });
       if (action === "getEmergencies") {
-        const result = await callServiceReportGateway<{ rows?: Record<string, unknown>[] }>("emergency.list", { date });
+        const result = await callServiceReportGateway<{ rows?: Record<string, unknown>[] }>("emergency.list", { date: emergencyDate });
         return NextResponse.json({ ok: true, data: { emergencies: result.rows || [] } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
       }
 
@@ -158,11 +172,11 @@ export async function POST(request: Request) {
       if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(emergencyId) || !emergencyStatus) {
         return NextResponse.json({ ok: false, message: "Choose a valid emergency action." }, { status: 400 });
       }
-      const emergency = await updateEmergencyFlagStatus({ id: emergencyId, date, status: emergencyStatus });
+      const emergency = await updateEmergencyFlagStatus({ id: emergencyId, date: emergencyDate, status: emergencyStatus });
       await callServiceReportGateway("activity.insert", {
         source_event_id: requestId,
         logged_at: new Date().toISOString(),
-        report_date: date,
+        report_date: emergencyDate,
         service: String(emergency.service || ""),
         category: "Emergency",
         action: emergencyStatus,
@@ -179,7 +193,7 @@ export async function POST(request: Request) {
       const requestedServices = isAllServicesHeadcount ? Array.from(SERVICES) : [service];
       const dashboards = await Promise.all(requestedServices.map(async (serviceName) => {
         try {
-          return { service: serviceName, result: await callSuite("getDashboard", token, date, serviceName) };
+          return { service: serviceName, result: await loadDashboard(date, serviceName) };
         } catch {
           return { service: serviceName, result: null };
         }
@@ -234,7 +248,7 @@ export async function POST(request: Request) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || recipient.length > 254 || !reportType) {
         return NextResponse.json({ ok: false, message: "Enter a valid recipient email and choose a report type." }, { status: 400 });
       }
-      const dashboard = await callSuite("getDashboard", token, date, service);
+      const dashboard = await loadDashboard(date, service);
       if (!dashboard.ok || !dashboard.data) {
         return NextResponse.json({ ok: false, message: typeof dashboard.message === "string" ? dashboard.message : "The service data could not be loaded." }, { status: 502 });
       }
@@ -299,7 +313,9 @@ export async function POST(request: Request) {
         }, { headers: { "Cache-Control": "no-store, max-age=0" } });
       }
     }
-    const result = await callSuite(action as "checkPassword" | "getDashboard", token, date || undefined, service || undefined);
+    const result = action === "getDashboard"
+      ? await loadDashboard(date, service)
+      : await callSuite("checkPassword", token);
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

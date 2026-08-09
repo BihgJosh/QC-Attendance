@@ -44,48 +44,38 @@ export async function appendEmergencyFlag(flag: EmergencyFlag) {
     submitted_at_ms: now.getTime(),
     source_fingerprint: `live:${recordId}`,
   });
-  const env = getGoogleEnv();
-  const auth = new google.auth.JWT({
-    email: env.serviceAccountEmail,
-    key: env.privateKey,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-  const sheets = google.sheets({ version: "v4", auth });
-  const metadata = await sheets.spreadsheets.get({
-    spreadsheetId: SPREADSHEET_ID,
-    fields: "sheets.properties(sheetId,title)",
-  });
-  const title = metadata.data.sheets?.find((sheet) => sheet.properties?.sheetId === SHEET_GID)?.properties?.title;
-  if (!title) throw new Error("The configured Emergency Flag sheet tab was not found.");
-  const sheet = escapeTitle(title);
-  const headerResponse = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${sheet}!A1:H1`,
-  });
-  const currentHeaders = (headerResponse.data.values?.[0] || []).map((value) => String(value).trim());
-  if (!currentHeaders.some(Boolean)) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${sheet}!A1:H1`,
-      valueInputOption: "RAW",
-      requestBody: { values: [EMERGENCY_FLAG_HEADERS] },
+  try {
+    const env = getGoogleEnv();
+    const auth = new google.auth.JWT({
+      email: env.serviceAccountEmail,
+      key: env.privateKey,
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
-  } else if (EMERGENCY_FLAG_HEADERS.some((header, index) => currentHeaders[index] !== header)) {
-    throw new Error("The Emergency Flag sheet headers do not match the required emergency columns.");
+    const sheets = google.sheets({ version: "v4", auth });
+    const metadata = await sheets.spreadsheets.get({
+      spreadsheetId: SPREADSHEET_ID,
+      fields: "sheets.properties(sheetId,title)",
+    });
+    const title = metadata.data.sheets?.find((sheet) => sheet.properties?.sheetId === SHEET_GID)?.properties?.title;
+    if (!title) throw new Error("The configured Emergency Flag sheet tab was not found.");
+    const sheet = escapeTitle(title);
+    const headerResponse = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${sheet}!A1:H1` });
+    const currentHeaders = (headerResponse.data.values?.[0] || []).map((value) => String(value).trim());
+    if (!currentHeaders.some(Boolean)) {
+      await sheets.spreadsheets.values.update({ spreadsheetId: SPREADSHEET_ID, range: `${sheet}!A1:H1`, valueInputOption: "RAW", requestBody: { values: [EMERGENCY_FLAG_HEADERS] } });
+    } else if (EMERGENCY_FLAG_HEADERS.some((header, index) => currentHeaders[index] !== header)) {
+      throw new Error("The Emergency Flag sheet headers do not match the required emergency columns.");
+    }
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${sheet}!A:H`,
+      valueInputOption: "USER_ENTERED",
+      insertDataOption: "INSERT_ROWS",
+      requestBody: { values: [[date, "", flag.location, flag.reportedBy, flag.description, "Active", now.toISOString(), now.getTime()]] },
+    });
+  } catch (error) {
+    console.error("[emergency-flag] Legacy workbook write failed", error instanceof Error ? error.message : error);
   }
-
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${sheet}!A:H`,
-    valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
-    requestBody: {
-      values: [[
-        date, "", flag.location, flag.reportedBy, flag.description,
-        "Active", now.toISOString(), now.getTime(),
-      ]],
-    },
-  }).catch((error) => console.error("[emergency-flag] Legacy workbook write failed", error instanceof Error ? error.message : error));
   await syncFinalReportForDate(date).catch((error) => console.error("[emergency-flag] Final daily report refresh failed", error instanceof Error ? error.message : error));
 }
 
@@ -112,6 +102,8 @@ export async function updateEmergencyFlagStatus(input: { id: string; date: strin
     console.error("[emergency-flag] Legacy status sync failed", error instanceof Error ? error.message : error);
   }
 
-  await syncFinalReportForDate(input.date);
+  await syncFinalReportForDate(input.date).catch((error) => {
+    console.error("[emergency-flag] Final daily report status refresh failed", error instanceof Error ? error.message : error);
+  });
   return result.row;
 }

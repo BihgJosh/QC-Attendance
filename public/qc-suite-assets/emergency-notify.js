@@ -208,7 +208,15 @@
 
   function addEmergencies(list) {
     if (!list || !list.length) return;
-    list.forEach(function (em) { emergencyQueue.push(em); });
+    var today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    var todaysEmergencies = list.filter(function (em) {
+      var rawTimestamp = em.submittedAtMs || em.submitted_at_ms || em.submittedAt || em.submitted_at || em.timestamp;
+      if (!rawTimestamp) return false;
+      var parsed = new Date(Number(rawTimestamp) || rawTimestamp);
+      return !isNaN(parsed.getTime()) && new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(parsed) === today;
+    });
+    if (!todaysEmergencies.length) return;
+    todaysEmergencies.forEach(function (em) { emergencyQueue.push(em); });
     renderCurrent();
     startAutoAdvance();
   }
@@ -238,8 +246,9 @@
       .then(function (result) {
         if (!result || !result.ok) return;
         if (result.emergencies && result.emergencies.length) {
-          result.emergencies.forEach(showOsNotification);
+          var before = emergencyQueue.length;
           addEmergencies(result.emergencies);
+          emergencyQueue.slice(before).forEach(showOsNotification);
         }
         localStorage.setItem(SINCE_KEY, String(result.serverNow || Date.now()));
       })

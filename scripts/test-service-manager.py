@@ -11,16 +11,31 @@ BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 def inspect(browser, label: str, width: int, height: int) -> list[str]:
     errors: list[str] = []
     page = browser.new_page(viewport={"width": width, "height": height})
+    page.set_default_navigation_timeout(90_000)
+    page.context.add_cookies([{"name": "qcu_member_session", "value": "qcu-go-live-playwright-session-20260809", "url": BASE_URL}])
     page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+
+    emergency_statuses = {
+        "00000000-0000-4000-8000-000000000101": "Active",
+        "00000000-0000-4000-8000-000000000102": "Open",
+    }
 
     def mock_manager(route, request):
         body = json.loads(request.post_data or "{}")
         if body.get("action") == "checkPassword":
             payload = {"ok": True}
+        elif body.get("action") == "getEmergencies":
+            payload = {"ok": True, "data": {"emergencies": [
+                {"id": emergency_id, "location": "Main Auditorium", "description": "QA emergency", "reported_by": "QA", "submitted_at": "2026-08-09T08:00:00Z", "status": status}
+                for emergency_id, status in emergency_statuses.items()
+            ]}}
+        elif body.get("action") == "updateEmergency":
+            emergency_statuses[body["emergencyId"]] = body["status"]
+            payload = {"ok": True, "message": f"Emergency marked as {body['status'].lower()}."}
         elif body.get("action") == "generateReport":
             payload = {
                 "ok": True,
-                "url": "https://docs.google.com/document/d/test-report/edit",
+                "url": "https://docs.google.com/spreadsheets/d/1eZPJiAX4tCTX8huAAFCRrUSRr5na34VqmzXFCiqjGu0/edit?pli=1&gid=1635578956#gid=1635578956",
                 "workbookUrl": "https://docs.google.com/spreadsheets/d/1QuNstJwL2wxBgM-bwa83r8rU9PZNln3tmih6DOBG2oY/edit",
                 "logRecordId": "test-log-record",
             }
@@ -37,7 +52,8 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
         route.fulfill(status=200, content_type="application/json", body=json.dumps(payload))
 
     page.route("**/api/service-manager", mock_manager)
-    page.goto(f"{BASE_URL}/service-tools", wait_until="networkidle")
+    page.goto(f"{BASE_URL}/service-tools", wait_until="domcontentloaded")
+    page.get_by_text("Service tools", exact=False).first.wait_for(state="visible")
 
     manager_card = page.get_by_role("article").filter(has_text="Service Manager")
     manager_card.get_by_role("button", name="Open service summary").click()
@@ -54,13 +70,20 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
     page.get_by_role("heading", name="All services at a glance.").wait_for(state="visible")
     assert page.get_by_text("1500", exact=True).is_visible()
     assert page.get_by_role("button", name="View report").count() == 5
+    assert page.get_by_role("heading", name="Today's emergency actions").is_visible()
+    page.get_by_role("button", name="Escalate").first.click()
+    page.get_by_text("Emergency marked as escalated.", exact=True).wait_for()
+    assert page.get_by_text("Escalated", exact=True).count() == 1
+    page.get_by_role("button", name="Mark resolved").first.click()
+    page.get_by_text("Emergency marked as resolved.", exact=True).wait_for()
+    assert page.get_by_text("Resolved", exact=True).count() == 1
     page.get_by_role("button", name="View report").first.click()
     assert page.get_by_text("Full detailed report", exact=False).is_visible()
     assert page.get_by_text("Main auditorium", exact=True).is_visible()
     assert page.get_by_text("Preparedness", exact=True).is_visible()
     page.get_by_role("button", name="Generate document").click()
-    page.get_by_text("Document generated and logged under 1st Service.").wait_for()
-    assert page.get_by_role("link", name="Open service workbook").get_attribute("href").startswith("https://docs.google.com/spreadsheets/")
+    page.get_by_text("Document generated successfully for 1st Service.").wait_for()
+    assert "1eZPJiAX4tCTX8huAAFCRrUSRr5na34VqmzXFCiqjGu0" in page.get_by_role("link", name="Open generated document").get_attribute("href")
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 
     workflow.screenshot(path=str(OUTPUT / f"qc-service-manager-{label}.png"))

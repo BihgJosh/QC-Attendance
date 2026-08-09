@@ -27,18 +27,8 @@ export async function POST(request: Request) {
     }
     const flag = { location, description, reportedBy: member.name };
 
-    const broadcastResponse = await fetch(LEGACY_EMERGENCY_API_URL, {
-      method: "POST",
-      signal: AbortSignal.timeout(12_000),
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(flag),
-    });
-    const broadcastResult = await broadcastResponse.json().catch(() => null) as { ok?: unknown; message?: unknown } | null;
-    if (!broadcastResponse.ok || broadcastResult?.ok !== true) {
-      throw new Error("The emergency alert broadcast was not accepted.");
-    }
-
-    let notificationWarning = "";
+    await appendEmergencyFlag(flag);
+    const warnings: string[] = [];
     try {
       const notificationResult = await notifyTeam({
         title: `Emergency — ${location}`,
@@ -49,24 +39,31 @@ export async function POST(request: Request) {
         ttlSeconds: 60 * 60 * 24,
         requireInteraction: true,
       });
-      if (notificationResult.total === 0) notificationWarning = "no_subscribed_devices";
-      else if (notificationResult.failed > 0) notificationWarning = "partial_notification_delivery";
+      if (notificationResult.total === 0) warnings.push("no_subscribed_devices");
+      else if (notificationResult.failed > 0) warnings.push("partial_notification_delivery");
     } catch (error) {
-      notificationWarning = "notification_delivery_failed";
+      warnings.push("notification_delivery_failed");
       console.error("[emergency-flag] Device notification broadcast failed", error instanceof Error ? error.message : "Unknown error");
     }
 
     try {
-      await appendEmergencyFlag(flag);
-      return NextResponse.json({
-        ok: true,
-        message: notificationWarning ? "Emergency flag sent and saved. Some devices may not have received the notification." : "Emergency flag sent to subscribed user devices and saved successfully.",
-        ...(notificationWarning ? { warning: notificationWarning } : {}),
+      const broadcastResponse = await fetch(LEGACY_EMERGENCY_API_URL, {
+        method: "POST",
+        signal: AbortSignal.timeout(12_000),
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(flag),
       });
+      const broadcastResult = await broadcastResponse.json().catch(() => null) as { ok?: unknown } | null;
+      if (!broadcastResponse.ok || broadcastResult?.ok !== true) throw new Error("The legacy broadcast was not accepted.");
     } catch (error) {
-      console.error("[emergency-flag] Alert sent but sheet logging failed", error instanceof Error ? error.message : "Unknown error");
-      return NextResponse.json({ ok: true, message: "Emergency alert sent. The report log will need follow-up.", warning: "logging_failed" });
+      warnings.push("legacy_broadcast_failed");
+      console.error("[emergency-flag] Legacy broadcast failed", error instanceof Error ? error.message : "Unknown error");
     }
+    return NextResponse.json({
+      ok: true,
+      message: warnings.length ? "Emergency saved and sent through available notification channels." : "Emergency saved and sent to subscribed user devices successfully.",
+      ...(warnings.length ? { warning: warnings.join(",") } : {}),
+    });
   } catch (error) {
     console.error("[emergency-flag] Emergency save failed", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({

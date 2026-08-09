@@ -64,11 +64,12 @@ function ratingSummary(rows: Json[]) {
 
 async function dashboard(date: string, service: string) {
   const filter = `report_date=eq.${encodeURIComponent(date)}&service=eq.${encodeURIComponent(service)}`;
+  const dateFilter = `report_date=eq.${encodeURIComponent(date)}`;
   const [posts, timers, observers, emergencies] = await Promise.all([
     rest(`service_post_reports?select=*&${filter}&order=submitted_at.asc,created_at.asc`) as Promise<Json[]>,
     rest(`service_timer_logs?select=*&${filter}&order=submitted_at.desc.nullslast,created_at.desc&limit=1`) as Promise<Json[]>,
     rest(`service_observer_reports?select=*&${filter}&order=submitted_at.desc.nullslast,created_at.desc&limit=1`) as Promise<Json[]>,
-    rest(`service_emergency_flags?select=*&${filter}&order=submitted_at.desc.nullslast,created_at.desc`) as Promise<Json[]>,
+    rest(`service_emergency_flags?select=*&${dateFilter}&order=submitted_at.desc.nullslast,created_at.desc`) as Promise<Json[]>,
   ]);
   const areas = new Map<string, { adults: number; children: number }>();
   for (const row of posts) {
@@ -81,7 +82,7 @@ async function dashboard(date: string, service: string) {
   const byDepartment = [...areas.entries()].map(([department, count]) => ({ department, ...count, total: count.adults + count.children }));
   const timer = timers[0] ? { timerName: timers[0].timer_name, serviceStart: timers[0].service_start, serviceEnd: timers[0].service_end, segments: timers[0].segments, generalObservation: timers[0].general_observation } : null;
   const observer = observers[0] ? { observerName: observers[0].observer_name, reporterRole: observers[0].reporter_role, postedLocation: observers[0].posted_location, reportingLocation: observers[0].reporting_location, generalObservations: observers[0].general_observations, unitReports: observers[0].unit_reports, recommendations: observers[0].recommendations, conclusion: observers[0].conclusion } : null;
-  return { headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), timer, observer, emergencies: emergencies.map((row) => ({ location: row.location, description: row.description, reportedBy: row.reported_by, submittedAt: row.submitted_at, status: row.status })) };
+  return { headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), timer, observer, emergencies: emergencies.map((row) => ({ id: row.id, service: row.service, location: row.location, description: row.description, reportedBy: row.reported_by, submittedAt: row.submitted_at, status: row.status })) };
 }
 
 async function dailyReport(date: string) {
@@ -120,7 +121,7 @@ Deno.serve(async (request) => {
       const date = encodeURIComponent(String(body.date || ""));
       const status = String(body.status || "");
       if (!id || !date || !["Resolved", "Escalated"].includes(status)) return json({ error: "Invalid emergency update." }, 400);
-      const rows = await rest(`service_emergency_flags?id=eq.${id}&report_date=eq.${date}&status=eq.Active`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ status }) }) as Json[];
+      const rows = await rest(`service_emergency_flags?id=eq.${id}&report_date=eq.${date}&or=(status.is.null,status.not.in.(Resolved,Escalated))`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ status }) }) as Json[];
       if (!rows.length) return json({ error: "Emergency flag not found or already accounted for." }, 409);
       return json({ ok: true, row: rows[0] });
     }

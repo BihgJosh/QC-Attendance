@@ -181,13 +181,13 @@ export function ServiceToolsHub() {
 
           <div className="flex items-center gap-1.5">
             <ThemeToggle />
-            <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 md:hidden" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}>
+            <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 md:hidden" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} aria-controls="service-tools-mobile-menu" onClick={() => setMenuOpen((value) => !value)}>
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </nav>
         {menuOpen && (
-          <div className="mx-auto mt-2 max-w-7xl rounded-2xl border border-cyan-200/10 bg-[linear-gradient(145deg,rgba(2,12,32,0.98),rgba(74,20,96,0.96))] p-2 text-white shadow-2xl md:hidden">
+          <div id="service-tools-mobile-menu" className="mx-auto mt-2 max-w-7xl rounded-2xl border border-cyan-200/10 bg-[linear-gradient(145deg,rgba(2,12,32,0.98),rgba(74,20,96,0.96))] p-2 text-white shadow-2xl md:hidden">
             <Link href="/" onClick={() => setMenuOpen(false)} className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-white/80 hover:bg-white/10">Home <ArrowLeft className="h-4 w-4" /></Link>
             <a href="#tools" onClick={() => setMenuOpen(false)} className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-white/80 hover:bg-white/10">Service tools <ChevronRight className="h-4 w-4" /></a>
             <a href="#workflow" onClick={() => setMenuOpen(false)} className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-white/80 hover:bg-white/10">Workflow guide <ChevronRight className="h-4 w-4" /></a>

@@ -34,6 +34,7 @@ export const SERVICE_TIMER_HEADERS = [
 
 export type TimerSegment = { status: string; min: number; sec: number };
 export type ServiceTimerLog = {
+  submissionId: string;
   date: string;
   service: string;
   name: string;
@@ -50,7 +51,7 @@ function escapeTitle(title: string) {
 
 export async function appendServiceTimerLog(log: ServiceTimerLog) {
   const submittedAt = new Date().toISOString();
-  const recordId = crypto.randomUUID();
+  const recordId = log.submissionId;
   await callServiceReportGateway("timer.insert", {
     id: recordId,
     report_date: log.date,
@@ -64,6 +65,7 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
     submitted_at: submittedAt,
     source_fingerprint: `live:${recordId}`,
   });
+  try {
   const env = getGoogleEnv();
   const auth = new google.auth.JWT({
     email: env.serviceAccountEmail,
@@ -121,5 +123,8 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
   })]);
   if (dashboardResult.status === "rejected") console.error("[service-timer] Dashboard write failed", dashboardResult.reason);
   if (primaryResult.status === "rejected") console.error("[service-timer] Primary write failed", primaryResult.reason);
+  } catch (error) {
+    console.error("[service-timer] Google workbook mirror failed", error instanceof Error ? error.message : error);
+  }
   await syncFinalReportForDate(log.date).catch((error) => console.error("[service-timer] Final daily report refresh failed", error instanceof Error ? error.message : error));
 }

@@ -70,16 +70,16 @@
       <div class="card-title">Report Now</div>
       <p class="card-sub">Keep it short — just enough for someone to respond fast. You can add detail later.</p>
 
-      <label>Your Name *</label>
+      <label for="reportedBy">Your Name *</label>
       <input type="text" id="reportedBy" placeholder="Your name">
 
-      <label>Where? *</label>
-      <input type="text" id="location" placeholder="e.g. Main Auditorium, Mighty Arrows Class 3, Main Gate">
+      <label for="location">Where? *</label>
+      <input type="text" id="location" placeholder="e.g. Main Auditorium, Mighty Arrows Class 3, Main Gate" required aria-required="true">
 
-      <label>What's happening? *</label>
-      <textarea id="description" placeholder="Brief description of the emergency"></textarea>
+      <label for="description">What's happening? *</label>
+      <textarea id="description" placeholder="Brief description of the emergency" required aria-required="true"></textarea>
 
-      <div class="msg" id="msg"></div>
+      <div class="msg" id="msg" role="alert" aria-live="assertive"></div>
       <button class="submit" id="submitBtn">🚨 Send Emergency Flag</button>
       <p class="note">This reaches every QC member with the app open. For life-threatening emergencies, also alert Medical/Security in person immediately — don't rely on this alone.</p>
     </div>

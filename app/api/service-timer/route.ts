@@ -40,10 +40,11 @@ export async function POST(request: Request) {
     if (!body) return NextResponse.json({ ok: false, message: "Invalid timer log." }, { status: 400 });
 
     const date = text(body.date, 10);
+    const submissionId = text(body.submissionId, 36);
     const service = text(body.service, 40);
     const serviceStart = text(body.serviceStart, 5);
     const serviceEnd = text(body.serviceEnd, 5);
-    if (!isIsoCalendarDate(date) || !SERVICES.has(service)) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId) || !isIsoCalendarDate(date) || !SERVICES.has(service)) {
       return NextResponse.json({ ok: false, message: "Complete the date and service correctly." }, { status: 400 });
     }
     if ((serviceStart && !isClockTime(serviceStart)) || (serviceEnd && !isClockTime(serviceEnd))) {
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
     if (!extraTiming) return NextResponse.json({ ok: false, message: "Enter valid extra-segment timing values." }, { status: 400 });
 
     await appendServiceTimerLog({
-      date, service, name: member.name, serviceStart, serviceEnd, segments,
+      submissionId, date, service, name: member.name, serviceStart, serviceEnd, segments,
       extra: { name: text(rawExtra.name, 160), ...extraTiming },
       generalObservation: text(body.generalObservation),
     });
