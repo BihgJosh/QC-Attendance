@@ -15,7 +15,7 @@ const POST_HEADERS = [
 ];
 const TIMER_SEGMENTS = [
   "Opening Prayer", "Praise & Worship", "Speaking into the Week", "Solo Ministration",
-  "Declaration", "First Testimony", "Second Testimony", "Third Testimony",
+  "Declaration", "First Testimony", "Second Testimony", "Third Testimony", "Fourth Testimony", "Fifth Testimony",
   "Choir Ministration", "Pastor's Ministration", "Offering & Announcement",
 ];
 const TIMER_HEADERS = [
@@ -74,7 +74,7 @@ async function main() {
     requests.push({ updateSheetProperties: { properties: { sheetId: blank.sheetId, title: "Dashboard" }, fields: "title" } });
   }
   for (const title of ["Post Reports", "Timer Logs", "Observer Reports", "Generated Documents", "Email Log", "Activity Log"]) {
-    if (!existing.has(title)) requests.push({ addSheet: { properties: { title, gridProperties: { rowCount: 2000, columnCount: title === "Timer Logs" ? 50 : 35 } } } });
+    if (!existing.has(title)) requests.push({ addSheet: { properties: { title, gridProperties: { rowCount: 2000, columnCount: title === "Timer Logs" ? 55 : 35 } } } });
   }
   if (requests.length) await sheets.spreadsheets.batchUpdate({ spreadsheetId: SPREADSHEET_ID, requestBody: { requests } });
 

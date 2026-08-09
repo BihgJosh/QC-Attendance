@@ -97,6 +97,14 @@
   const segVals = {};
   const extraVal = { status: '' };
 
+  function ensureFiveTestimonies() {
+    const additions = [{ id: 'fourthTestimony', label: 'Fourth Testimony' }, { id: 'fifthTestimony', label: 'Fifth Testimony' }];
+    const thirdIndex = ctx.segments.findIndex(segment => segment.id === 'thirdTestimony');
+    additions.reverse().forEach(segment => {
+      if (!ctx.segments.some(existing => existing.id === segment.id)) ctx.segments.splice(thirdIndex >= 0 ? thirdIndex + 1 : ctx.segments.length, 0, segment);
+    });
+  }
+
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
   function statusPills(field) {
@@ -235,12 +243,14 @@
       const res = await fetch(API_URL + '?action=getContext', { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error('Context unavailable');
       ctx = await res.json();
+      ensureFiveTestimonies();
       document.getElementById('loading').style.display = 'none';
       document.getElementById('content').style.display = 'block';
       render();
     } catch (err) {
       const now = new Date();
-      ctx = { date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now), time: new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit' }).format(now), segments: [['openingPrayer','Opening Prayer'],['praiseWorship','Praise & Worship'],['speakingIntoWeek','Speaking into the Week'],['soloMinistration','Solo Ministration'],['declaration','Declaration'],['firstTestimony','First Testimony'],['secondTestimony','Second Testimony'],['thirdTestimony','Third Testimony'],['choirMinistration','Choir Ministration'],['pastorMinistration',"Pastor's Ministration"],['offeringAnnouncement','Offering & Announcement']].map(function (segment) { return { id: segment[0], label: segment[1] }; }) };
+      ctx = { date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now), time: new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Lagos', hour: '2-digit', minute: '2-digit' }).format(now), segments: [['openingPrayer','Opening Prayer'],['praiseWorship','Praise & Worship'],['speakingIntoWeek','Speaking into the Week'],['soloMinistration','Solo Ministration'],['declaration','Declaration'],['firstTestimony','First Testimony'],['secondTestimony','Second Testimony'],['thirdTestimony','Third Testimony'],['fourthTestimony','Fourth Testimony'],['fifthTestimony','Fifth Testimony'],['choirMinistration','Choir Ministration'],['pastorMinistration',"Pastor's Ministration"],['offeringAnnouncement','Offering & Announcement']].map(function (segment) { return { id: segment[0], label: segment[1] }; }) };
+      ensureFiveTestimonies();
       document.getElementById('loading').style.display = 'none';
       document.getElementById('content').style.display = 'block';
       render();

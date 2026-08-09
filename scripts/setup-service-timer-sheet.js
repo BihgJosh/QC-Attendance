@@ -5,7 +5,7 @@ const SPREADSHEET_ID = "1BeoEcYvTGtVhBCp4SxX8mlfFscQD5rBrZ2tnPUdKP-8";
 const SHEET_GID = 810317383;
 const SEGMENTS = [
   "Opening Prayer", "Praise & Worship", "Speaking into the Week", "Solo Ministration",
-  "Declaration", "First Testimony", "Second Testimony", "Third Testimony",
+  "Declaration", "First Testimony", "Second Testimony", "Third Testimony", "Fourth Testimony", "Fifth Testimony",
   "Choir Ministration", "Pastor's Ministration", "Offering & Announcement",
 ];
 const HEADERS = [
@@ -42,12 +42,12 @@ async function main() {
   const title = metadata.data.sheets?.find((sheet) => sheet.properties?.sheetId === SHEET_GID)?.properties?.title;
   if (!title) throw new Error("The selected Service Timer tab was not found.");
   const escapedTitle = `'${title.replace(/'/g, "''")}'`;
-  const result = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${escapedTitle}!A1:AR1` });
+  const result = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `${escapedTitle}!A1:AX1` });
   const current = (result.data.values?.[0] || []).map((value) => String(value).trim());
   if (!current.some(Boolean)) {
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${escapedTitle}!A1:AR1`,
+      range: `${escapedTitle}!A1:AX1`,
       valueInputOption: "RAW",
       requestBody: { values: [HEADERS] },
     });

@@ -18,6 +18,8 @@ export const SERVICE_TIMER_SEGMENTS = [
   ["firstTestimony", "First Testimony"],
   ["secondTestimony", "Second Testimony"],
   ["thirdTestimony", "Third Testimony"],
+  ["fourthTestimony", "Fourth Testimony"],
+  ["fifthTestimony", "Fifth Testimony"],
   ["choirMinistration", "Choir Ministration"],
   ["pastorMinistration", "Pastor's Ministration"],
   ["offeringAnnouncement", "Offering & Announcement"],
@@ -82,13 +84,13 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
   const sheet = escapeTitle(title);
   const headerResponse = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${sheet}!A1:AR1`,
+    range: `${sheet}!A1:AX1`,
   });
   const currentHeaders = (headerResponse.data.values?.[0] || []).map((value) => String(value).trim());
   if (!currentHeaders.some(Boolean)) {
     await sheets.spreadsheets.values.update({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${sheet}!A1:AR1`,
+      range: `${sheet}!A1:AX1`,
       valueInputOption: "RAW",
       requestBody: { values: [SERVICE_TIMER_HEADERS] },
     });
@@ -116,7 +118,7 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
     summary: `${log.serviceStart || "Start not set"} - ${log.serviceEnd || "End not set"}`,
   }), sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${sheet}!A:AR`,
+    range: `${sheet}!A:AX`,
     valueInputOption: "RAW",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: [[...row, submittedAt]] },
