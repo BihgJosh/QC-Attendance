@@ -130,16 +130,15 @@ const toneClasses = {
   slate: "border-slate-200 bg-slate-100 text-slate-700",
 };
 
-export function ServiceToolsHub({ accessRole }: { accessRole: string }) {
+export function ServiceToolsHub({ canViewServiceManager }: { canViewServiceManager: boolean }) {
   const [activeId, setActiveId] = useState<ToolId>("post-report");
   const [menuOpen, setMenuOpen] = useState(false);
-  const canManage = ["service_manager", "admin", "super_admin"].includes(accessRole);
-  const availableTools = canManage ? tools : tools.filter((tool) => tool.id !== "manager");
+  const availableTools = canViewServiceManager ? tools : tools.filter((tool) => tool.id !== "manager");
   const activeTool = availableTools.find((tool) => tool.id === activeId) || availableTools[0];
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("tool") as ToolId | null;
     if (requested && availableTools.some((tool) => tool.id === requested)) setActiveId(requested);
-  }, [canManage]);
+  }, [canViewServiceManager]);
 
   const showManager = () => {
     setActiveId("manager");
@@ -198,7 +197,12 @@ export function ServiceToolsHub({ accessRole }: { accessRole: string }) {
             <p className="mt-7 max-w-2xl text-base leading-7 text-white/65 sm:text-lg">Report what happened at your post, protect the service timeline, record cross-unit observations and escalate urgent incidents from one organised QC workspace.</p>
           </motion.div>
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/10 shadow-2xl sm:grid-cols-3 lg:grid-cols-2">
-            {[{ value: "05", label: "connected tools" }, { value: "01", label: "leadership view" }, { value: "WAT", label: "Abuja service time" }, { value: "LIVE", label: "existing suite" }].map((item) => (
+            {[
+              { value: canViewServiceManager ? "05" : "04", label: "connected tools" },
+              ...(canViewServiceManager ? [{ value: "01", label: "leadership view" }] : []),
+              { value: "WAT", label: "Abuja service time" },
+              { value: "LIVE", label: "native forms" },
+            ].map((item) => (
               <div key={item.label} className="bg-slate-950/55 p-5 backdrop-blur-xl sm:p-6">
                 <p className="text-2xl font-black tracking-tight text-white">{item.value}</p>
                 <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-white/45">{item.label}</p>
@@ -213,7 +217,7 @@ export function ServiceToolsHub({ accessRole }: { accessRole: string }) {
           <div className="max-w-2xl">
             <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-primary"><ShieldCheck className="h-4 w-4" /> Choose your assignment</p>
             <h2 className="mt-4 text-3xl font-bold tracking-[-0.04em] sm:text-5xl">The right tool for every QC role.</h2>
-            <p className="mt-4 text-sm leading-6 text-muted-foreground sm:text-base">Reporting tools open the live QC suite, while Service Manager compiles every service into one leadership summary here.</p>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground sm:text-base">{canViewServiceManager ? "Reporting tools capture live service data, while Service Manager compiles every service into one leadership summary here." : "Use your assigned reporting tools to capture accurate live service data."}</p>
           </div>
 
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">

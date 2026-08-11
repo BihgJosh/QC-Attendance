@@ -14,10 +14,11 @@ export default async function ServiceToolsPage() {
   const session = await readMemberSession();
   if (!session) redirect("/member/login?next=/service-tools");
   const access = await resolveUserAccess(session.email);
+  const canViewServiceManager = ["service_manager", "admin", "super_admin"].includes(access.role);
   return (
     <>
       <EmergencyAlertLoader />
-      <ServiceToolsHub accessRole={access.role} />
+      <ServiceToolsHub canViewServiceManager={canViewServiceManager} />
     </>
   );
 }
