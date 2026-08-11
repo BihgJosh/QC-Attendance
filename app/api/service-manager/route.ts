@@ -14,8 +14,6 @@ import { callServiceReportGateway } from "@/lib/service-report-store";
 import { readMemberSession } from "@/lib/member-auth";
 import { resolveUserAccess } from "@/lib/member-store";
 
-const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycby9y-TP-NfdLurUyqW9hXg5WaHIyl-bW4kJoAOoUpW-ObemJLjmRV0RVS1kwtPJCx9iFg/exec";
-const API_URL = process.env.QC_SUITE_API_URL || DEFAULT_API_URL;
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const ACTIONS = new Set(["checkPassword", "getDashboard", "getEmergencies", "updateEmergency", "generateReport", "generateHeadcount", "sendEmail"]);
 
@@ -47,41 +45,6 @@ function escapeHtml(value: unknown) {
 function numberValue(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-async function callSuite(action: "checkPassword" | "getDashboard" | "generateReport", token: string, date?: string, service?: string) {
-  const params = new URLSearchParams({ action, token });
-  if (date && service) {
-    params.set("date", date);
-    params.set("service", service);
-  }
-  const timeouts = [12_000, 7_000];
-  for (let attempt = 0; attempt < timeouts.length; attempt += 1) {
-    try {
-      const response = await fetch(`${API_URL}?${params.toString()}`, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(timeouts[attempt]),
-      });
-      if (!response.ok) {
-        if (response.status >= 500 && attempt === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
-          continue;
-        }
-        throw new Error(`QC suite responded with ${response.status}`);
-      }
-      return await response.json() as SuiteResult;
-    } catch (error) {
-      if (attempt === 0 && (
-        error instanceof TypeError
-        || (error instanceof Error && (error.name === "TimeoutError" || error instanceof SyntaxError))
-      )) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        continue;
-      }
-      throw error;
-    }
-  }
-  throw new Error("QC suite did not respond.");
 }
 
 async function loadDashboard(date: string, service: string) {
@@ -145,13 +108,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json() as Record<string, unknown>;
     const action = typeof body.action === "string" ? body.action : "";
-    const token = typeof body.token === "string" ? body.token.trim() : "";
     const date = typeof body.date === "string" ? body.date : "";
     const service = typeof body.service === "string" ? body.service : "";
     const requestId = typeof body.requestId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)
       ? body.requestId
       : randomUUID();
-    if (!ACTIONS.has(action) || !token || token.length > 200) {
+    if (!ACTIONS.has(action)) {
       return NextResponse.json({ ok: false, message: "Invalid request." }, { status: 400 });
     }
     const session = await readMemberSession();
@@ -170,8 +132,6 @@ export async function POST(request: Request) {
 
     if (isEmergencyAction) {
       const emergencyDate = abujaToday();
-      const access = await callSuite("checkPassword", token);
-      if (!access.ok) return NextResponse.json({ ok: false, message: "Service Manager access has expired." }, { status: 401 });
       if (action === "getEmergencies") {
         const result = await callServiceReportGateway<{ rows?: Record<string, unknown>[] }>("emergency.list", { date: emergencyDate });
         return NextResponse.json({ ok: true, data: { emergencies: result.rows || [] } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
@@ -326,7 +286,7 @@ export async function POST(request: Request) {
     }
     const result = action === "getDashboard"
       ? await loadDashboard(date, service)
-      : await callSuite("checkPassword", token);
+      : { ok: true, data: { assignments: access.assignments } };
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

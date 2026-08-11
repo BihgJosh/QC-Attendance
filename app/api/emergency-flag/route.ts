@@ -5,9 +5,6 @@ import { appendEmergencyFlag } from "@/lib/emergency-flag-sheet";
 import { notifyTeam } from "@/lib/web-push";
 import { callServiceReportGateway } from "@/lib/service-report-store";
 
-const LEGACY_EMERGENCY_API_URL =
-  "https://script.google.com/macros/s/AKfycbzZJ5LEnQGUAC8ChcZ--oxUfUkJMYG8jg-IRUu2i_KcqFD6GByKk5ahTIrbMXz8sjDNMQ/exec";
-
 function text(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
@@ -78,19 +75,6 @@ export async function POST(request: Request) {
       console.error("[emergency-flag] Device notification broadcast failed", error instanceof Error ? error.message : "Unknown error");
     }
 
-    try {
-      const broadcastResponse = await fetch(LEGACY_EMERGENCY_API_URL, {
-        method: "POST",
-        signal: AbortSignal.timeout(12_000),
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(flag),
-      });
-      const broadcastResult = await broadcastResponse.json().catch(() => null) as { ok?: unknown } | null;
-      if (!broadcastResponse.ok || broadcastResult?.ok !== true) throw new Error("The legacy broadcast was not accepted.");
-    } catch (error) {
-      warnings.push("legacy_broadcast_failed");
-      console.error("[emergency-flag] Legacy broadcast failed", error instanceof Error ? error.message : "Unknown error");
-    }
     return NextResponse.json({
       ok: true,
       message: warnings.length ? "Emergency saved and sent through available notification channels." : "Emergency saved and sent to subscribed user devices successfully.",

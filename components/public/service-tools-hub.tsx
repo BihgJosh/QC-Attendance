@@ -112,7 +112,7 @@ const tools = [
     href: "/service-tools?tool=manager#workflow",
     tone: "slate",
     details: [
-      "Password-protected leadership access",
+      "Role-based leadership access from the active posting schedule",
       "Filter by date and specific service",
       "Combined worshipper headcount by department",
       "Post ratings, timer status and observer notes",
