@@ -8,7 +8,25 @@ import { Label } from "@/components/ui/label";
 
 const SERVICES = ["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"];
 const RATINGS = ["Excellent", "Good", "Needs Improvement", "Poor"];
-const AREAS = ["Main Auditorium", "Overflow", "Outside", "Emporium", "Toilet", "Vendors", "Mighty Arrows", "Teens Ministry", "Children Section", "Timers", "Service Manager"];
+const AREAS = [
+  "Main Church – FrontRow 1",
+  "Main Church – FrontRow 2",
+  "Main Church – FrontRow 3",
+  "Main Church – FrontRow 4",
+  "Main Church – BackRow 1",
+  "Main Church – BackRow 2 & Media",
+  "Main Church – BackRow 3",
+  "Main Church – BackRow 4 & Back Media",
+  "Overflow – Row 1",
+  "Overflow – Row 2",
+  "Overflow – Row 3",
+  "Overflow – Row 4",
+  "Outside – Vendors Gate",
+  "Outside – Main Gate",
+  "Outside – Emporium & Toilet",
+  "Mighty Arrows - Entrance",
+  "Mighty Arrows - Exit",
+];
 const OBSERVATIONS = [["preparedness", "Preparedness"], ["neatness", "Neatness & appearance"], ["orderliness", "Orderliness"], ["conduct", "Workers' conduct"], ["compliance", "Compliance"], ["coordination", "Coordination"]] as const;
 const SEGMENTS = [["openingPrayer", "Opening Prayer"], ["praiseWorship", "Praise & Worship"], ["speakingIntoWeek", "Speaking into the Week"], ["soloMinistration", "Solo Ministration"], ["declaration", "Declaration"], ["firstTestimony", "First Testimony"], ["secondTestimony", "Second Testimony"], ["thirdTestimony", "Third Testimony"], ["fourthTestimony", "Fourth Testimony"], ["fifthTestimony", "Fifth Testimony"], ["choirMinistration", "Choir Ministration"], ["pastorMinistration", "Pastor's Ministration"], ["offeringAnnouncement", "Offering & Announcement"]] as const;
 const UNITS = ["Teens Ministries", "Mighty Arrows", "Chabod Ministrels", "Ushering", "Protocol", "Traffic Unit (Watch Tower)", "Security", "Media", "Meeters and Greeters", "Temple Keepers", "Medical Care", "Streams Emporium", "Streams Enquiry Unit", "Instrumental Unit", "Transport Unit", "Other"];
