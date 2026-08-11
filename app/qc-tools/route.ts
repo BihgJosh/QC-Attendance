@@ -1,5 +1,2 @@
-import { serveQcTool } from "@/lib/qc-tool-static";
-
-export function GET() {
-  return serveQcTool("index.html");
-}
+import { NextResponse } from "next/server";
+export function GET(request: Request) { return NextResponse.redirect(new URL("/service-tools", request.url)); }

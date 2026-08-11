@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
-  CheckCircle2,
   ChevronRight,
   ClipboardCheck,
   Clock3,
@@ -19,11 +18,9 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ServiceManagerDashboard } from "@/components/public/service-manager-dashboard";
-
-const SUITE_URL = "/qc-tools";
+import { ServiceToolForm } from "@/components/public/service-tool-forms";
 
 const tools = [
   {
@@ -33,7 +30,7 @@ const tools = [
     shortTitle: "Post report",
     description: "Capture headcount, standards, incidents and observations for one assigned service area.",
     icon: ClipboardCheck,
-    href: `${SUITE_URL}/post-report`,
+    href: "/service-tools?tool=post-report#workflow",
     tone: "cyan",
     details: [
       "Date, service, observer and assigned area",
@@ -52,7 +49,7 @@ const tools = [
     shortTitle: "Timer",
     description: "Track each program segment against schedule and record the size of every deviation.",
     icon: Clock3,
-    href: `${SUITE_URL}/timer`,
+    href: "/service-tools?tool=timer#workflow",
     tone: "purple",
     details: [
       "Service date, service number and timer name",
@@ -71,7 +68,7 @@ const tools = [
     shortTitle: "Observer",
     description: "Write one structured report across every unit visited during the service.",
     icon: Eye,
-    href: `${SUITE_URL}/observer`,
+    href: "/service-tools?tool=observer#workflow",
     tone: "blue",
     details: [
       "Service date, service number and observer name",
@@ -90,7 +87,7 @@ const tools = [
     shortTitle: "Emergency",
     description: "Raise an urgent incident immediately with a precise location and short description.",
     icon: AlertTriangle,
-    href: `${SUITE_URL}/emergency`,
+    href: "/service-tools?tool=emergency#workflow",
     tone: "red",
     details: [
       "Reporter’s name",
@@ -133,17 +130,16 @@ const toneClasses = {
   slate: "border-slate-200 bg-slate-100 text-slate-700",
 };
 
-export function ServiceToolsHub() {
+export function ServiceToolsHub({ accessRole }: { accessRole: string }) {
   const [activeId, setActiveId] = useState<ToolId>("post-report");
   const [menuOpen, setMenuOpen] = useState(false);
-  const activeTool = tools.find((tool) => tool.id === activeId) || tools[0];
-  const ActiveIcon = activeTool.icon;
-
+  const canManage = ["service_manager", "admin", "super_admin"].includes(accessRole);
+  const availableTools = canManage ? tools : tools.filter((tool) => tool.id !== "manager");
+  const activeTool = availableTools.find((tool) => tool.id === activeId) || availableTools[0];
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tool") === "manager") {
-      setActiveId("manager");
-    }
-  }, []);
+    const requested = new URLSearchParams(window.location.search).get("tool") as ToolId | null;
+    if (requested && availableTools.some((tool) => tool.id === requested)) setActiveId(requested);
+  }, [canManage]);
 
   const showManager = () => {
     setActiveId("manager");
@@ -152,11 +148,8 @@ export function ServiceToolsHub() {
   };
 
   const selectTool = (toolId: ToolId) => {
-    if (toolId === "manager") {
-      showManager();
-      return;
-    }
     setActiveId(toolId);
+    window.history.replaceState(null, "", `/service-tools?tool=${toolId}#workflow`);
   };
 
   return (
@@ -224,7 +217,7 @@ export function ServiceToolsHub() {
           </div>
 
           <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            {tools.map((tool) => {
+            {availableTools.map((tool) => {
               const Icon = tool.icon;
               return (
                 <article key={tool.id} className={`group flex min-h-64 flex-col rounded-3xl border p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl ${tool.id === "emergency" ? "border-red-300/30 bg-red-500/[0.05]" : "border-border/70 bg-card/80"}`}>
@@ -250,7 +243,7 @@ export function ServiceToolsHub() {
           </div>
           <div className="grid min-w-0 lg:grid-cols-[18rem_minmax(0,1fr)]">
             <div className="flex min-w-0 gap-2 overflow-x-auto border-b border-slate-200 bg-slate-50/80 p-3 lg:block lg:border-b-0 lg:border-r lg:p-4">
-              {tools.map((tool) => {
+              {availableTools.map((tool) => {
                 const Icon = tool.icon;
                 const active = tool.id === activeId;
                 return (
@@ -260,23 +253,7 @@ export function ServiceToolsHub() {
                 );
               })}
             </div>
-            {activeTool.id === "manager" ? <motion.div key="manager" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceManagerDashboard /></motion.div> : <motion.div key={activeTool.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0 p-5 sm:p-8 lg:p-10">
-              <div className="flex flex-wrap items-start justify-between gap-5">
-                <div>
-                  <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl border ${toneClasses[activeTool.tone]}`}><ActiveIcon className="h-5 w-5" /></div>
-                  <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.18em] text-cyan-700">{activeTool.eyebrow}</p>
-                  <h3 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">{activeTool.title}</h3>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{activeTool.description}</p>
-                </div>
-              </div>
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                {activeTool.details.map((detail) => <div key={detail} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-700"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600" />{detail}</div>)}
-              </div>
-              <div className="mt-7 flex flex-col gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/80 p-5 sm:flex-row sm:items-center sm:justify-between">
-                <div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-800">Result</p><p className="mt-1 max-w-2xl text-sm leading-6 text-slate-700">{activeTool.outcome}</p></div>
-                <Button asChild variant="gradient" className="min-h-11 shrink-0 rounded-full px-5"><a href={activeTool.href}>Open {activeTool.shortTitle.toLowerCase()} <ArrowRight className="ml-2 h-4 w-4" /></a></Button>
-              </div>
-            </motion.div>}
+            {activeTool.id === "manager" ? <motion.div key="manager" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceManagerDashboard /></motion.div> : <motion.div key={activeTool.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceToolForm tool={activeTool.id} /></motion.div>}
           </div>
         </div>
       </section>

@@ -2,7 +2,7 @@
  * SOJ QC — Service Worker
  * Caches the static app shell (the 4 pages, manifest, icons) for fast loads
  * and installability. Deliberately does NOT cache anything going to the
- * Apps Script backends (script.google.com) — report/attendance data is
+ * Remote document APIs — report and attendance data is
  * always fetched live, never served from cache.
  */
 
@@ -41,7 +41,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   // Only ever handle same-origin GET requests. Anything going to a different
-  // origin (script.google.com, docs.google.com, etc.) is left completely
+  // origin (docs.google.com, etc.) is left completely
   // alone — no interception, no caching, always live.
   if (url.origin !== self.location.origin || request.method !== 'GET') {
     return;

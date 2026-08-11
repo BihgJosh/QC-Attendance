@@ -3,6 +3,7 @@ import { ServiceToolsHub } from "@/components/public/service-tools-hub";
 import { EmergencyAlertLoader } from "@/components/emergency-alert-loader";
 import { readMemberSession } from "@/lib/member-auth";
 import { redirect } from "next/navigation";
+import { resolveUserAccess } from "@/lib/member-store";
 
 export const metadata: Metadata = {
   title: "Service Tools | Quality Control Unit",
@@ -10,11 +11,13 @@ export const metadata: Metadata = {
 };
 
 export default async function ServiceToolsPage() {
-  if (!(await readMemberSession())) redirect("/member/login?next=/service-tools");
+  const session = await readMemberSession();
+  if (!session) redirect("/member/login?next=/service-tools");
+  const access = await resolveUserAccess(session.email);
   return (
     <>
       <EmergencyAlertLoader />
-      <ServiceToolsHub />
+      <ServiceToolsHub accessRole={access.role} />
     </>
   );
 }
