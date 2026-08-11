@@ -220,6 +220,9 @@ Deno.serve(async (request) => {
       if (existing[0]) return json({ error: "This account already has a private password. Sign in instead." }, 409);
       const now = new Date().toISOString();
       await rest("member_credentials?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, password_hash: await hashPassword(password), must_change_password: false, failed_attempts: 0, locked_until: null, password_changed_at: now, updated_at: now }) });
+      const adminRows = await rest(`admin_access?select=email&email=eq.${encodeURIComponent(email)}&limit=1`) as Json[];
+      const defaultRole = PROTECTED_BOOTSTRAP_EMAILS.has(email) ? "super_admin" : adminRows[0] ? "admin" : "general_user";
+      await rest("user_roles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify({ email, role: defaultRole, created_by: "member_setup", updated_at: now }) });
       await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       return json({ token: await createMemberSession(email), mustChangePassword: false });
     }
@@ -303,6 +306,7 @@ Deno.serve(async (request) => {
         headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
         body: JSON.stringify({ email, created_at: now }),
       });
+      await rest("user_roles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, role: PROTECTED_BOOTSTRAP_EMAILS.has(email) ? "super_admin" : "admin", is_active: true, created_by: "admin_access", updated_at: now }) });
       return json({ success: true, admin: { email, createdAt: now, isProtected: PROTECTED_BOOTSTRAP_EMAILS.has(email) } });
     }
     if (operation === "admin.remove") {
@@ -310,6 +314,7 @@ Deno.serve(async (request) => {
       if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return json({ error: "The primary administrator cannot be removed." }, 403);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       await rest(`admin_access?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      await rest(`user_roles?email=eq.${encodeURIComponent(email)}&role=eq.admin`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ role: "general_user", department: null, updated_at: new Date().toISOString() }) });
       await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       return json({ success: true });
     }
