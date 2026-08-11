@@ -11,6 +11,8 @@ import { isIsoCalendarDate } from "@/lib/validation";
 import { updateHeadcountGoogleDocument, type HeadcountService } from "@/lib/headcount-google-doc";
 import { updateEmergencyFlagStatus } from "@/lib/emergency-flag-sheet";
 import { callServiceReportGateway } from "@/lib/service-report-store";
+import { readMemberSession } from "@/lib/member-auth";
+import { resolveUserAccess } from "@/lib/member-store";
 
 const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycby9y-TP-NfdLurUyqW9hXg5WaHIyl-bW4kJoAOoUpW-ObemJLjmRV0RVS1kwtPJCx9iFg/exec";
 const API_URL = process.env.QC_SUITE_API_URL || DEFAULT_API_URL;
@@ -152,6 +154,14 @@ export async function POST(request: Request) {
     if (!ACTIONS.has(action) || !token || token.length > 200) {
       return NextResponse.json({ ok: false, message: "Invalid request." }, { status: 400 });
     }
+    const session = await readMemberSession();
+    if (!session) return NextResponse.json({ ok: false, message: "Sign in with your member account first." }, { status: 401 });
+    const access = await resolveUserAccess(session.email);
+    const elevated = access.role === "admin" || access.role === "super_admin";
+    const activeAssignments = access.assignments.filter((assignment) => !date || assignment.serviceDate === date).filter((assignment) => !service || service === "All services" || assignment.service === service);
+    if (!elevated && access.role !== "service_manager") return NextResponse.json({ ok: false, message: "Service Manager access is required." }, { status: 403 });
+    if (!elevated && activeAssignments.length === 0) return NextResponse.json({ ok: false, message: "Your posting schedule does not grant access to this service or the access window has expired." }, { status: 403 });
+    if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     const isAllServicesHeadcount = action === "generateHeadcount" && service === "All services";
     const isEmergencyAction = action === "getEmergencies" || action === "updateEmergency";
     if (action !== "checkPassword" && (!isIsoCalendarDate(date) || (!isEmergencyAction && !SERVICES.has(service) && !isAllServicesHeadcount))) {
@@ -298,6 +308,7 @@ export async function POST(request: Request) {
 
     if (action === "generateReport") {
       await syncFinalReportForDate(date);
+      await callServiceReportGateway("manager.finalize", { date, service });
       try {
         const log = await appendGeneratedDocumentLog({ date, service, url: FINAL_REPORT_SPREADSHEET_URL, requestId });
         return NextResponse.json({ ok: true, url: FINAL_REPORT_SPREADSHEET_URL, workbookUrl: log.workbookUrl, logRecordId: log.recordId, message: "Compiled service report refreshed." }, {

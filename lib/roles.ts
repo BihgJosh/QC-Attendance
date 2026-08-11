@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getOptionalEnv } from "@/lib/env";
-import { listAdminAccess } from "@/lib/member-store";
+import { listAdminAccess, resolveUserAccess } from "@/lib/member-store";
 
 const DEFAULT_PRIVILEGED_ADMINS = ["joshuaagusa001@gmail.com"];
 
@@ -20,5 +20,9 @@ export function isPrivilegedAdminEmail(email: string) {
 export async function isAdminEmail(email: string) {
   const normalized = email.trim().toLowerCase();
   if (isPrivilegedAdminEmail(normalized)) return true;
-  return (await listAdminAccess()).some((admin) => admin.email === normalized);
+  if ((await listAdminAccess()).some((admin) => admin.email === normalized)) return true;
+  try {
+    const access = await resolveUserAccess(normalized);
+    return access.role === "admin" || access.role === "super_admin";
+  } catch { return false; }
 }

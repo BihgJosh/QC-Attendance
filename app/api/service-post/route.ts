@@ -73,7 +73,9 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true, message: "Service Post report saved successfully." });
   } catch (error) {
-    console.error("[service-post] Report save failed", error instanceof Error ? error.message : "Unknown error");
-    return NextResponse.json({ ok: false, message: "The report could not be saved. Please try again." }, { status: 502 });
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[service-post] Report save failed", message);
+    const duplicate = /already been submitted|duplicate/i.test(message);
+    return NextResponse.json({ ok: false, message: duplicate ? message : "The report could not be saved. Please try again." }, { status: duplicate ? 409 : 502 });
   }
 }

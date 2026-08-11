@@ -26,6 +26,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ContentManager } from "@/components/admin/content-manager";
 import { MemberPasswordManager } from "@/components/admin/member-password-manager";
 import { AdminAccessManager } from "@/components/admin/admin-access-manager";
+import { RoleManager } from "@/components/admin/role-manager";
 import { AttendanceAudit } from "@/components/admin/attendance-audit";
 
 interface Settings {
@@ -74,7 +75,7 @@ export function Dashboard() {
   const [togglingStatus, setTogglingStatus] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [confirmToggle, setConfirmToggle] = useState(false);
-  const [adminView, setAdminView] = useState<"operations" | "audit" | "passwords" | "access">("operations");
+  const [adminView, setAdminView] = useState<"operations" | "audit" | "passwords" | "access" | "roles">("operations");
 
   /* ---------- Sort state ---------- */
   const [sortField, setSortField] = useState<SortField>("time");
@@ -338,11 +339,12 @@ export function Dashboard() {
           <Button type="button" size="sm" variant={adminView === "audit" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "audit"} onClick={() => setAdminView("audit")}><FileSpreadsheet className="mr-2 h-4 w-4" />Attendance audit</Button>
           <Button type="button" size="sm" variant={adminView === "passwords" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "passwords"} onClick={() => setAdminView("passwords")}><KeyRound className="mr-2 h-4 w-4" />Password resets</Button>
           <Button type="button" size="sm" variant={adminView === "access" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "access"} onClick={() => setAdminView("access")}><UserCog className="mr-2 h-4 w-4" />Admin access</Button>
+          <Button type="button" size="sm" variant={adminView === "roles" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "roles"} onClick={() => setAdminView("roles")}><ShieldCheck className="mr-2 h-4 w-4" />Role manager</Button>
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {adminView === "audit" ? <AttendanceAudit /> : adminView === "passwords" ? <MemberPasswordManager /> : adminView === "access" ? <AdminAccessManager /> : <>
+        {adminView === "audit" ? <AttendanceAudit /> : adminView === "passwords" ? <MemberPasswordManager /> : adminView === "access" ? <AdminAccessManager /> : adminView === "roles" ? <RoleManager /> : <>
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>

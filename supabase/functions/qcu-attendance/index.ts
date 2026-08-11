@@ -4,6 +4,7 @@ const allowedOperations = new Set([
   "attendance.device-check", "attendance.insert", "attendance.list", "migration.import",
   "member.status", "member.setup-complete", "member.authenticate", "member.session", "member.change-password", "member.logout",
   "member.list", "member.reset", "admin.list", "admin.add", "admin.remove",
+  "roles.list", "roles.resolve", "roles.upsert", "roles.remove", "assignments.upsert", "assignments.remove",
   "push.subscribe", "push.unsubscribe", "push.list", "push.deactivate",
 ]);
 
@@ -310,6 +311,57 @@ Deno.serve(async (request) => {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       await rest(`admin_access?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       await rest(`member_sessions?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      return json({ success: true });
+    }
+    if (operation === "roles.list") {
+      const [roles, assignments] = await Promise.all([
+        rest("user_roles?select=email,role,department,is_active,updated_at&order=email.asc") as Promise<Json[]>,
+        rest("service_assignments?select=id,service_date,service,manager_email,access_starts_at,access_ends_at,status&order=service_date.desc,service.asc") as Promise<Json[]>,
+      ]);
+      return json({
+        roles: roles.map((row) => ({ email: row.email, role: row.role, department: row.department || null, isActive: row.is_active !== false, updatedAt: row.updated_at })),
+        assignments: assignments.map((row) => ({ id: row.id, serviceDate: row.service_date, service: row.service, managerEmail: row.manager_email, accessStartsAt: row.access_starts_at, accessEndsAt: row.access_ends_at, status: row.status })),
+      });
+    }
+    if (operation === "roles.resolve") {
+      const email = normalizeEmail(body.email);
+      const rows = await rest(`user_roles?select=role,department,is_active&email=eq.${encodeURIComponent(email)}&is_active=eq.true&limit=1`) as Json[];
+      const role = String(rows[0]?.role || "general_user");
+      const now = new Date().toISOString();
+      const assignments = role === "service_manager" ? await rest(`service_assignments?select=id,service_date,service,manager_email,access_starts_at,access_ends_at,status&manager_email=eq.${encodeURIComponent(email)}&access_starts_at=lte.${encodeURIComponent(now)}&access_ends_at=gte.${encodeURIComponent(now)}&status=in.(scheduled,active)&order=access_starts_at.asc`) as Json[] : [];
+      return json({ role, department: rows[0]?.department || null, assignments: assignments.map((row) => ({ id: row.id, serviceDate: row.service_date, service: row.service, managerEmail: row.manager_email, accessStartsAt: row.access_starts_at, accessEndsAt: row.access_ends_at, status: row.status })) });
+    }
+    if (operation === "roles.upsert") {
+      const email = normalizeEmail(body.email);
+      const role = String(body.role || "");
+      const department = String(body.department || "").trim() || null;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["general_user", "service_manager", "hod", "admin", "super_admin"].includes(role)) return json({ error: "Choose a valid user and role." }, 400);
+      await rest("user_roles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, role, department, is_active: true, updated_at: new Date().toISOString() }) });
+      return json({ success: true });
+    }
+    if (operation === "roles.remove") {
+      const email = normalizeEmail(body.email);
+      if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return json({ error: "The Super Admin role cannot be removed." }, 403);
+      await rest(`user_roles?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      return json({ success: true });
+    }
+    if (operation === "assignments.upsert") {
+      const managerEmail = normalizeEmail(body.managerEmail);
+      const serviceDate = String(body.serviceDate || "");
+      const service = String(body.service || "").trim();
+      const accessStartsAt = String(body.accessStartsAt || "");
+      const accessEndsAt = String(body.accessEndsAt || "");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate) || !service || !managerEmail || !Date.parse(accessStartsAt) || !Date.parse(accessEndsAt) || Date.parse(accessEndsAt) <= Date.parse(accessStartsAt)) return json({ error: "Complete the service assignment and access window." }, 400);
+      const row = { service_date: serviceDate, service, manager_email: managerEmail, access_starts_at: accessStartsAt, access_ends_at: accessEndsAt, status: "scheduled", updated_at: new Date().toISOString() };
+      const id = String(body.id || "");
+      if (id) await rest(`service_assignments?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(row) });
+      else await rest("service_assignments?on_conflict=service_date,service,manager_email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(row) });
+      return json({ success: true });
+    }
+    if (operation === "assignments.remove") {
+      const id = String(body.id || "");
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "Invalid assignment." }, 400);
+      await rest(`service_assignments?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       return json({ success: true });
     }
     if (operation === "push.subscribe") {

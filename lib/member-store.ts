@@ -13,7 +13,13 @@ type MemberOperation =
   | "member.reset"
   | "admin.list"
   | "admin.add"
-  | "admin.remove";
+  | "admin.remove"
+  | "roles.list"
+  | "roles.resolve"
+  | "roles.upsert"
+  | "roles.remove"
+  | "assignments.upsert"
+  | "assignments.remove";
 
 export type MemberStatus = {
   email: string;
@@ -154,4 +160,32 @@ export function addAdminAccess(email: string) {
 
 export function removeAdminAccess(email: string) {
   return callMemberGateway<{ success: boolean }>("admin.remove", { email });
+}
+
+export type AppRole = "general_user" | "service_manager" | "hod" | "admin" | "super_admin";
+export type RoleRecord = { email: string; role: AppRole; department: string | null; isActive: boolean; updatedAt: string };
+export type ServiceAssignment = { id: string; serviceDate: string; service: string; managerEmail: string; accessStartsAt: string; accessEndsAt: string; status: string };
+
+export async function listRoleManagerData() {
+  return callMemberGateway<{ roles: RoleRecord[]; assignments: ServiceAssignment[] }>("roles.list");
+}
+
+export function resolveUserAccess(email: string) {
+  return callMemberGateway<{ role: AppRole; department: string | null; assignments: ServiceAssignment[] }>("roles.resolve", { email });
+}
+
+export function upsertRole(input: { email: string; role: AppRole; department?: string }) {
+  return callMemberGateway<{ success: boolean }>("roles.upsert", input);
+}
+
+export function removeRole(email: string) {
+  return callMemberGateway<{ success: boolean }>("roles.remove", { email });
+}
+
+export function upsertServiceAssignment(input: { id?: string; serviceDate: string; service: string; managerEmail: string; accessStartsAt: string; accessEndsAt: string }) {
+  return callMemberGateway<{ success: boolean }>("assignments.upsert", input);
+}
+
+export function removeServiceAssignment(id: string) {
+  return callMemberGateway<{ success: boolean }>("assignments.remove", { id });
 }

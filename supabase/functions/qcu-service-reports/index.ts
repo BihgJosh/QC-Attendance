@@ -1,5 +1,5 @@
 const GATEWAY_SECRET_HASH = "e961e32016c41f358eac3f9e1546b93d78bae0b9b30a446ccceecea47533fa41";
-const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "document.find", "document.insert", "activity.insert", "email.insert"]);
+const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "manager.finalize", "document.find", "document.insert", "activity.insert", "email.insert"]);
 type Json = Record<string, unknown>;
 
 function json(body: unknown, status = 200) {
@@ -24,7 +24,10 @@ const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 async function rest(path: string, init: RequestInit = {}) {
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, { ...init, headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", ...(init.headers || {}) } });
   const payload = response.status === 204 ? null : await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.message || `Database request failed (${response.status}).`);
+  if (!response.ok) {
+    const error = new Error(payload?.message || `Database request failed (${response.status}).`) as Error & { code?: string; status?: number };
+    error.code = payload?.code; error.status = response.status; throw error;
+  }
   return payload;
 }
 
@@ -80,6 +83,17 @@ async function dashboard(date: string, service: string) {
     areas.set(area, current);
   }
   const byDepartment = [...areas.entries()].map(([department, count]) => ({ department, ...count, total: count.adults + count.children }));
+  if (byDepartment.length) {
+    await rest("headcount_reconciliations?on_conflict=service_date,service,department", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(byDepartment.map((row) => ({
+        service_date: date, service, department: row.department,
+        submitted_adults: row.adults, submitted_children: row.children,
+        updated_at: new Date().toISOString(),
+      }))),
+    });
+  }
   const timer = timers[0] ? { timerName: timers[0].timer_name, serviceStart: timers[0].service_start, serviceEnd: timers[0].service_end, segments: timers[0].segments, generalObservation: timers[0].general_observation } : null;
   const observer = observers[0] ? { observerName: observers[0].observer_name, reporterRole: observers[0].reporter_role, postedLocation: observers[0].posted_location, reportingLocation: observers[0].reporting_location, generalObservations: observers[0].general_observations, unitReports: observers[0].unit_reports, recommendations: observers[0].recommendations, conclusion: observers[0].conclusion } : null;
   return { headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), timer, observer, emergencies: emergencies.map((row) => ({ id: row.id, service: row.service, location: row.location, description: row.description, reportedBy: row.reported_by, submittedAt: row.submitted_at, status: row.status })) };
@@ -111,6 +125,18 @@ Deno.serve(async (request) => {
     }
     if (operation === "manager.dashboard") return json({ ok: true, data: await dashboard(String(body.date || ""), String(body.service || "")) });
     if (operation === "manager.daily-report") return json({ ok: true, data: await dailyReport(String(body.date || "")) });
+    if (operation === "manager.finalize") {
+      const date = String(body.date || "");
+      const service = String(body.service || "");
+      const data = await dashboard(date, service);
+      const unresolved = await rest(`headcount_reconciliations?select=department,status,discrepancy_reason&service_date=eq.${encodeURIComponent(date)}&service=eq.${encodeURIComponent(service)}&status=in.(pending,discrepancy)`) as Json[];
+      if (unresolved.some((row) => row.status === "discrepancy" && !String(row.discrepancy_reason || "").trim())) return json({ error: "Resolve every headcount discrepancy before final submission." }, 409);
+      await rest(`final_hod_reports?service_date=eq.${encodeURIComponent(date)}&service=eq.${encodeURIComponent(service)}&status=eq.approved`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "superseded" }) });
+      const assignmentRows = await rest(`service_assignments?select=id,manager_email&service_date=eq.${encodeURIComponent(date)}&service=eq.${encodeURIComponent(service)}&status=neq.cancelled&order=created_at.desc&limit=1`) as Json[];
+      const rows = await rest("final_hod_reports", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ service_date: date, service, assignment_id: assignmentRows[0]?.id || null, submitted_by: assignmentRows[0]?.manager_email || "Service Manager", totals: { worshippers: data.headcount.grandTotal, incidents: data.incidentCount }, department_breakdown: data.headcount.byDepartment, discrepancy_summary: unresolved.map((row) => `${row.department}: ${row.discrepancy_reason || row.status}`).join("; "), status: "approved" }) }) as Json[];
+      if (assignmentRows[0]?.id) await rest(`service_assignments?id=eq.${encodeURIComponent(String(assignmentRows[0].id))}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "submitted", updated_at: new Date().toISOString() }) });
+      return json({ ok: true, report: rows[0], data });
+    }
     if (operation === "emergency.list") {
       const date = encodeURIComponent(String(body.date || ""));
       const rows = await rest(`service_emergency_flags?select=id,report_date,service,location,reported_by,description,status,submitted_at,submitted_at_ms&report_date=eq.${date}&order=submitted_at.desc.nullslast,created_at.desc`) as Json[];
@@ -136,6 +162,8 @@ Deno.serve(async (request) => {
     return json({ success: true, row: rows[0] || null });
   } catch (error) {
     console.error("[qcu-service-reports]", error instanceof Error ? error.message : error);
-    return json({ error: error instanceof Error ? error.message : "Service report request failed." }, 500);
+    const typed = error as Error & { code?: string; status?: number };
+    if (typed.code === "23505") return json({ error: "A report for this service, area and reporter has already been submitted. Ask the Service Manager to review or correct the existing report.", code: "duplicate_submission" }, 409);
+    return json({ error: typed.message || "Service report request failed." }, typed.status && typed.status < 500 ? typed.status : 500);
   }
 });
