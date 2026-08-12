@@ -26,6 +26,15 @@ function abujaToday() {
   }).format(new Date());
 }
 
+function abujaDate(value: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Lagos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
 type SuiteResult = {
   ok?: boolean;
   url?: unknown;
@@ -120,9 +129,9 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ ok: false, message: "Sign in with your member account first." }, { status: 401 });
     const access = await resolveUserAccess(session.email);
     const elevated = access.role === "admin" || access.role === "super_admin";
-    const activeAssignments = access.assignments
-      .filter((assignment) => !date || assignment.serviceDate === date)
-      .filter((assignment) => !service || assignment.service === "All services" || service === "All services" || assignment.service === service);
+    const activeAssignments = access.assignments.filter((assignment) => !date || (
+      date >= abujaDate(assignment.accessStartsAt) && date <= abujaDate(assignment.accessEndsAt)
+    ));
     if (!elevated && access.role !== "service_manager") return NextResponse.json({ ok: false, message: "Service Manager access is required." }, { status: 403 });
     if (!elevated && activeAssignments.length === 0) return NextResponse.json({ ok: false, message: "Your schedule does not grant access on this date or the access window has expired." }, { status: 403 });
     if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
