@@ -16,7 +16,7 @@ export function PWARegister() {
     if (!("serviceWorker" in navigator)) return;
 
     const hadController = Boolean(navigator.serviceWorker.controller);
-    navigator.serviceWorker.register("/sw.js").catch(() => {
+    navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).then((registration) => registration.update()).catch(() => {
       // Registration failed — likely offline or unsupported.
       // The app still works, just without offline caching.
     });

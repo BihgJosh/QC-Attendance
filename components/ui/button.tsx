@@ -4,14 +4,14 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "relative inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:translate-y-px disabled:pointer-events-none disabled:opacity-50",
+  "relative inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-semibold ring-offset-background transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.975] disabled:pointer-events-none disabled:opacity-50 disabled:saturate-50",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 hover:shadow-md",
-        gradient: "brand-gradient text-white shadow-md shadow-accent/15 hover:brightness-105 hover:shadow-lg",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 hover:shadow-md",
-        outline: "border border-border bg-background/80 shadow-sm hover:border-primary/30 hover:bg-primary/[0.06]",
+        default: "bg-primary text-primary-foreground shadow-[var(--control-shadow)] hover:bg-primary/90 hover:shadow-md",
+        gradient: "brand-gradient text-white shadow-md shadow-accent/15 hover:brightness-[1.03] hover:shadow-lg",
+        destructive: "bg-destructive text-destructive-foreground shadow-[var(--control-shadow)] hover:bg-destructive/90 hover:shadow-md",
+        outline: "border border-border bg-background/80 shadow-[var(--control-shadow)] hover:border-primary/30 hover:bg-primary/[0.06]",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent/10 hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",

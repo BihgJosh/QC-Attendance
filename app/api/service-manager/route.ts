@@ -6,7 +6,7 @@ import {
   appendGeneratedDocumentLog,
   SERVICE_REPORT_WORKBOOK_URL,
 } from "@/lib/service-report-workbook";
-import { FINAL_REPORT_SPREADSHEET_URL, syncFinalReportForDate } from "@/lib/final-report-sheet";
+import { syncFinalReportForDate } from "@/lib/final-report-sheet";
 import { isIsoCalendarDate } from "@/lib/validation";
 import { updateHeadcountGoogleDocument, type HeadcountService } from "@/lib/headcount-google-doc";
 import { updateEmergencyFlagStatus } from "@/lib/emergency-flag-sheet";
@@ -120,7 +120,9 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ ok: false, message: "Sign in with your member account first." }, { status: 401 });
     const access = await resolveUserAccess(session.email);
     const elevated = access.role === "admin" || access.role === "super_admin";
-    const activeAssignments = access.assignments.filter((assignment) => !date || assignment.serviceDate === date).filter((assignment) => !service || service === "All services" || assignment.service === service);
+    const activeAssignments = access.assignments
+      .filter((assignment) => !date || assignment.serviceDate === date)
+      .filter((assignment) => !service || assignment.service === "All services" || service === "All services" || assignment.service === service);
     if (!elevated && access.role !== "service_manager") return NextResponse.json({ ok: false, message: "Service Manager access is required." }, { status: 403 });
     if (!elevated && activeAssignments.length === 0) return NextResponse.json({ ok: false, message: "Your posting schedule does not grant access to this service or the access window has expired." }, { status: 403 });
     if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
@@ -226,8 +228,8 @@ export async function POST(request: Request) {
       let documentUrl: string | undefined;
       let documentLoggingFailed = false;
       if (reportType === "full") {
-        await syncFinalReportForDate(date);
-        documentUrl = FINAL_REPORT_SPREADSHEET_URL;
+        const report = await syncFinalReportForDate(date);
+        documentUrl = report.url;
         try {
           await appendGeneratedDocumentLog({ date, service, url: documentUrl, actor: `Email delivery to ${recipient}`, requestId });
         } catch (error) {
@@ -267,18 +269,18 @@ export async function POST(request: Request) {
     }
 
     if (action === "generateReport") {
-      await syncFinalReportForDate(date);
+      const report = await syncFinalReportForDate(date);
       await callServiceReportGateway("manager.finalize", { date, service });
       try {
-        const log = await appendGeneratedDocumentLog({ date, service, url: FINAL_REPORT_SPREADSHEET_URL, requestId });
-        return NextResponse.json({ ok: true, url: FINAL_REPORT_SPREADSHEET_URL, workbookUrl: log.workbookUrl, logRecordId: log.recordId, message: "Compiled service report refreshed." }, {
+        const log = await appendGeneratedDocumentLog({ date, service, url: report.url, requestId });
+        return NextResponse.json({ ok: true, url: report.url, workbookUrl: log.workbookUrl, logRecordId: log.recordId, message: `Compiled service report refreshed in ${report.title}.` }, {
           headers: { "Cache-Control": "no-store, max-age=0" },
         });
       } catch (error) {
         console.error("[service-manager] Compiled report logging failed", error instanceof Error ? error.message : "Unknown error");
         return NextResponse.json({
           ok: true,
-          url: FINAL_REPORT_SPREADSHEET_URL,
+          url: report.url,
           message: "Compiled service report refreshed. Its audit log will be retried separately.",
           warning: "logging_failed",
         }, { headers: { "Cache-Control": "no-store, max-age=0" } });

@@ -7,7 +7,7 @@ export function MemberAuthShell({ eyebrow, title, copy, children }: { eyebrow: s
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#050d1f] px-4 py-10 text-white sm:px-6">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(57,169,219,.22),transparent_32%),radial-gradient(circle_at_90%_80%,rgba(142,20,168,.24),transparent_36%)]" />
-      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] shadow-2xl shadow-black/40 backdrop-blur-xl lg:grid-cols-[.85fr_1.15fr]">
+      <div className="relative grid w-full max-w-5xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] shadow-[0_28px_80px_-32px_rgba(0,0,0,.72)] backdrop-blur-2xl lg:grid-cols-[.85fr_1.15fr]">
         <section className="hidden flex-col justify-between bg-[linear-gradient(150deg,rgba(25,46,91,.98),rgba(94,20,115,.95))] p-10 lg:flex">
           <Link href="/member/login" className="flex w-fit items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label="QC member sign in">
             <span className="relative h-12 w-12 overflow-hidden rounded-xl bg-white"><Image src="/soja-logo.jpeg" alt="" fill sizes="48px" className="object-cover" /></span>

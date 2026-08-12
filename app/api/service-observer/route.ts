@@ -47,6 +47,20 @@ export async function POST(request: Request) {
       ? body.unitReports as Record<string, unknown>
       : {};
     const unitReports = Object.fromEntries(unitsReported.map((unit) => [unit, text(rawReports[unit])]));
+    if (unitsReported.some((unit) => !unitReports[unit])) {
+      return NextResponse.json({ ok: false, message: "Add an observation for every selected unit." }, { status: 400 });
+    }
+    const otherUnitName = text(body.otherUnitName, 80);
+    if (unitsReported.includes("Other") && !otherUnitName) {
+      return NextResponse.json({ ok: false, message: "Name the other unit or area you observed." }, { status: 400 });
+    }
+    const namedOtherUnit = otherUnitName ? `Other — ${otherUnitName}` : "Other";
+    const savedUnits = unitsReported.map((unit) => unit === "Other" ? namedOtherUnit : unit);
+    const savedUnitReports = Object.fromEntries(Object.entries(unitReports).map(([unit, report]) => [unit === "Other" ? namedOtherUnit : unit, report]));
+    const generalObservations = text(body.generalObservations);
+    if (!generalObservations && unitsReported.length === 0) {
+      return NextResponse.json({ ok: false, message: "Add a general observation or at least one unit observation." }, { status: 400 });
+    }
     const reporterRole = text(body.reporterRole, 40);
     const postedLocation = text(body.postedLocation, 80);
     const reportingLocation = text(body.reportingLocation, 80);
@@ -57,8 +71,8 @@ export async function POST(request: Request) {
     await appendServiceObserverReport({
       submissionId: UUID_PATTERN.test(text(body.submissionId, 36)) ? text(body.submissionId, 36) : randomUUID(),
       date, service, observerName: member.name,
-      generalObservations: text(body.generalObservations),
-      unitsReported, unitReports,
+      generalObservations,
+      unitsReported: savedUnits, unitReports: savedUnitReports,
       recommendations: text(body.recommendations),
       conclusion: text(body.conclusion),
       reporterRole, postedLocation, reportingLocation,

@@ -32,7 +32,7 @@ export type ServiceObserverReport = {
 
 export async function appendServiceObserverReport(report: ServiceObserverReport) {
   const submittedAt = new Date().toISOString();
-  await callServiceReportGateway("observer.insert", {
+  const inserted = await callServiceReportGateway<{ created?: boolean }>("observer.insert", {
     id: report.submissionId,
     report_date: report.date,
     service: report.service,
@@ -47,5 +47,6 @@ export async function appendServiceObserverReport(report: ServiceObserverReport)
     conclusion: report.conclusion,
     submitted_at: submittedAt,
   });
+  if (inserted.created === false) return;
   await syncFinalReportForDate(report.date).catch((error) => console.error("[service-observer] Final daily report refresh failed", error instanceof Error ? error.message : error));
 }

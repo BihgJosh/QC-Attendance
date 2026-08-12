@@ -5,7 +5,7 @@ const SPREADSHEET_ID = "1BeoEcYvTGtVhBCp4SxX8mlfFscQD5rBrZ2tnPUdKP-8";
 const SHEET_GID = 810317383;
 const SEGMENTS = [
   "Opening Prayer", "Praise & Worship", "Speaking into the Week", "Solo Ministration",
-  "Declaration", "First Testimony", "Second Testimony", "Third Testimony", "Fourth Testimony", "Fifth Testimony",
+  "Declaration", "Testimony Introduction", "First Testimony", "Second Testimony", "Third Testimony", "Fourth Testimony", "Fifth Testimony",
   "Choir Ministration", "Pastor's Ministration", "Offering & Announcement",
 ];
 const HEADERS = [

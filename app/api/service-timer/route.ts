@@ -65,6 +65,10 @@ export async function POST(request: Request) {
       : {};
     const extraTiming = timing(rawExtra);
     if (!extraTiming) return NextResponse.json({ ok: false, message: "Enter valid extra-segment timing values." }, { status: 400 });
+    const hasTimingEntry = Boolean(serviceStart || serviceEnd || Object.values(segments).some((segment) => segment.status) || extraTiming.status);
+    if (!hasTimingEntry) {
+      return NextResponse.json({ ok: false, message: "Record the service start or end time, or at least one segment status." }, { status: 400 });
+    }
 
     await appendServiceTimerLog({
       submissionId, date, service, name: member.name, serviceStart, serviceEnd, segments,

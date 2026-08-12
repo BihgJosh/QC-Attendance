@@ -26,6 +26,10 @@ function tabTitle(date: string) {
   return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }).format(parsed).replace(/ /g, "-");
 }
 
+function sheetUrl(sheetId: number) {
+  return `https://docs.google.com/spreadsheets/d/${FINAL_REPORT_SPREADSHEET_ID}/edit?pli=1&gid=${sheetId}#gid=${sheetId}`;
+}
+
 function display(value: unknown) {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "object") return JSON.stringify(value, null, 2);
@@ -202,9 +206,8 @@ export async function syncFinalReportForDate(date: string) {
   const response = await callServiceReportGateway<{ data?: DailyReport }>("manager.daily-report", { date });
   if (!response.data) throw new Error("Supabase did not return the daily service reports.");
   const sheets = google.sheets({ version: "v4", auth: authClient() });
-  const metadata = await sheets.spreadsheets.get({ spreadsheetId: FINAL_REPORT_SPREADSHEET_ID, fields: "sheets.properties(sheetId,title)" });
-  const target = metadata.data.sheets?.find((sheet) => sheet.properties?.sheetId === FINAL_REPORT_SHEET_ID)?.properties;
-  if (!target?.title) throw new Error("The configured final report tab could not be found.");
-  await paintSheet(sheets, FINAL_REPORT_SHEET_ID, target.title, response.data);
-  return { title: target.title, url: FINAL_REPORT_SPREADSHEET_URL };
+  const title = tabTitle(date);
+  const sheetId = await ensureSheet(sheets, title);
+  await paintSheet(sheets, sheetId, title, response.data);
+  return { title, sheetId, url: sheetUrl(sheetId) };
 }

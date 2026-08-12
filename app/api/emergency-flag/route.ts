@@ -49,12 +49,13 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
     if (!body) return NextResponse.json({ ok: false, message: "Invalid emergency flag." }, { status: 400 });
 
+    const submissionId = text(body.submissionId, 36);
     const location = text(body.location, 200);
     const description = text(body.description, 2_000);
-    if (!location || !description) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId) || !location || !description) {
       return NextResponse.json({ ok: false, message: "Enter the emergency location and description." }, { status: 400 });
     }
-    const flag = { location, description, reportedBy: member.name };
+    const flag = { submissionId, location, description, reportedBy: member.name };
 
     await appendEmergencyFlag(flag);
     const warnings: string[] = [];

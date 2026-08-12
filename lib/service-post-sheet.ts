@@ -26,6 +26,8 @@ export type ServicePostReport = {
   service: string;
   name: string;
   email: string;
+  submittedByName: string;
+  submittedByEmail: string;
   area: string;
   adultsHeadcount: number;
   childrenHeadcount: number;
@@ -54,12 +56,14 @@ function escapeTitle(title: string) {
 export async function appendServicePostReport(report: ServicePostReport) {
   const submittedAt = new Date().toISOString();
   const recordId = report.submissionId;
-  await callServiceReportGateway("report.insert", {
+  const inserted = await callServiceReportGateway<{ created?: boolean }>("report.insert", {
     id: recordId,
     report_date: report.date,
     service: report.service,
     reporter_name: report.name,
     reporter_email: report.email,
+    submitted_by_name: report.submittedByName,
+    submitted_by_email: report.submittedByEmail,
     area: report.area,
     adults_headcount: report.adultsHeadcount,
     children_headcount: report.childrenHeadcount,
@@ -76,6 +80,7 @@ export async function appendServicePostReport(report: ServicePostReport) {
     submitted_at: submittedAt,
     source_fingerprint: `live:${recordId}`,
   });
+  if (inserted.created === false) return;
   try {
   const env = getGoogleEnv();
   const auth = new google.auth.JWT({

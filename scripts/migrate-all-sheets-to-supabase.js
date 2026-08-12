@@ -54,7 +54,7 @@ function normalizePost(record) {
 }
 
 function normalizeTimer(record) {
-  const segmentLabels = ["Opening Prayer", "Praise & Worship", "Speaking into the Week", "Solo Ministration", "Declaration", "First Testimony", "Second Testimony", "Third Testimony", "Fourth Testimony", "Fifth Testimony", "Choir Ministration", "Pastor's Ministration", "Offering & Announcement"];
+  const segmentLabels = ["Opening Prayer", "Praise & Worship", "Speaking into the Week", "Solo Ministration", "Declaration", "Testimony Introduction", "First Testimony", "Second Testimony", "Third Testimony", "Fourth Testimony", "Fifth Testimony", "Choir Ministration", "Pastor's Ministration", "Offering & Announcement"];
   const segments = segmentLabels.map((label) => ({ label, status: text(field(record, `${label} - Status`)), min: number(field(record, `${label} - Min`)), sec: number(field(record, `${label} - Sec`)) }));
   const row = { report_date: date(field(record, "Date")), service: text(field(record, "Service")), timer_name: text(field(record, "Timer Name")), service_start: text(field(record, "Service Start")), service_end: text(field(record, "Service End")), segments, extra_segment: { name: text(field(record, "Extra Segment Name")), status: text(field(record, "Extra Segment Status")), min: number(field(record, "Extra Segment Min")), sec: number(field(record, "Extra Segment Sec")) }, general_observation: text(field(record, "Timer General Observation")), submitted_at: timestamp(field(record, "Submitted At")) };
   return { ...row, source_fingerprint: fingerprint("service_timer_logs", row) };

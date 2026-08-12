@@ -126,7 +126,7 @@ export function CustomSelect({
         }}
         className={cn(
           "flex w-full items-center justify-between border border-border bg-background/50 backdrop-blur",
-          "ring-offset-background transition-all duration-200 cursor-pointer",
+          "cursor-pointer shadow-[var(--control-shadow)] ring-offset-background transition-[background-color,border-color,box-shadow,transform] duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)] active:scale-[0.985]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary/40 focus-visible:bg-background",
           "disabled:cursor-not-allowed disabled:opacity-50",
           sizeClasses,
@@ -140,7 +140,7 @@ export function CustomSelect({
         </span>
         <ChevronDown
           className={cn(
-            "w-4 h-4 text-muted-foreground/50 flex-shrink-0 transition-transform duration-200",
+            "h-4 w-4 flex-shrink-0 text-muted-foreground/50 transition-transform duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]",
             open && "rotate-180"
           )}
         />
@@ -153,10 +153,10 @@ export function CustomSelect({
             initial={{ opacity: 0, y: -6, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
-            transition={{ duration: 0.15 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.32 }}
             className={cn(
               "absolute z-50 left-0 right-0 mt-1.5 overflow-hidden",
-              "rounded-xl border border-border bg-card shadow-xl shadow-black/[0.08]",
+              "rounded-xl border border-border bg-card/95 shadow-xl shadow-black/[0.10] backdrop-blur-xl",
               size === "sm" ? "rounded-lg" : "rounded-xl"
             )}
             id={listboxId}
@@ -173,7 +173,7 @@ export function CustomSelect({
                   aria-selected={option.value === value}
                   tabIndex={-1}
                   className={cn(
-                    "w-full text-left transition-colors duration-100 flex items-center",
+                    "flex w-full items-center text-left transition-colors duration-150",
                     size === "sm" ? "px-3 py-2 text-xs gap-2" : "px-4 py-2.5 text-sm gap-3",
                     i === activeIndex
                       ? "bg-primary/10 text-primary"

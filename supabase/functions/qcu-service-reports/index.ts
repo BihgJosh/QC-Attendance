@@ -1,5 +1,5 @@
 const GATEWAY_SECRET_HASH = "e961e32016c41f358eac3f9e1546b93d78bae0b9b30a446ccceecea47533fa41";
-const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "manager.finalize", "document.find", "document.insert", "activity.insert", "email.insert"]);
+const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "manager.finalize", "admin.report-activity", "document.find", "document.insert", "activity.insert", "email.insert"]);
 type Json = Record<string, unknown>;
 
 function json(body: unknown, status = 200) {
@@ -110,6 +110,33 @@ async function dailyReport(date: string) {
   return { date, posts, timers, observers, emergencies };
 }
 
+async function reportActivity(from = "", to = "") {
+  const dateFilter = `${from ? `&report_date=gte.${encodeURIComponent(from)}` : ""}${to ? `&report_date=lte.${encodeURIComponent(to)}` : ""}`;
+  const [posts, timers, observers, emergencies] = await Promise.all([
+    rest(`service_post_reports?select=reporter_name,reporter_email,submitted_by_name,submitted_by_email,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
+    rest(`service_timer_logs?select=timer_name,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
+    rest(`service_observer_reports?select=observer_name,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
+    rest(`service_emergency_flags?select=reported_by,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
+  ]);
+  const users = new Map<string, { name: string; email: string; total: number; lastSubmittedAt: string; reportTypes: Record<string, number> }>();
+  const add = (nameValue: unknown, emailValue: unknown, type: string, submittedValue: unknown, createdValue: unknown) => {
+    const name = String(nameValue || "Unknown user").trim() || "Unknown user";
+    const email = String(emailValue || "").trim().toLowerCase();
+    const key = email || name.toLowerCase();
+    const submittedAt = String(submittedValue || createdValue || "");
+    const current = users.get(key) || { name, email, total: 0, lastSubmittedAt: "", reportTypes: {} };
+    current.total += 1;
+    current.reportTypes[type] = (current.reportTypes[type] || 0) + 1;
+    if (submittedAt > current.lastSubmittedAt) current.lastSubmittedAt = submittedAt;
+    users.set(key, current);
+  };
+  posts.forEach((row) => add(row.submitted_by_name || row.reporter_name, row.submitted_by_email || row.reporter_email, "Service Post", row.submitted_at, row.created_at));
+  timers.forEach((row) => add(row.timer_name, "", "Service Timer", row.submitted_at, row.created_at));
+  observers.forEach((row) => add(row.observer_name, "", "Observer Report", row.submitted_at, row.created_at));
+  emergencies.forEach((row) => add(row.reported_by, "", "Emergency Flag", row.submitted_at, row.created_at));
+  return [...users.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
   try {
@@ -125,6 +152,7 @@ Deno.serve(async (request) => {
     }
     if (operation === "manager.dashboard") return json({ ok: true, data: await dashboard(String(body.date || ""), String(body.service || "")) });
     if (operation === "manager.daily-report") return json({ ok: true, data: await dailyReport(String(body.date || "")) });
+    if (operation === "admin.report-activity") return json({ ok: true, users: await reportActivity(String(body.from || ""), String(body.to || "")) });
     if (operation === "manager.finalize") {
       const date = String(body.date || "");
       const service = String(body.service || "");
@@ -158,8 +186,9 @@ Deno.serve(async (request) => {
       return json({ ok: true, row: rows[0] || null });
     }
     const table = ({ "report.insert": "service_post_reports", "timer.insert": "service_timer_logs", "observer.insert": "service_observer_reports", "emergency.insert": "service_emergency_flags", "document.insert": "service_generated_documents", "activity.insert": "service_activity_log", "email.insert": "service_email_log" } as Record<string, string>)[operation];
-    const rows = await insert(table, body.row, String((body.row as Json)?.source_fingerprint || "") ? "source_fingerprint" : "id") as Json[];
-    return json({ success: true, row: rows[0] || null });
+    const conflictKey = String((body.row as Json)?.source_fingerprint || "") ? "source_fingerprint" : "id";
+    const rows = await rest(`${table}?on_conflict=${conflictKey}`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify(body.row) }) as Json[];
+    return json({ success: true, created: rows.length > 0, row: rows[0] || null });
   } catch (error) {
     console.error("[qcu-service-reports]", error instanceof Error ? error.message : error);
     const typed = error as Error & { code?: string; status?: number };

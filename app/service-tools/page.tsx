@@ -15,10 +15,11 @@ export default async function ServiceToolsPage() {
   if (!session) redirect("/member/login?next=/service-tools");
   const access = await resolveUserAccess(session.email);
   const canViewServiceManager = ["service_manager", "admin", "super_admin"].includes(access.role);
+  const canViewReportActivity = ["admin", "super_admin"].includes(access.role);
   return (
     <>
       <EmergencyAlertLoader />
-      <ServiceToolsHub canViewServiceManager={canViewServiceManager} />
+      <ServiceToolsHub canViewServiceManager={canViewServiceManager} canViewReportActivity={canViewReportActivity} />
     </>
   );
 }

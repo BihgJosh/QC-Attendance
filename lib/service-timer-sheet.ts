@@ -15,6 +15,7 @@ export const SERVICE_TIMER_SEGMENTS = [
   ["speakingIntoWeek", "Speaking into the Week"],
   ["soloMinistration", "Solo Ministration"],
   ["declaration", "Declaration"],
+  ["testimonyIntroduction", "Testimony Introduction"],
   ["firstTestimony", "First Testimony"],
   ["secondTestimony", "Second Testimony"],
   ["thirdTestimony", "Third Testimony"],
@@ -54,7 +55,7 @@ function escapeTitle(title: string) {
 export async function appendServiceTimerLog(log: ServiceTimerLog) {
   const submittedAt = new Date().toISOString();
   const recordId = log.submissionId;
-  await callServiceReportGateway("timer.insert", {
+  const inserted = await callServiceReportGateway<{ created?: boolean }>("timer.insert", {
     id: recordId,
     report_date: log.date,
     service: log.service,
@@ -67,6 +68,7 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
     submitted_at: submittedAt,
     source_fingerprint: `live:${recordId}`,
   });
+  if (inserted.created === false) return;
   try {
   const env = getGoogleEnv();
   const auth = new google.auth.JWT({

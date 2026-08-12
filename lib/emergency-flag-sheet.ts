@@ -14,6 +14,7 @@ export const EMERGENCY_FLAG_HEADERS = [
 ];
 
 export type EmergencyFlag = {
+  submissionId: string;
   location: string;
   reportedBy: string;
   description: string;
@@ -31,8 +32,8 @@ export async function appendEmergencyFlag(flag: EmergencyFlag) {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
-  const recordId = crypto.randomUUID();
-  await callServiceReportGateway("emergency.insert", {
+  const recordId = flag.submissionId;
+  const inserted = await callServiceReportGateway<{ created?: boolean }>("emergency.insert", {
     id: recordId,
     report_date: date,
     service: "",
@@ -44,6 +45,7 @@ export async function appendEmergencyFlag(flag: EmergencyFlag) {
     submitted_at_ms: now.getTime(),
     source_fingerprint: `live:${recordId}`,
   });
+  if (inserted.created === false) return;
   try {
     const env = getGoogleEnv();
     const auth = new google.auth.JWT({

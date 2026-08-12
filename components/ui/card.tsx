@@ -8,7 +8,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      variant === "default" && "surface-shadow rounded-2xl bg-card text-card-foreground",
+      variant === "default" && "surface-shadow rounded-2xl border border-border/60 bg-card text-card-foreground",
       variant === "glass" && "glass-card",
       variant === "gradient-border" && "gradient-border surface-shadow-raised",
       className
