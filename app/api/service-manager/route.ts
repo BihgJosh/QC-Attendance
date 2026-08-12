@@ -124,7 +124,7 @@ export async function POST(request: Request) {
       .filter((assignment) => !date || assignment.serviceDate === date)
       .filter((assignment) => !service || assignment.service === "All services" || service === "All services" || assignment.service === service);
     if (!elevated && access.role !== "service_manager") return NextResponse.json({ ok: false, message: "Service Manager access is required." }, { status: 403 });
-    if (!elevated && activeAssignments.length === 0) return NextResponse.json({ ok: false, message: "Your posting schedule does not grant access to this service or the access window has expired." }, { status: 403 });
+    if (!elevated && activeAssignments.length === 0) return NextResponse.json({ ok: false, message: "Your schedule does not grant access on this date or the access window has expired." }, { status: 403 });
     if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     const isAllServicesHeadcount = action === "generateHeadcount" && service === "All services";
     const isEmergencyAction = action === "getEmergencies" || action === "updateEmergency";
