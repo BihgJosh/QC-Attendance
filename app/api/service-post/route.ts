@@ -3,6 +3,7 @@ import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { resolveUserAccess } from "@/lib/member-store";
 import { appendServicePostReport } from "@/lib/service-post-sheet";
+import { callServiceReportGateway } from "@/lib/service-report-store";
 import { isIsoCalendarDate } from "@/lib/validation";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
@@ -32,11 +33,14 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
     if (!body) return NextResponse.json({ ok: false, message: "Invalid report." }, { status: 400 });
 
+    const access = await resolveUserAccess(session.email);
+    const canOverride = ["service_manager", "hod", "admin", "super_admin"].includes(access.role);
+    const assignmentOverride = body.assignmentOverride === true;
+    if (assignmentOverride && !canOverride) return NextResponse.json({ ok: false, message: "Your role does not allow observation-area overrides." }, { status: 403 });
     const reportFor = text(body.reportFor, 20) || "Me";
     const requestedName = text(body.reportForName, 160);
     let reportForName = member.name;
     if (reportFor === "Someone else") {
-      const access = await resolveUserAccess(session.email);
       if (!["service_manager", "hod", "admin", "super_admin"].includes(access.role)) return NextResponse.json({ ok: false, message: "Your role does not allow you to submit a report for someone else." }, { status: 403 });
       if (!requestedName) return NextResponse.json({ ok: false, message: "Enter the name of the person this report is for." }, { status: 400 });
       reportForName = requestedName;
@@ -94,7 +98,7 @@ export async function POST(request: Request) {
       areasForImprovement, recommendations,
       incidentFlag, incidentDescribe,
       ma: stringRecord(body.ma), teens: stringRecord(body.teens),
-      additionalComments: text(body.additionalComments), confirmAccurate: true,
+      additionalComments: text(body.additionalComments), confirmAccurate: true, assignmentOverride,
     });
     return NextResponse.json({ ok: true, message: "Service Post report saved successfully." });
   } catch (error) {
@@ -105,11 +109,21 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await readMemberSession();
   if (!session) return NextResponse.json({ ok: false, message: "Your member session has expired." }, { status: 401 });
   const member = await getTeamMemberByEmail(session.email);
   if (!member) return NextResponse.json({ ok: false, message: "Your email is not registered in Team Data." }, { status: 403 });
   const access = await resolveUserAccess(session.email);
-  return NextResponse.json({ ok: true, name: member.name, canDelegate: ["service_manager", "hod", "admin", "super_admin"].includes(access.role) }, { headers: { "Cache-Control": "no-store" } });
+  const canOverride = ["service_manager", "hod", "admin", "super_admin"].includes(access.role);
+  const { searchParams } = new URL(request.url);
+  const date = text(searchParams.get("date"), 10);
+  const service = text(searchParams.get("service"), 40);
+  let assignments: Array<{ area: string; assignedTo: string }> = [];
+  if (date && service) {
+    if (!isIsoCalendarDate(date) || !SERVICES.has(service)) return NextResponse.json({ ok: false, message: "Choose a valid date and service." }, { status: 400 });
+    const result = await callServiceReportGateway<{ assignments?: Array<{ area?: unknown; assignedTo?: unknown }> }>("report.assignments", { date, service });
+    assignments = (result.assignments || []).map((row) => ({ area: text(row.area, 160), assignedTo: text(row.assignedTo, 160) || "another user" })).filter((row) => row.area);
+  }
+  return NextResponse.json({ ok: true, name: member.name, canDelegate: canOverride, canOverride, assignments }, { headers: { "Cache-Control": "no-store" } });
 }

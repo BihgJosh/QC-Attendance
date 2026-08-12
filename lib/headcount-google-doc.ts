@@ -66,10 +66,16 @@ function serviceText(input: HeadcountService) {
 function documentText(date: string, services: HeadcountService[]) {
   const combined = services.reduce((sum, service) => {
     const organized = organizeHeadcount(Array.isArray(service.headcount.byDepartment) ? service.headcount.byDepartment : []);
-    return { adults: sum.adults + organized.totals.adults, children: sum.children + organized.totals.children, grand: sum.grand + adjustedTotal(organized.grandTotal || numberValue(service.headcount.grandTotal)) };
-  }, { adults: 0, children: 0, grand: 0 });
-  const summary = services.length > 1 ? `ALL SERVICES COMBINED\nAdults: ${combined.adults}  |  Children: ${combined.children}\nGrand Total = ${combined.grand}\n\n` : "";
-  return `QC SERVICE HEADCOUNT\nService date: ${date}  ·  Updated: ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n${summary}${services.map(serviceText).join("\n\n────────────────────────────────────────\n\n")}\n`;
+    return { adults: sum.adults + organized.totals.adults, children: sum.children + organized.totals.children };
+  }, { adults: 0, children: 0 });
+  const rawTotal = combined.adults + combined.children;
+  const markupTotal = adjustedTotal(rawTotal);
+  const sundayServices = ["1st Service", "2nd Service", "3rd Service", "4th Service"];
+  const hasAllFourSundayServices = sundayServices.every((service) => services.some((item) => item.service === service));
+  const summary = hasAllFourSundayServices
+    ? `FOUR-SERVICE TOTAL\nAdults: ${combined.adults}\nChildren: ${combined.children}\nTotal: ${rawTotal}\nTotal with 2% markup: ${markupTotal}\n\n`
+    : services.length > 1 ? `SELECTED SERVICES TOTAL\nAdults: ${combined.adults}\nChildren: ${combined.children}\nTotal: ${rawTotal}\nTotal with 2% markup: ${markupTotal}\n\n` : "";
+  return `QC SERVICE HEADCOUNT\nService date: ${date}  ·  Updated: ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n${services.map(serviceText).join("\n\n────────────────────────────────────────\n\n")}\n\n${summary}`;
 }
 
 function docsClient() {

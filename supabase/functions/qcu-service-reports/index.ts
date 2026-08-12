@@ -1,5 +1,5 @@
 const GATEWAY_SECRET_HASH = "e961e32016c41f358eac3f9e1546b93d78bae0b9b30a446ccceecea47533fa41";
-const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "manager.finalize", "admin.report-activity", "document.find", "document.insert", "activity.insert", "email.insert"]);
+const allowedOperations = new Set(["migration.import", "report.insert", "report.assignments", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "manager.finalize", "admin.report-activity", "document.find", "document.insert", "activity.insert", "email.insert"]);
 type Json = Record<string, unknown>;
 
 function json(body: unknown, status = 200) {
@@ -151,6 +151,17 @@ Deno.serve(async (request) => {
       return json({ success: true });
     }
     if (operation === "manager.dashboard") return json({ ok: true, data: await dashboard(String(body.date || ""), String(body.service || "")) });
+    if (operation === "report.assignments") {
+      const date = encodeURIComponent(String(body.date || ""));
+      const service = encodeURIComponent(String(body.service || ""));
+      const rows = await rest(`service_post_reports?select=area,reporter_name&report_date=eq.${date}&service=eq.${service}&assignment_enforced=eq.true&order=submitted_at.asc.nullslast,created_at.asc`) as Json[];
+      const assignments = new Map<string, Json>();
+      for (const row of rows) {
+        const key = String(row.area || "").trim().toLowerCase();
+        if (key && !assignments.has(key)) assignments.set(key, { area: row.area, assignedTo: row.reporter_name || "another user" });
+      }
+      return json({ ok: true, assignments: [...assignments.values()] });
+    }
     if (operation === "manager.daily-report") return json({ ok: true, data: await dailyReport(String(body.date || "")) });
     if (operation === "admin.report-activity") return json({ ok: true, users: await reportActivity(String(body.from || ""), String(body.to || "")) });
     if (operation === "manager.finalize") {
@@ -188,11 +199,16 @@ Deno.serve(async (request) => {
     const table = ({ "report.insert": "service_post_reports", "timer.insert": "service_timer_logs", "observer.insert": "service_observer_reports", "emergency.insert": "service_emergency_flags", "document.insert": "service_generated_documents", "activity.insert": "service_activity_log", "email.insert": "service_email_log" } as Record<string, string>)[operation];
     const conflictKey = String((body.row as Json)?.source_fingerprint || "") ? "source_fingerprint" : "id";
     const rows = await rest(`${table}?on_conflict=${conflictKey}`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify(body.row) }) as Json[];
+    if (operation === "report.insert" && !rows.length) {
+      const id = encodeURIComponent(String((body.row as Json)?.id || ""));
+      const existing = await rest(`service_post_reports?select=id&id=eq.${id}&limit=1`) as Json[];
+      if (!existing.length) return json({ error: "This observation area was just assigned to another user. Choose another available area, or use an authorized override.", code: "area_assigned" }, 409);
+    }
     return json({ success: true, created: rows.length > 0, row: rows[0] || null });
   } catch (error) {
     console.error("[qcu-service-reports]", error instanceof Error ? error.message : error);
     const typed = error as Error & { code?: string; status?: number };
-    if (typed.code === "23505") return json({ error: "A report for this service, area and reporter has already been submitted. Ask the Service Manager to review or correct the existing report.", code: "duplicate_submission" }, 409);
+    if (typed.code === "23505" || /duplicate key|unique constraint/i.test(typed.message || "")) return json({ error: "This observation area was just assigned to another user. Choose another available area, or use an authorized override.", code: "area_assigned" }, 409);
     return json({ error: typed.message || "Service report request failed." }, typed.status && typed.status < 500 ? typed.status : 500);
   }
 });
