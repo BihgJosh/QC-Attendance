@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
+import { resolveUserAccess, type AppRole } from "@/lib/member-store";
 import {
   appendServiceObserverReport,
   SERVICE_OBSERVER_UNITS,
@@ -10,14 +11,20 @@ import { randomUUID } from "crypto";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const UNITS = new Set<string>(SERVICE_OBSERVER_UNITS);
-const REPORTER_ROLES = new Set(["Service Observer", "QC member"]);
 const REPORTING_LOCATIONS = new Set(["Outside", "Emporium", "Toilet", "Children Section", "Vendors", "Overflow", "Main Auditorium"]);
-const POSTING_LOCATIONS = new Set(["Outside", "Emporium", "Toilet", "Children Section", "Vendors", "Overflow Tent", "Main Auditorium", "Timers", "Service Manager"]);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function text(value: unknown, max = 2_000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
+
+const ROLE_LABELS: Record<AppRole, string> = {
+  general_user: "General User",
+  service_manager: "Service Manager",
+  hod: "HOD",
+  admin: "Admin",
+  super_admin: "Super Admin",
+};
 
 export async function POST(request: Request) {
   try {
@@ -34,6 +41,19 @@ export async function POST(request: Request) {
     const service = text(body.service, 40);
     if (!isIsoCalendarDate(date) || !SERVICES.has(service)) {
       return NextResponse.json({ ok: false, message: "Complete the date and service correctly." }, { status: 400 });
+    }
+    const access = await resolveUserAccess(session.email);
+    const rawLocations = Array.isArray(body.locationsReported) ? body.locationsReported : [];
+    const locationsReported = [...new Set(rawLocations.map((location) => text(location, 80)).filter((location) => REPORTING_LOCATIONS.has(location)))];
+    if (locationsReported.length === 0 || locationsReported.length !== rawLocations.length) {
+      return NextResponse.json({ ok: false, message: "Select at least one valid reporting location." }, { status: 400 });
+    }
+    const rawLocationObservations = body.locationObservations && typeof body.locationObservations === "object" && !Array.isArray(body.locationObservations)
+      ? body.locationObservations as Record<string, unknown>
+      : {};
+    const locationObservations = Object.fromEntries(locationsReported.map((location) => [location, text(rawLocationObservations[location])]));
+    if (locationsReported.some((location) => !locationObservations[location])) {
+      return NextResponse.json({ ok: false, message: "Add an observation for every selected location." }, { status: 400 });
     }
     const rawUnits = Array.isArray(body.unitsReported) ? body.unitsReported : [];
     if (rawUnits.length > SERVICE_OBSERVER_UNITS.length) {
@@ -58,15 +78,8 @@ export async function POST(request: Request) {
     const savedUnits = unitsReported.map((unit) => unit === "Other" ? namedOtherUnit : unit);
     const savedUnitReports = Object.fromEntries(Object.entries(unitReports).map(([unit, report]) => [unit === "Other" ? namedOtherUnit : unit, report]));
     const generalObservations = text(body.generalObservations);
-    if (!generalObservations && unitsReported.length === 0) {
-      return NextResponse.json({ ok: false, message: "Add a general observation or at least one unit observation." }, { status: 400 });
-    }
-    const reporterRole = text(body.reporterRole, 40);
-    const postedLocation = text(body.postedLocation, 80);
-    const reportingLocation = text(body.reportingLocation, 80);
-    if (!REPORTER_ROLES.has(reporterRole) || !REPORTING_LOCATIONS.has(reportingLocation) || (reporterRole === "QC member" && !POSTING_LOCATIONS.has(postedLocation))) {
-      return NextResponse.json({ ok: false, message: "Complete the reporter and location details correctly." }, { status: 400 });
-    }
+    const reporterRole = ROLE_LABELS[access.role];
+    const reportingLocation = locationsReported.join(", ");
 
     await appendServiceObserverReport({
       submissionId: UUID_PATTERN.test(text(body.submissionId, 36)) ? text(body.submissionId, 36) : randomUUID(),
@@ -75,11 +88,21 @@ export async function POST(request: Request) {
       unitsReported: savedUnits, unitReports: savedUnitReports,
       recommendations: text(body.recommendations),
       conclusion: text(body.conclusion),
-      reporterRole, postedLocation, reportingLocation,
+      reporterRole, postedLocation: "", reportingLocation,
+      locationsReported, locationObservations,
     });
     return NextResponse.json({ ok: true, message: "Service Observer report saved successfully." });
   } catch (error) {
     console.error("[service-observer] Report save failed", error instanceof Error ? error.message : "Unknown error");
     return NextResponse.json({ ok: false, message: "The observer report could not be saved. Please try again." }, { status: 502 });
   }
+}
+
+export async function GET() {
+  const session = await readMemberSession();
+  if (!session) return NextResponse.json({ ok: false, message: "Your member session has expired." }, { status: 401 });
+  const member = await getTeamMemberByEmail(session.email);
+  if (!member) return NextResponse.json({ ok: false, message: "Your email is not registered in Team Data." }, { status: 403 });
+  const access = await resolveUserAccess(session.email);
+  return NextResponse.json({ ok: true, name: member.name, role: ROLE_LABELS[access.role] }, { headers: { "Cache-Control": "no-store" } });
 }

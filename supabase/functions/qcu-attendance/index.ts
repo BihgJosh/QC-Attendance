@@ -332,8 +332,7 @@ Deno.serve(async (request) => {
       const email = normalizeEmail(body.email);
       const rows = await rest(`user_roles?select=role,department,is_active&email=eq.${encodeURIComponent(email)}&is_active=eq.true&limit=1`) as Json[];
       const role = String(rows[0]?.role || "general_user");
-      const now = new Date().toISOString();
-      const assignments = role === "service_manager" ? await rest(`service_assignments?select=id,service_date,service,manager_email,access_starts_at,access_ends_at,status&manager_email=eq.${encodeURIComponent(email)}&access_starts_at=lte.${encodeURIComponent(now)}&access_ends_at=gte.${encodeURIComponent(now)}&status=in.(scheduled,active)&order=access_starts_at.asc`) as Json[] : [];
+      const assignments = role === "service_manager" ? await rest(`service_assignments?select=id,service_date,service,manager_email,access_starts_at,access_ends_at,status&manager_email=eq.${encodeURIComponent(email)}&status=neq.cancelled&order=access_starts_at.asc`) as Json[] : [];
       return json({ role, department: rows[0]?.department || null, assignments: assignments.map((row) => ({ id: row.id, serviceDate: row.service_date, service: row.service, managerEmail: row.manager_email, accessStartsAt: row.access_starts_at, accessEndsAt: row.access_ends_at, status: row.status })) });
     }
     if (operation === "roles.upsert") {

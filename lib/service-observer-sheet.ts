@@ -28,6 +28,8 @@ export type ServiceObserverReport = {
   reporterRole: string;
   postedLocation: string;
   reportingLocation: string;
+  locationsReported: string[];
+  locationObservations: Record<string, string>;
 };
 
 export async function appendServiceObserverReport(report: ServiceObserverReport) {
@@ -40,6 +42,8 @@ export async function appendServiceObserverReport(report: ServiceObserverReport)
     reporter_role: report.reporterRole,
     posted_location: report.postedLocation,
     reporting_location: report.reportingLocation,
+    locations_reported: report.locationsReported,
+    location_observations: report.locationObservations,
     general_observations: report.generalObservations,
     units_reported: report.unitsReported,
     unit_reports: report.unitReports,

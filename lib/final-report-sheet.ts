@@ -121,6 +121,8 @@ function buildRows(data: DailyReport) {
     if (!observers.length) add(["No observer report has been submitted for this service."], "note", true);
     for (const row of observers) {
       add(["Observer", row.observer_name, "Role", row.reporter_role, "Reporting location", row.reporting_location, "Submitted", timestamp(row.submitted_at)], "header");
+      const locationObservations = row.location_observations && typeof row.location_observations === "object" ? row.location_observations as ReportRow : {};
+      for (const [location, report] of Object.entries(locationObservations)) narrative(`LOCATION OBSERVATION — ${location.toUpperCase()}`, report, "observation");
       narrative("GENERAL SERVICE OBSERVATIONS", row.general_observations, "observation");
       const unitReports = row.unit_reports && typeof row.unit_reports === "object" ? row.unit_reports as ReportRow : {};
       for (const [unit, report] of Object.entries(unitReports)) narrative(`UNIT OBSERVATION — ${unit.toUpperCase()}`, report, "observation");

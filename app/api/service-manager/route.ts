@@ -78,6 +78,9 @@ function reportEmailHtml(input: {
   const unitReports = observer?.unitReports && typeof observer.unitReports === "object"
     ? observer.unitReports as Record<string, unknown>
     : {};
+  const locationObservations = observer?.locationObservations && typeof observer.locationObservations === "object"
+    ? observer.locationObservations as Record<string, unknown>
+    : {};
   const section = (title: string, content: string) => `<div style="margin-top:22px;padding:18px;border:1px solid #dbeafe;border-radius:16px;background:#f8fbff"><h2 style="margin:0 0 12px;color:#102044;font-size:16px">${escapeHtml(title)}</h2>${content}</div>`;
   const rows = (items: string) => `<table style="width:100%;border-collapse:collapse;font-size:13px">${items}</table>`;
   const row = (label: unknown, value: unknown) => `<tr><th scope="row" style="padding:7px 4px;text-align:left;font-weight:500;color:#64748b;border-bottom:1px solid #e2e8f0">${escapeHtml(label)}</th><td style="padding:7px 4px;text-align:right;font-weight:700;color:#0f172a;border-bottom:1px solid #e2e8f0">${escapeHtml(value)}</td></tr>`;
@@ -93,7 +96,7 @@ function reportEmailHtml(input: {
       ? `${rows([row("Timer", timer.timerName || "Not provided"), row("Service time", `${timer.serviceStart || "—"} – ${timer.serviceEnd || "—"}`), ...segments.map((item) => row(item.label || "Segment", `${item.status || "No data"}${item.min || item.sec ? ` · ${numberValue(item.min)}m ${numberValue(item.sec)}s` : ""}`))].join(""))}${timer.generalObservation ? `<p style="color:#475569;line-height:1.6">${escapeHtml(timer.generalObservation)}</p>` : ""}`
       : "<p style=\"color:#64748b\">No timer log was submitted.</p>"),
     section("Observer report", observer
-      ? `${observer.generalObservations ? `<p style="color:#475569;line-height:1.6">${escapeHtml(observer.generalObservations)}</p>` : ""}${rows(Object.entries(unitReports).map(([unit, text]) => row(unit, text)).join(""))}${observer.recommendations ? `<p><strong>Recommendations:</strong> ${escapeHtml(observer.recommendations)}</p>` : ""}${observer.conclusion ? `<p><strong>Conclusion:</strong> ${escapeHtml(observer.conclusion)}</p>` : ""}`
+      ? `${rows(Object.entries(locationObservations).map(([location, text]) => row(`Observation for ${location}`, text)).join(""))}${observer.generalObservations ? `<p style="color:#475569;line-height:1.6">${escapeHtml(observer.generalObservations)}</p>` : ""}${rows(Object.entries(unitReports).map(([unit, text]) => row(unit, text)).join(""))}${observer.recommendations ? `<p><strong>Recommendations:</strong> ${escapeHtml(observer.recommendations)}</p>` : ""}${observer.conclusion ? `<p><strong>Conclusion:</strong> ${escapeHtml(observer.conclusion)}</p>` : ""}`
       : "<p style=\"color:#64748b\">No observer report was submitted.</p>"),
     emergencies.length
       ? section("Emergency flags", emergencies.map((item) => `<p style="padding:10px;border-left:4px solid #ef4444;background:#fff1f2;color:#7f1d1d"><strong>${escapeHtml(item.location || "Location not provided")}</strong><br>${escapeHtml(item.description || "No description")}<br><small>${escapeHtml(item.reportedBy || "Unknown reporter")} · ${escapeHtml(item.status || "Status unavailable")}</small></p>`).join(""))
@@ -128,10 +131,10 @@ export async function POST(request: Request) {
     const session = await readMemberSession();
     if (!session) return NextResponse.json({ ok: false, message: "Sign in with your member account first." }, { status: 401 });
     const access = await resolveUserAccess(session.email);
-    const elevated = access.role === "admin" || access.role === "super_admin";
-    const activeAssignments = access.assignments.filter((assignment) => !date || (
+    const elevated = access.role === "hod" || access.role === "admin" || access.role === "super_admin";
+    const activeAssignments = access.assignments.filter((assignment) => assignment.status !== "cancelled" && (!date || (
       date >= abujaDate(assignment.accessStartsAt) && date <= abujaDate(assignment.accessEndsAt)
-    ));
+    )));
     if (!elevated && access.role !== "service_manager") return NextResponse.json({ ok: false, message: "Service Manager access is required." }, { status: 403 });
     if (!elevated && activeAssignments.length === 0) return NextResponse.json({ ok: false, message: "Your schedule does not grant access on this date or the access window has expired." }, { status: 403 });
     if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
