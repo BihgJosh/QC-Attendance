@@ -1,3 +1,4 @@
+
 insert into public.user_roles (email, role, created_by)
 select credentials.email, 'general_user', 'default_member_backfill'
 from public.member_credentials as credentials
@@ -22,3 +23,5 @@ insert into public.user_roles (email, role, created_by)
 values ('joshuaagusa001@gmail.com', 'super_admin', 'bootstrap')
 on conflict (email) do update
 set role = 'super_admin', is_active = true, updated_at = now();
+
+;

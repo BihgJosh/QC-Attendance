@@ -9,6 +9,12 @@ type MemberOperation =
   | "member.session"
   | "member.change-password"
   | "member.logout"
+  | "profile.get"
+  | "profile.update"
+  | "profile.email-change-request"
+  | "profile.email-change-confirm"
+  | "profile.image-upload"
+  | "profile.image-delete"
   | "member.list"
   | "member.reset"
   | "admin.list"
@@ -132,6 +138,43 @@ export function changeMemberPassword(token: string, password: string) {
 
 export function logoutMember(token: string) {
   return callMemberGateway<{ success: boolean }>("member.logout", { token });
+}
+
+export type MemberProfile = {
+  email: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  phone: string;
+  birthMonth: number | null;
+  birthDay: number | null;
+  avatarUrl: string | null;
+  role: AppRole;
+};
+
+export async function getMemberProfile(token: string) {
+  const data = await callMemberGateway<{ profile: MemberProfile }>("profile.get", { token });
+  return data.profile;
+}
+
+export function updateMemberProfile(token: string, input: Pick<MemberProfile, "firstName" | "middleName" | "lastName" | "phone" | "birthMonth" | "birthDay">) {
+  return callMemberGateway<{ success: boolean }>("profile.update", { token, ...input });
+}
+
+export function requestMemberEmailChange(token: string, newEmail: string) {
+  return callMemberGateway<{ success: boolean; newEmail: string; verificationCode: string; requestedAt: string }>("profile.email-change-request", { token, newEmail });
+}
+
+export function confirmMemberEmailChange(token: string, code: string) {
+  return callMemberGateway<{ success: boolean; email: string; token: string }>("profile.email-change-confirm", { token, code });
+}
+
+export function uploadMemberProfileImage(token: string, base64: string) {
+  return callMemberGateway<{ success: boolean; avatarUrl: string }>("profile.image-upload", { token, base64 });
+}
+
+export function deleteMemberProfileImage(token: string) {
+  return callMemberGateway<{ success: boolean }>("profile.image-delete", { token });
 }
 
 export async function listMemberStatuses() {

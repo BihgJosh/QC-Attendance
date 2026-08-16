@@ -27,6 +27,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}>
+        <div className="hidden" aria-hidden="true" dangerouslySetInnerHTML={{ __html: `<!--
+THESIS: My Profile behaves like a digital membership passport, refusing a generic settings-card dashboard.
+OWN-WORLD: QC navy, cyan and purple; cool paper surfaces; precise rounded controls; restrained offset depth.
+STORY: A member recognizes their identity and role, keeps personal details accurate, and verifies sensitive email changes.
+FIRST VIEWPORT: Compact app navigation, identity passport with photo/name/email/role, then a two-column editing workspace with profile details leading.
+FORM: Identity-first passport, selected whole-surface structure, seed 016962ff.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->` }} />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

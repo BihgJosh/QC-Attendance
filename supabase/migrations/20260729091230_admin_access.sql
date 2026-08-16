@@ -12,4 +12,4 @@ alter table public.admin_access enable row level security;
 revoke all on table public.admin_access from anon, authenticated;
 grant all on table public.admin_access to service_role;
 
-comment on table public.admin_access is 'Server-only allowlist of member emails authorized for the QC admin dashboard.';
+comment on table public.admin_access is 'Server-only allowlist of member emails authorized for the QC admin dashboard.';;

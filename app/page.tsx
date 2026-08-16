@@ -18,6 +18,7 @@ import {
   Shirt,
   Sparkles,
   Users,
+  UserRound,
   X,
 } from "lucide-react";
 import { BirthdayNotice } from "@/components/public/birthday-notice";
@@ -36,6 +37,7 @@ const navigation = [
   { label: "Uniform", href: "#uniform" },
   { label: "Attendance", href: "/attendance" },
   { label: "Service Tools", href: "/service-tools" },
+  { label: "My Profile", href: "/member/profile" },
 ];
 
 const accentClasses = {
@@ -119,6 +121,7 @@ export default function HomePage() {
               </Link>
             </Button>
             <ThemeToggle />
+            <Button asChild variant="ghost" size="icon" className="hidden text-white/70 hover:bg-white/10 hover:text-white sm:inline-flex"><Link href="/member/profile" aria-label="Open my profile"><UserRound className="h-4 w-4" /></Link></Button>
             <span className="hidden sm:inline-flex"><MemberLogoutButton compact /></span>
             <button
               type="button"

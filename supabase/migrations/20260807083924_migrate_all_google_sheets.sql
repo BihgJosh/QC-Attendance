@@ -1,3 +1,4 @@
+
 create extension if not exists pgcrypto;
 
 create table if not exists public.sheet_sources (
@@ -182,3 +183,5 @@ grant all on public.sheet_sources, public.sheet_tabs, public.sheet_rows,
 grant usage, select on all sequences in schema public to service_role;
 
 comment on table public.sheet_rows is 'Lossless row-level replica of every connected Google Sheet, with source position and checksum.';
+
+;

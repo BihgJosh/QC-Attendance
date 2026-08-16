@@ -1,3 +1,4 @@
+
 create table if not exists public.user_roles (
   email text primary key check (email = lower(email) and email ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'),
   role text not null check (role in ('general_user', 'service_manager', 'hod', 'admin', 'super_admin')),
@@ -81,5 +82,7 @@ insert into public.user_roles (email, role, created_by)
 values ('joshuaagusa001@gmail.com', 'super_admin', 'bootstrap')
 on conflict (email) do update set role = 'super_admin', is_active = true, updated_at = now();
 
-comment on table public.service_assignments is 'Schedule that grants time-bound Service Manager access by day or by service.';
+comment on table public.service_assignments is 'Posting schedule that grants time-bound Service Manager access per Sunday service.';
 comment on table public.headcount_reconciliations is 'Department totals and verified corrections used to produce final HOD reports.';
+
+;

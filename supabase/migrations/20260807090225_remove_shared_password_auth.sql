@@ -1,3 +1,4 @@
+
 alter table public.member_sessions
   add column if not exists remember_me boolean not null default false;
 
@@ -24,3 +25,5 @@ delete from public.member_credentials where must_change_password is true;
 
 comment on table public.member_setup_challenges is
   'Short-lived, server-only email verification challenges for first-time private-password setup.';
+
+;

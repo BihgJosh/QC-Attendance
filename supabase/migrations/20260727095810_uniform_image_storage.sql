@@ -10,7 +10,4 @@ on conflict (id) do update
 set
   public = excluded.public,
   file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
-
--- Uploads and deletions are performed only by the service-role Edge Function.
--- No storage.objects policies are intentionally granted to public or authenticated users.
+  allowed_mime_types = excluded.allowed_mime_types;;

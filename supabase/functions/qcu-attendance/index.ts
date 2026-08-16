@@ -3,6 +3,7 @@ const allowedOperations = new Set([
   "status.get", "status.update", "settings.get", "settings.update", "members.list",
   "attendance.device-check", "attendance.insert", "attendance.list", "migration.import",
   "member.status", "member.setup-complete", "member.authenticate", "member.session", "member.change-password", "member.logout",
+  "profile.get", "profile.update", "profile.email-change-request", "profile.email-change-confirm", "profile.image-upload", "profile.image-delete",
   "member.list", "member.reset", "admin.list", "admin.add", "admin.remove",
   "roles.list", "roles.resolve", "roles.upsert", "roles.remove", "assignments.upsert", "assignments.remove",
   "push.subscribe", "push.unsubscribe", "push.list", "push.deactivate",
@@ -51,6 +52,30 @@ async function rest(path: string, init: RequestInit = {}) {
     throw error;
   }
   return payload;
+}
+
+async function storage(path: string, init: RequestInit = {}) {
+  const response = await fetch(`${supabaseUrl}/storage/v1/${path}`, {
+    ...init,
+    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, ...(init.headers || {}) },
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(payload && typeof payload.message === "string" ? payload.message : "Profile photo storage is unavailable.") as Error & { status?: number };
+    error.status = response.status;
+    throw error;
+  }
+  return payload as Json;
+}
+
+async function signedAvatarUrl(path: unknown) {
+  const objectPath = String(path || "");
+  if (!objectPath) return null;
+  const result = await storage(`object/sign/member-profile-photos/${encodeURIComponent(objectPath)}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn: 3600 }),
+  });
+  const signed = String(result.signedURL || result.signedUrl || "");
+  return signed ? `${supabaseUrl}/storage/v1${signed}` : null;
 }
 
 const PROTECTED_BOOTSTRAP_EMAILS = new Set(["joshuaagusa001@gmail.com"]);
@@ -265,6 +290,105 @@ Deno.serve(async (request) => {
     if (operation === "member.logout") {
       const token = String(body.token || "");
       if (token) await rest(`member_sessions?token_hash=eq.${encodeURIComponent(await sha256(token))}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      return json({ success: true });
+    }
+    if (operation === "profile.get") {
+      const session = await resolveMemberSession(body.token);
+      if (!session) return json({ error: "Your session has expired." }, 401);
+      const [profiles, roles, teamRows] = await Promise.all([
+        rest(`member_profiles?select=first_name,middle_name,last_name,phone,birth_month,birth_day,avatar_path&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
+        rest(`user_roles?select=role,is_active&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
+        rest(`Team%20Data?select=Surname,Other%20Names&normalized_email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
+      ]);
+      const profile = profiles[0] || {};
+      const team = teamRows[0] || {};
+      const otherNames = String(team["Other Names"] || "").trim().split(/\s+/).filter(Boolean);
+      return json({ profile: {
+        email: session.email,
+        firstName: String(profile.first_name || otherNames.shift() || ""),
+        middleName: String(profile.middle_name || otherNames.join(" ")),
+        lastName: String(profile.last_name || team.Surname || ""),
+        phone: String(profile.phone || ""),
+        birthMonth: profile.birth_month == null ? null : Number(profile.birth_month),
+        birthDay: profile.birth_day == null ? null : Number(profile.birth_day),
+        avatarUrl: await signedAvatarUrl(profile.avatar_path),
+        role: roles[0]?.is_active === false ? "general_user" : String(roles[0]?.role || "general_user"),
+      } });
+    }
+    if (operation === "profile.update") {
+      const session = await resolveMemberSession(body.token);
+      if (!session) return json({ error: "Your session has expired." }, 401);
+      const firstName = String(body.firstName || "").trim().replace(/\s+/g, " ");
+      const middleName = String(body.middleName || "").trim().replace(/\s+/g, " ");
+      const lastName = String(body.lastName || "").trim().replace(/\s+/g, " ");
+      const phone = String(body.phone || "").trim().replace(/\s+/g, " ");
+      const birthMonth = body.birthMonth == null || body.birthMonth === "" ? null : Number(body.birthMonth);
+      const birthDay = body.birthDay == null || body.birthDay === "" ? null : Number(body.birthDay);
+      if (!firstName || !lastName || firstName.length > 80 || middleName.length > 80 || lastName.length > 80) return json({ error: "Enter your first and last name using 80 characters or fewer." }, 400);
+      if (phone && (!/^[+0-9()\-\s]{7,30}$/.test(phone))) return json({ error: "Enter a valid phone number." }, 400);
+      if ((birthMonth == null) !== (birthDay == null)) return json({ error: "Choose both a birthday month and day, or leave both empty." }, 400);
+      if (birthMonth != null && birthDay != null) {
+        const birthday = new Date(Date.UTC(2000, birthMonth - 1, birthDay));
+        if (birthday.getUTCMonth() !== birthMonth - 1 || birthday.getUTCDate() !== birthDay) return json({ error: "Choose a valid birthday." }, 400);
+      }
+      const now = new Date().toISOString();
+      await rest("member_profiles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, first_name: firstName, middle_name: middleName, last_name: lastName, phone, birth_month: birthMonth, birth_day: birthDay, updated_at: now }) });
+      await rest(`Team%20Data?normalized_email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ Surname: lastName, "Other Names": [firstName, middleName].filter(Boolean).join(" ") }) });
+      return json({ success: true });
+    }
+    if (operation === "profile.email-change-request") {
+      const session = await resolveMemberSession(body.token);
+      if (!session) return json({ error: "Your session has expired." }, 401);
+      if (PROTECTED_BOOTSTRAP_EMAILS.has(session.email)) return json({ error: "The primary administrator email is managed in secure configuration and cannot be changed here." }, 403);
+      const newEmail = normalizeEmail(body.newEmail);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail) || newEmail.length > 254) return json({ error: "Enter a valid new email address." }, 400);
+      if (newEmail === session.email) return json({ error: "Enter a different email address." }, 400);
+      const [credentials, teamRows] = await Promise.all([
+        rest(`member_credentials?select=email&email=eq.${encodeURIComponent(newEmail)}&limit=1`) as Promise<Json[]>,
+        rest(`Team%20Data?select=Email&normalized_email=eq.${encodeURIComponent(newEmail)}&limit=1`) as Promise<Json[]>,
+      ]);
+      if (credentials[0] || teamRows[0]) return json({ error: "That email address is already in use." }, 409);
+      const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
+      const now = new Date();
+      await rest("member_email_change_challenges?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, new_email: newEmail, code_hash: await sha256(code), expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString(), attempts: 0, requested_at: now.toISOString() }) });
+      return json({ success: true, newEmail, verificationCode: code, requestedAt: now.toISOString() });
+    }
+    if (operation === "profile.email-change-confirm") {
+      const session = await resolveMemberSession(body.token);
+      if (!session) return json({ error: "Your session has expired." }, 401);
+      const code = String(body.code || "").trim();
+      const rows = await rest(`member_email_change_challenges?select=new_email,code_hash,expires_at,attempts&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Json[];
+      const challenge = rows[0];
+      if (!challenge || Date.parse(String(challenge.expires_at)) <= Date.now()) return json({ error: "This verification code has expired. Request a new one." }, 410);
+      if (Number(challenge.attempts) >= 5) return json({ error: "Too many incorrect attempts. Request a new code." }, 429);
+      if (!/^\d{6}$/.test(code) || !safeEqual(await sha256(code), String(challenge.code_hash))) {
+        await rest(`member_email_change_challenges?email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attempts: Number(challenge.attempts) + 1 }) });
+        return json({ error: "That verification code is incorrect." }, 400);
+      }
+      const newEmail = normalizeEmail(challenge.new_email);
+      await rest("rpc/complete_member_email_change", { method: "POST", body: JSON.stringify({ old_email: session.email, replacement_email: newEmail }) });
+      return json({ success: true, email: newEmail, token: await createMemberSession(newEmail) });
+    }
+    if (operation === "profile.image-upload") {
+      const session = await resolveMemberSession(body.token);
+      if (!session) return json({ error: "Your session has expired." }, 401);
+      const base64 = String(body.base64 || "");
+      let bytes: Uint8Array;
+      try { bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0)); } catch { return json({ error: "The processed image is invalid." }, 400); }
+      if (!bytes.length || bytes.length > 409600) return json({ error: "The processed profile picture must be 400 KB or smaller." }, 413);
+      if (String.fromCharCode(...bytes.slice(0, 4)) !== "RIFF" || String.fromCharCode(...bytes.slice(8, 12)) !== "WEBP") return json({ error: "The processed image must be WebP." }, 415);
+      const objectPath = `${await sha256(session.email)}.webp`;
+      await storage(`object/member-profile-photos/${objectPath}`, { method: "POST", headers: { "Content-Type": "image/webp", "x-upsert": "true" }, body: bytes });
+      await rest("member_profiles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, avatar_path: objectPath, updated_at: new Date().toISOString() }) });
+      return json({ success: true, avatarUrl: await signedAvatarUrl(objectPath) });
+    }
+    if (operation === "profile.image-delete") {
+      const session = await resolveMemberSession(body.token);
+      if (!session) return json({ error: "Your session has expired." }, 401);
+      const rows = await rest(`member_profiles?select=avatar_path&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Json[];
+      const objectPath = String(rows[0]?.avatar_path || "");
+      if (objectPath) await storage("object/member-profile-photos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [objectPath] }) });
+      await rest(`member_profiles?email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ avatar_path: null, updated_at: new Date().toISOString() }) });
       return json({ success: true });
     }
     if (operation === "member.list") {

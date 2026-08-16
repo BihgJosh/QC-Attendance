@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-16T23:23:52.9411235Z",
+  "title": "Design System: Quality Control Unit",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Signal Cyan", "canonical": "hsl(199 75% 54%)", "tonalRamp": ["oklch(22% 0.07 225)", "oklch(32% 0.10 225)", "oklch(43% 0.13 225)", "oklch(55% 0.15 225)", "oklch(66% 0.13 225)", "oklch(76% 0.10 225)", "oklch(86% 0.06 225)", "oklch(95% 0.025 225)"] },
+      "accent": { "role": "secondary", "displayName": "QC Purple", "canonical": "hsl(277 80% 36%)", "tonalRamp": ["oklch(20% 0.08 315)", "oklch(29% 0.13 315)", "oklch(39% 0.17 315)", "oklch(50% 0.19 315)", "oklch(61% 0.16 315)", "oklch(72% 0.12 315)", "oklch(84% 0.07 315)", "oklch(95% 0.025 315)"] },
+      "background": { "role": "neutral", "displayName": "Cool Paper", "canonical": "hsl(250 50% 99%)", "tonalRamp": ["oklch(18% 0.01 280)", "oklch(30% 0.01 280)", "oklch(43% 0.01 280)", "oklch(56% 0.01 280)", "oklch(68% 0.009 280)", "oklch(79% 0.008 280)", "oklch(89% 0.006 280)", "oklch(98% 0.004 280)"] },
+      "foreground": { "role": "neutral", "displayName": "QC Navy", "canonical": "hsl(222 47% 11%)", "tonalRamp": ["oklch(18% 0.04 255)", "oklch(29% 0.045 255)", "oklch(41% 0.04 255)", "oklch(53% 0.035 255)", "oklch(65% 0.028 255)", "oklch(76% 0.02 255)", "oklch(87% 0.012 255)", "oklch(95% 0.006 255)"] },
+      "success": { "role": "semantic", "displayName": "Success Green", "canonical": "#10B981", "tonalRamp": ["oklch(20% 0.07 160)", "oklch(31% 0.10 160)", "oklch(43% 0.13 160)", "oklch(55% 0.15 160)", "oklch(66% 0.13 160)", "oklch(77% 0.10 160)", "oklch(87% 0.06 160)", "oklch(95% 0.025 160)"] },
+      "warning": { "role": "semantic", "displayName": "Warning Amber", "canonical": "#F59E0B", "tonalRamp": ["oklch(22% 0.07 75)", "oklch(33% 0.10 75)", "oklch(45% 0.13 75)", "oklch(57% 0.15 75)", "oklch(68% 0.13 75)", "oklch(78% 0.10 75)", "oklch(88% 0.06 75)", "oklch(95% 0.025 75)"] },
+      "danger": { "role": "semantic", "displayName": "Danger Red", "canonical": "#EF4444", "tonalRamp": ["oklch(20% 0.08 25)", "oklch(31% 0.12 25)", "oklch(43% 0.16 25)", "oklch(55% 0.18 25)", "oklch(66% 0.15 25)", "oklch(77% 0.11 25)", "oklch(87% 0.065 25)", "oklch(95% 0.025 25)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Major desktop page statements used sparingly." },
+      "headline": { "displayName": "Headline", "purpose": "Page and major section headings." },
+      "title": { "displayName": "Title", "purpose": "Card, workflow, and subsection titles." },
+      "body": { "displayName": "Body", "purpose": "Forms, explanations, and operational copy." },
+      "label": { "displayName": "Label", "purpose": "Short uppercase eyebrows and category cues." }
+    },
+    "shadows": [
+      { "name": "surface", "value": "0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px -18px rgba(15, 23, 42, 0.22)", "purpose": "Default cards and contained work areas." },
+      { "name": "surface-raised", "value": "0 2px 5px rgba(15, 23, 42, 0.06), 0 22px 52px -24px rgba(15, 23, 42, 0.30)", "purpose": "Emphasized or hovered surfaces." },
+      { "name": "control", "value": "0 1px 2px rgba(15, 23, 42, 0.05), 0 5px 14px -10px rgba(15, 23, 42, 0.22)", "purpose": "Buttons, inputs, and compact controls." }
+    ],
+    "motion": [
+      { "name": "quick", "value": "160ms cubic-bezier(0.2, 0.8, 0.2, 1)", "purpose": "Default control and field state transitions." },
+      { "name": "spring", "value": "400ms linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 32.2%, 0.937 39.9%, 0.984 48.7%, 1.006 59.4%, 1.012 74.8%, 1.003 92.5%, 1)", "purpose": "Restrained surface lift and shadow settling." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1400px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The standard affirmative action for operational workflows.",
+      "html": "<button class=\"ds-btn-primary\">Save changes</button>",
+      "css": ".ds-btn-primary { height: 44px; padding: 8px 20px; border: 0; border-radius: 10px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font: 600 14px/1 var(--font-geist-sans), system-ui, sans-serif; box-shadow: var(--control-shadow); transition: background-color 150ms cubic-bezier(.2,.8,.2,1), box-shadow 150ms cubic-bezier(.2,.8,.2,1), transform 150ms cubic-bezier(.2,.8,.2,1); } .ds-btn-primary:hover { background: hsl(var(--primary) / .9); box-shadow: 0 4px 10px rgba(15,23,42,.14); } .ds-btn-primary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; } .ds-btn-primary:active { transform: scale(.975); }"
+    },
+    {
+      "name": "Gradient Button",
+      "kind": "button",
+      "refersTo": "button-gradient",
+      "description": "A selective high-value action using the established brand gradient.",
+      "html": "<button class=\"ds-btn-gradient\">Save profile</button>",
+      "css": ".ds-btn-gradient { height: 44px; padding: 8px 20px; border: 0; border-radius: 10px; background: linear-gradient(135deg,#39A9DB 0%,#8E14A8 100%); color: #fff; font: 600 14px/1 var(--font-geist-sans), system-ui, sans-serif; box-shadow: 0 4px 12px rgba(109,14,131,.15); transition: filter 150ms cubic-bezier(.2,.8,.2,1), box-shadow 150ms cubic-bezier(.2,.8,.2,1), transform 150ms cubic-bezier(.2,.8,.2,1); } .ds-btn-gradient:hover { filter: brightness(1.03); box-shadow: 0 8px 20px rgba(109,14,131,.2); } .ds-btn-gradient:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; } .ds-btn-gradient:active { transform: scale(.975); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "A bounded secondary action for adjacent workflow choices.",
+      "html": "<button class=\"ds-btn-outline\">Send verification code</button>",
+      "css": ".ds-btn-outline { min-height: 44px; padding: 8px 20px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--background) / .8); color: hsl(var(--foreground)); font: 600 14px/1.2 var(--font-geist-sans), system-ui, sans-serif; box-shadow: var(--control-shadow); transition: background-color 150ms cubic-bezier(.2,.8,.2,1), border-color 150ms cubic-bezier(.2,.8,.2,1), transform 150ms cubic-bezier(.2,.8,.2,1); } .ds-btn-outline:hover { border-color: hsl(var(--primary) / .3); background: hsl(var(--primary) / .06); } .ds-btn-outline:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; } .ds-btn-outline:active { transform: scale(.975); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "The standard profile and operational data-entry field.",
+      "html": "<label class=\"ds-field\">First name<input class=\"ds-input\" value=\"Ada\" /></label>",
+      "css": ".ds-field { display: grid; gap: 8px; color: hsl(var(--foreground)); font: 600 14px/1.25 var(--font-geist-sans), system-ui, sans-serif; } .ds-input { width: 100%; height: 48px; padding: 8px 16px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--background) / .8); color: hsl(var(--foreground)); font: 400 14px/1.5 var(--font-geist-sans), system-ui, sans-serif; box-shadow: var(--control-shadow); transition: background-color 150ms cubic-bezier(.2,.8,.2,1), border-color 150ms cubic-bezier(.2,.8,.2,1), box-shadow 150ms cubic-bezier(.2,.8,.2,1); } .ds-input:hover { border-color: hsl(var(--muted-foreground) / .35); } .ds-input:focus-visible { border-color: hsl(var(--primary) / .6); outline: none; box-shadow: 0 0 0 3px hsl(var(--primary) / .2), var(--control-shadow); }"
+    },
+    {
+      "name": "Default Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "The primary neutral container for forms, tools, and grouped information.",
+      "html": "<article class=\"ds-card\"><p class=\"ds-card-eyebrow\">Operational details</p><h3>Personal information</h3><p>Keep the details connected to your QC account accurate.</p></article>",
+      "css": ".ds-card { padding: 24px; border: 1px solid hsl(var(--border) / .6); border-radius: 14px; background: hsl(var(--card)); color: hsl(var(--card-foreground)); box-shadow: var(--surface-shadow); font-family: var(--font-geist-sans), system-ui, sans-serif; transition: border-color 160ms cubic-bezier(.2,.8,.2,1), box-shadow 400ms ease, transform 400ms ease; } .ds-card h3 { margin: 8px 0; font-size: 20px; line-height: 1.25; letter-spacing: -.02em; } .ds-card p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 14px; line-height: 1.5; } .ds-card .ds-card-eyebrow { color: hsl(var(--primary)); font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; } .ds-card:hover { border-color: hsl(var(--primary) / .22); box-shadow: var(--surface-shadow-raised); transform: translateY(-1px); } .ds-card:focus-within { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-default",
+      "description": "A compact role, category, or status label with softly tinted emphasis.",
+      "html": "<span class=\"ds-badge\">Service Manager</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; padding: 4px 12px; border: 1px solid transparent; border-radius: 9999px; background: hsl(var(--primary) / .1); color: hsl(var(--primary)); font: 600 12px/1.25 var(--font-geist-sans), system-ui, sans-serif; transition: background-color 200ms ease; } .ds-badge:hover { background: hsl(var(--primary) / .2); } .ds-badge:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Branded Navigation",
+      "kind": "nav",
+      "description": "The compact QC identity bar used at the top of member and service-tool surfaces.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav-mark\">QC</span><span class=\"ds-nav-title\"><strong>Quality Control Unit</strong><small>Service tools</small></span><a href=\"#\">Home</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border: 1px solid rgba(165,243,252,.1); border-radius: 14px; background: linear-gradient(110deg,rgba(2,12,32,.96),rgba(26,20,69,.95) 58%,rgba(74,20,96,.94)); color: #fff; box-shadow: 0 18px 50px -24px rgba(2,6,23,.72); font-family: var(--font-geist-sans), system-ui, sans-serif; } .ds-nav-mark { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 10px; background: #fff; color: #07152f; font-size: 13px; font-weight: 800; } .ds-nav-title { display: grid; margin-right: auto; line-height: 1.15; } .ds-nav-title strong { font-size: 14px; } .ds-nav-title small { margin-top: 3px; color: rgba(207,250,254,.65); font-size: 10px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; } .ds-nav a { min-height: 40px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 9999px; color: rgba(255,255,255,.7); font-size: 14px; font-weight: 500; text-decoration: none; } .ds-nav a:hover { background: rgba(255,255,255,.1); color: #fff; } .ds-nav a:focus-visible { outline: 2px solid #67e8f9; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Calm Operations Desk",
+    "overview": "The Quality Control Unit interface presents serious operational work with calm clarity. Cool, pale surfaces keep information readable while the established cyan-to-purple identity supplies recognition, emphasis, and a measured sense of energy.\n\nThe system is compact, touch-friendly, and gently dimensional. Strong headings, short labels, precise rounded controls, and restrained surface lift help members scan responsibilities and complete forms without the interface feeling clinical. “Excellence is our culture” is expressed through order, legibility, and dependable states rather than decoration alone.",
+    "keyCharacteristics": [
+      "Cool paper-like backgrounds with white or translucent working surfaces.",
+      "Cyan primary actions and selective purple brand emphasis.",
+      "Bold, tightly tracked headings paired with highly legible Geist body text.",
+      "Rounded, tactile controls with restrained shadows and explicit focus states.",
+      "Mobile-first spacing that opens into centered, bounded desktop layouts."
+    ],
+    "rules": [
+      { "name": "The Signal, Not Wallpaper Rule", "body": "Cyan and purple identify actions, active states, and brand moments; routine content remains on neutral surfaces.", "section": "colors" },
+      { "name": "The Semantic Color Rule", "body": "Success, warning, and danger colors communicate their actual state and are not used as interchangeable decoration.", "section": "colors" },
+      { "name": "The Weight Before Ornament Rule", "body": "Establish hierarchy through size, weight, and measured tracking; do not add decorative type treatments to routine product copy.", "section": "typography" },
+      { "name": "The Bounded Workspace Rule", "body": "Let the ambient page extend edge to edge, but keep navigation, reading, and forms inside a centered maximum-width workspace.", "section": "layout" },
+      { "name": "The Mobile Sequence Rule", "body": "Preserve the task's reading and action order when columns collapse; never rely on desktop position alone to explain hierarchy.", "section": "layout" },
+      { "name": "The Restrained Lift Rule", "body": "Depth clarifies containment and interaction; routine surfaces never float dramatically above the page.", "section": "elevation" },
+      { "name": "The Nested Radius Rule", "body": "Smaller elements inside a rounded surface use an equal or smaller radius so the visual nesting remains orderly.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do use neutral surfaces for sustained reading and reserve brand color for identity, state, and action.",
+      "Do maintain 44px minimum touch targets and visible keyboard focus across navigation and controls.",
+      "Do preserve the established 10px control and 14px surface corner rhythm.",
+      "Do provide opaque and reduced-motion behavior when the user's accessibility preferences request it.",
+      "Do use semantic colors with accompanying labels or icons where status meaning matters."
+    ],
+    "donts": [
+      "Don't turn a surface-specific composition, including the profile's membership-passport presentation, into a mandatory global layout.",
+      "Don't cover routine forms or dense operational content in strong gradients.",
+      "Don't use large shadows, continuous floating motion, or decorative lift that competes with task completion.",
+      "Don't use uppercase tracked labels for sentences, body copy, or primary form instructions.",
+      "Don't rely on translucency, color, or a profile image as the sole carrier of meaning."
+    ]
+  }
+}
