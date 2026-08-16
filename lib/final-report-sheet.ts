@@ -3,17 +3,18 @@ import "server-only";
 import { google, sheets_v4 } from "googleapis";
 import { getGoogleEnv } from "@/lib/env";
 import { callServiceReportGateway } from "@/lib/service-report-store";
+import { buildApprovedFinalReport, type DailyReportData } from "@/lib/final-report-layout";
 
 export const FINAL_REPORT_SPREADSHEET_ID = "1eZPJiAX4tCTX8huAAFCRrUSRr5na34VqmzXFCiqjGu0";
 export const FINAL_REPORT_SHEET_ID = 1635578956;
 export const FINAL_REPORT_SPREADSHEET_URL = `https://docs.google.com/spreadsheets/d/${FINAL_REPORT_SPREADSHEET_ID}/edit?pli=1&gid=${FINAL_REPORT_SHEET_ID}#gid=${FINAL_REPORT_SHEET_ID}`;
 const TEMPLATE_TITLE = "TEMPLATE";
-const COLUMN_COUNT = 8;
+const COLUMN_COUNT = 10;
 const SERVICES = ["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"];
 
 type ReportRow = Record<string, unknown>;
-type DailyReport = { date: string; posts: ReportRow[]; timers: ReportRow[]; observers: ReportRow[]; emergencies: ReportRow[] };
-type Style = "title" | "subtitle" | "kpi" | "service" | "section" | "header" | "danger" | "note" | "observation" | "recommendation" | "improvement";
+type DailyReport = DailyReportData;
+type Style = "title" | "subtitle" | "kpi" | "service" | "serviceKpi" | "coverage" | "section" | "sectionDark" | "header" | "subheader" | "total" | "danger" | "dangerStrong" | "headerDanger" | "note" | "detail" | "observation" | "recommendation" | "improvement" | "positive" | "audit" | "headerAudit";
 
 function authClient() {
   const env = getGoogleEnv();
@@ -150,17 +151,28 @@ function color(hex: string) {
 
 function styleFormat(style: Style): sheets_v4.Schema$CellFormat {
   const formats: Record<Style, sheets_v4.Schema$CellFormat> = {
-    title: { backgroundColor: color("0B1738"), textFormat: { foregroundColor: color("FFFFFF"), bold: true, fontSize: 20 }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE" },
+    title: { backgroundColor: color("07152F"), textFormat: { foregroundColor: color("FFFFFF"), bold: true, fontSize: 20 }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE" },
     subtitle: { backgroundColor: color("172554"), textFormat: { foregroundColor: color("CFFAFE"), bold: true, fontSize: 11 }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE" },
-    kpi: { backgroundColor: color("E0F2FE"), textFormat: { foregroundColor: color("0F172A"), bold: true }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE" },
+    kpi: { backgroundColor: color("E0F2FE"), textFormat: { foregroundColor: color("0F294A"), bold: true }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE" },
     service: { backgroundColor: color("1D4ED8"), textFormat: { foregroundColor: color("FFFFFF"), bold: true, fontSize: 12 }, verticalAlignment: "MIDDLE" },
-    section: { backgroundColor: color("EDE9FE"), textFormat: { foregroundColor: color("4C1D95"), bold: true }, verticalAlignment: "MIDDLE" },
+    serviceKpi: { backgroundColor: color("DBEAFE"), textFormat: { foregroundColor: color("1E3A8A"), bold: true }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE" },
+    coverage: { backgroundColor: color("EFF6FF"), textFormat: { foregroundColor: color("1E3A8A"), bold: true }, verticalAlignment: "MIDDLE" },
+    section: { backgroundColor: color("E8EEF8"), textFormat: { foregroundColor: color("17365D"), bold: true }, verticalAlignment: "MIDDLE" },
+    sectionDark: { backgroundColor: color("0F294A"), textFormat: { foregroundColor: color("FFFFFF"), bold: true }, verticalAlignment: "MIDDLE" },
     header: { backgroundColor: color("0F766E"), textFormat: { foregroundColor: color("FFFFFF"), bold: true }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE", wrapStrategy: "WRAP" },
-    danger: { backgroundColor: color("FEF2F2"), textFormat: { foregroundColor: color("991B1B") }, verticalAlignment: "TOP", wrapStrategy: "WRAP" },
-    note: { backgroundColor: color("F8FAFC"), textFormat: { foregroundColor: color("64748B"), italic: true }, verticalAlignment: "MIDDLE" },
-    observation: { backgroundColor: color("ECFEFF"), textFormat: { foregroundColor: color("155E75"), bold: true }, verticalAlignment: "MIDDLE" },
-    recommendation: { backgroundColor: color("ECFDF5"), textFormat: { foregroundColor: color("065F46"), bold: true }, verticalAlignment: "MIDDLE" },
-    improvement: { backgroundColor: color("FFF7ED"), textFormat: { foregroundColor: color("9A3412"), bold: true }, verticalAlignment: "MIDDLE" },
+    subheader: { backgroundColor: color("DDE7F3"), textFormat: { foregroundColor: color("17365D"), bold: true }, verticalAlignment: "MIDDLE", wrapStrategy: "WRAP" },
+    total: { backgroundColor: color("CFFAFE"), textFormat: { foregroundColor: color("164E63"), bold: true }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE" },
+    positive: { backgroundColor: color("DCFCE7"), textFormat: { foregroundColor: color("166534"), bold: true }, verticalAlignment: "MIDDLE" },
+    improvement: { backgroundColor: color("FFEDD5"), textFormat: { foregroundColor: color("9A3412"), bold: true }, verticalAlignment: "MIDDLE" },
+    recommendation: { backgroundColor: color("FEF3C7"), textFormat: { foregroundColor: color("92400E"), bold: true }, verticalAlignment: "MIDDLE" },
+    danger: { backgroundColor: color("FEE2E2"), textFormat: { foregroundColor: color("991B1B") }, verticalAlignment: "TOP", wrapStrategy: "WRAP" },
+    dangerStrong: { backgroundColor: color("991B1B"), textFormat: { foregroundColor: color("FFFFFF"), bold: true }, verticalAlignment: "MIDDLE" },
+    headerDanger: { backgroundColor: color("B91C1C"), textFormat: { foregroundColor: color("FFFFFF"), bold: true }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE", wrapStrategy: "WRAP" },
+    note: { backgroundColor: color("F8FAFC"), textFormat: { foregroundColor: color("475569"), italic: true }, verticalAlignment: "MIDDLE", wrapStrategy: "WRAP" },
+    detail: { backgroundColor: color("FFFFFF"), textFormat: { foregroundColor: color("1E293B") }, verticalAlignment: "TOP", wrapStrategy: "WRAP" },
+    observation: { backgroundColor: color("CFFAFE"), textFormat: { foregroundColor: color("155E75"), bold: true }, verticalAlignment: "MIDDLE" },
+    audit: { backgroundColor: color("312E81"), textFormat: { foregroundColor: color("FFFFFF"), bold: true }, verticalAlignment: "MIDDLE" },
+    headerAudit: { backgroundColor: color("4338CA"), textFormat: { foregroundColor: color("FFFFFF"), bold: true }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE", wrapStrategy: "WRAP" },
   };
   return formats[style];
 }
@@ -174,7 +186,7 @@ async function ensureSheet(sheets: sheets_v4.Sheets, title: string) {
     await sheets.spreadsheets.batchUpdate({ spreadsheetId: FINAL_REPORT_SPREADSHEET_ID, requestBody: { requests: [{ updateSheetProperties: { properties: { sheetId: blank.sheetId, title }, fields: "title" } }] } });
     return blank.sheetId;
   }
-  const response = await sheets.spreadsheets.batchUpdate({ spreadsheetId: FINAL_REPORT_SPREADSHEET_ID, requestBody: { requests: [{ addSheet: { properties: { title, gridProperties: { rowCount: 600, columnCount: COLUMN_COUNT, frozenRowCount: 3, hideGridlines: true } } } }] } });
+  const response = await sheets.spreadsheets.batchUpdate({ spreadsheetId: FINAL_REPORT_SPREADSHEET_ID, requestBody: { requests: [{ addSheet: { properties: { title, gridProperties: { rowCount: 600, columnCount: COLUMN_COUNT, frozenRowCount: 7, hideGridlines: true } } } }] } });
   const id = response.data.replies?.[0]?.addSheet?.properties?.sheetId;
   if (id === undefined || id === null) throw new Error(`Could not create sheet tab ${title}.`);
   return id;
@@ -182,12 +194,12 @@ async function ensureSheet(sheets: sheets_v4.Sheets, title: string) {
 
 async function paintSheet(sheets: sheets_v4.Sheets, sheetId: number, title: string, data?: DailyReport) {
   const report = data || { date: "YYYY-MM-DD", posts: [], timers: [], observers: [], emergencies: [] };
-  const built = buildRows(report);
+  const built = buildApprovedFinalReport(report);
   await sheets.spreadsheets.values.clear({ spreadsheetId: FINAL_REPORT_SPREADSHEET_ID, range: `'${title}'!A:N` });
   await sheets.spreadsheets.values.update({ spreadsheetId: FINAL_REPORT_SPREADSHEET_ID, range: `'${title}'!A1`, valueInputOption: "RAW", requestBody: { values: built.rows } });
   const requests: sheets_v4.Schema$Request[] = [
     { unmergeCells: { range: { sheetId } } },
-    { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 3, hideGridlines: true } }, fields: "gridProperties.frozenRowCount,gridProperties.hideGridlines" } },
+    { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 7, hideGridlines: true } }, fields: "gridProperties.frozenRowCount,gridProperties.hideGridlines" } },
     { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: Math.max(600, built.rows.length + 20), startColumnIndex: 0, endColumnIndex: COLUMN_COUNT }, cell: { userEnteredFormat: { backgroundColor: color("F4F7FB"), textFormat: { foregroundColor: color("0F172A"), fontFamily: "Arial", fontSize: 10 }, verticalAlignment: "TOP", wrapStrategy: "WRAP", padding: { top: 6, bottom: 6, left: 7, right: 7 } } }, fields: "userEnteredFormat" } },
     ...built.merges.map((range) => ({ mergeCells: { range: { sheetId, startRowIndex: range.startRow, endRowIndex: range.endRow, startColumnIndex: range.startColumn, endColumnIndex: range.endColumn }, mergeType: "MERGE_ALL" } })),
     ...built.styles.map(({ row, style }) => ({ repeatCell: { range: { sheetId, startRowIndex: row, endRowIndex: row + 1, startColumnIndex: 0, endColumnIndex: COLUMN_COUNT }, cell: { userEnteredFormat: styleFormat(style) }, fields: "userEnteredFormat" } })),

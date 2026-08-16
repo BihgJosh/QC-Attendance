@@ -8,14 +8,16 @@ import {
 } from "@/lib/service-report-workbook";
 import { syncFinalReportForDate } from "@/lib/final-report-sheet";
 import { isIsoCalendarDate } from "@/lib/validation";
-import { updateHeadcountGoogleDocument, type HeadcountService } from "@/lib/headcount-google-doc";
+import { describeHeadcountGoogleError, updateFinalHeadcountGoogleDocument, updateHeadcountGoogleDocument, type HeadcountService } from "@/lib/headcount-google-doc";
 import { updateEmergencyFlagStatus } from "@/lib/emergency-flag-sheet";
 import { callServiceReportGateway } from "@/lib/service-report-store";
 import { readMemberSession } from "@/lib/member-auth";
 import { resolveUserAccess } from "@/lib/member-store";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
-const ACTIONS = new Set(["checkPassword", "getDashboard", "getEmergencies", "updateEmergency", "generateReport", "generateHeadcount", "sendEmail"]);
+const ACTIONS = new Set(["checkPassword", "getDashboard", "getEmergencies", "updateEmergency", "generateReport", "generateHeadcount", "generateFinalHeadcount", "sendEmail"]);
+
+export const maxDuration = 120;
 
 function abujaToday() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -132,13 +134,15 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ ok: false, message: "Sign in with your member account first." }, { status: 401 });
     const access = await resolveUserAccess(session.email);
     const elevated = access.role === "hod" || access.role === "admin" || access.role === "super_admin";
+    const isFinalHeadcount = action === "generateFinalHeadcount";
+    if (isFinalHeadcount && !elevated) return NextResponse.json({ ok: false, message: "Only HODs and administrators can open the final headcount." }, { status: 403 });
     const activeAssignments = access.assignments.filter((assignment) => assignment.status !== "cancelled" && (!date || (
       date >= abujaDate(assignment.accessStartsAt) && date <= abujaDate(assignment.accessEndsAt)
     )));
     if (!elevated && access.role !== "service_manager") return NextResponse.json({ ok: false, message: "Service Manager access is required." }, { status: 403 });
     if (!elevated && activeAssignments.length === 0) return NextResponse.json({ ok: false, message: "Your schedule does not grant access on this date or the access window has expired." }, { status: 403 });
     if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
-    const isAllServicesHeadcount = action === "generateHeadcount" && service === "All services";
+    const isAllServicesHeadcount = (action === "generateHeadcount" || isFinalHeadcount) && service === "All services";
     const isEmergencyAction = action === "getEmergencies" || action === "updateEmergency";
     if (action !== "checkPassword" && (!isIsoCalendarDate(date) || (!isEmergencyAction && !SERVICES.has(service) && !isAllServicesHeadcount))) {
       return NextResponse.json({ ok: false, message: "Choose a valid date and service." }, { status: 400 });
@@ -173,8 +177,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, message: `Emergency marked as ${emergencyStatus.toLowerCase()} and added to the daily report.` }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }
 
-    if (action === "generateHeadcount") {
-      const requestedServices = isAllServicesHeadcount ? Array.from(SERVICES) : [service];
+    if (action === "generateHeadcount" || isFinalHeadcount) {
+      const requestedServices = isAllServicesHeadcount ? ["1st Service", "2nd Service", "3rd Service", "4th Service"] : [service];
       const dashboards = await Promise.all(requestedServices.map(async (serviceName) => {
         try {
           return { service: serviceName, result: await loadDashboard(date, serviceName) };
@@ -193,13 +197,41 @@ export async function POST(request: Request) {
       if (!available.length) {
         return NextResponse.json({ ok: false, message: "No submitted headcount data is available for this selection." }, { status: 404 });
       }
+      const missingServices = requestedServices.filter((serviceName) => !available.some((item) => item.service === serviceName));
+      if (isAllServicesHeadcount && missingServices.length) {
+        return NextResponse.json({
+          ok: false,
+          message: `The Sunday headcount is incomplete. Submit headcount for ${missingServices.join(", ")} before generating the dated document tab.`,
+        }, { status: 409 });
+      }
       let document: Awaited<ReturnType<typeof updateHeadcountGoogleDocument>>;
       let headcountLoggingFailed = false;
       try {
-        document = await updateHeadcountGoogleDocument(date, available);
+        document = isFinalHeadcount
+          ? await updateFinalHeadcountGoogleDocument(date, available)
+          : await updateHeadcountGoogleDocument(date, available);
       } catch (error) {
-        console.error("[service-manager] Shared headcount document update failed", error instanceof Error ? error.message : "Unknown error");
-        return NextResponse.json({ ok: false, message: "The shared headcount Google Doc could not be updated. Confirm that the service account has Editor access and the Google Docs API is enabled." }, { status: 502 });
+        const googleError = describeHeadcountGoogleError(error);
+        console.error(JSON.stringify({
+          level: "error",
+          message: "Shared headcount document update failed",
+          requestId,
+          date,
+          service: isAllServicesHeadcount ? "All services" : service,
+          googleStatus: googleError.status,
+          googleReason: googleError.reason,
+          googleMessage: googleError.message,
+        }));
+        const message = googleError.reason === "timeout"
+          ? "Google Docs took too long to respond. The dated headcount tab was preserved; tap Generate headcount again."
+          : googleError.reason === "permission"
+            ? "The headcount document is not writable by the service account. Share it with the service account as Editor."
+            : googleError.reason === "not_found"
+              ? "The configured headcount document no longer exists. The administrator must select the shared headcount document again."
+              : googleError.reason === "invalid_request"
+                ? "Google Docs rejected the document update. The existing headcount tab was preserved; retry the generation."
+                : "Google Docs is temporarily unavailable. The existing headcount tab was preserved; retry shortly.";
+        return NextResponse.json({ ok: false, message, code: `google_docs_${googleError.reason}` }, { status: googleError.reason === "timeout" ? 504 : 502 });
       }
       try {
         await appendGeneratedDocumentLog({
@@ -207,13 +239,13 @@ export async function POST(request: Request) {
           service: isAllServicesHeadcount ? "All services" : service,
           url: document.url,
           requestId,
-          actor: "Service Manager · Shared headcount",
+          actor: isFinalHeadcount ? "HOD/Admin · Final headcount" : "Service Manager · Shared headcount",
         });
       } catch (error) {
         headcountLoggingFailed = true;
         console.error("[service-manager] Shared headcount document logging failed", error instanceof Error ? error.message : "Unknown error");
       }
-      const skippedServices = requestedServices.filter((serviceName) => !available.some((item) => item.service === serviceName));
+      const skippedServices = missingServices;
       return NextResponse.json({
         ok: true,
         url: document.url,
@@ -221,7 +253,7 @@ export async function POST(request: Request) {
         skippedServices,
         message: skippedServices.length
           ? `Headcount document generated for ${available.length} service${available.length === 1 ? "" : "s"}; ${skippedServices.length} service${skippedServices.length === 1 ? " was" : "s were"} skipped because data was unavailable.`
-          : `Headcount document generated for ${available.length} service${available.length === 1 ? "" : "s"}.`,
+          : isFinalHeadcount ? "Final Sunday headcount is ready." : `Headcount document generated for ${available.length} service${available.length === 1 ? "" : "s"}.`,
         ...((headcountLoggingFailed || skippedServices.length) ? { warning: headcountLoggingFailed ? "logging_failed" : "partial_data" } : {}),
       }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     }

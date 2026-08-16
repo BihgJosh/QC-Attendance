@@ -57,10 +57,10 @@ function abujaToday() {
   }).format(new Date());
 }
 
-async function managerRequest(body: Record<string, string>): Promise<ManagerResult> {
+async function managerRequest(body: Record<string, string>, timeoutMs = 30_000): Promise<ManagerResult> {
   const response = await fetch("/api/service-manager", {
     method: "POST",
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -125,7 +125,7 @@ function normalizeDashboardData(value: unknown): DashboardData | null {
   };
 }
 
-export function ServiceManagerDashboard() {
+export function ServiceManagerDashboard({ canViewFinalHeadcount = false }: { canViewFinalHeadcount?: boolean }) {
   const token = "role-session";
   const [date, setDate] = useState(abujaToday);
   const [loading, setLoading] = useState(false);
@@ -137,7 +137,7 @@ export function ServiceManagerDashboard() {
   const [emergencyMessage, setEmergencyMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [selectedService, setSelectedService] = useState<ServiceName | null>(null);
   const [reportLoading, setReportLoading] = useState<ServiceName | null>(null);
-  const [headcountLoading, setHeadcountLoading] = useState<ServiceName | "All services" | null>(null);
+  const [headcountLoading, setHeadcountLoading] = useState<ServiceName | "All services" | "Final headcount" | null>(null);
   const [headcountDocument, setHeadcountDocument] = useState<{ scope: string; url: string; services: string[]; message?: string; warning?: string } | null>(null);
   const [generatedLog, setGeneratedLog] = useState<{ service: ServiceName; documentUrl: string; warning?: string } | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
@@ -277,7 +277,7 @@ export function ServiceManagerDashboard() {
     setError("");
     setHeadcountDocument(null);
     try {
-      const result = await managerRequest({ action: "generateHeadcount", token, date, service: scope, requestId: headcountRequest.current.id });
+      const result = await managerRequest({ action: "generateHeadcount", token, date, service: scope, requestId: headcountRequest.current.id }, 120_000);
       if (!result.ok || !result.url) {
         documentWindow?.close();
         setError(result.message || "The headcount document could not be generated.");
@@ -298,6 +298,38 @@ export function ServiceManagerDashboard() {
     } catch {
       documentWindow?.close();
       setError("The headcount document could not be generated. Check the available service reports and try again.");
+    } finally {
+      setHeadcountLoading(null);
+    }
+  };
+
+  const generateFinalHeadcount = async () => {
+    const scope = "Final headcount" as const;
+    const signature = `${date}|${scope}`;
+    if (!headcountRequest.current || headcountRequest.current.signature !== signature) {
+      headcountRequest.current = { signature, id: crypto.randomUUID() };
+    }
+    const documentWindow = window.open("about:blank", "_blank");
+    if (documentWindow) documentWindow.opener = null;
+    setHeadcountLoading(scope);
+    setError("");
+    setHeadcountDocument(null);
+    try {
+      const result = await managerRequest({ action: "generateFinalHeadcount", token, date, service: "All services", requestId: headcountRequest.current.id }, 120_000);
+      if (!result.ok || !result.url) {
+        documentWindow?.close();
+        setError(result.message || "The final headcount could not be generated.");
+        return;
+      }
+      const documentUrl = new URL(result.url);
+      if (documentUrl.protocol !== "https:" || documentUrl.hostname !== "docs.google.com") throw new Error("Unsafe document URL");
+      setHeadcountDocument({ scope, url: documentUrl.toString(), services: result.includedServices || [], message: result.message, warning: result.warning });
+      headcountRequest.current = null;
+      if (documentWindow) documentWindow.location.href = documentUrl.toString();
+      else setError("The final headcount is ready, but the browser blocked the new tab. Use the document link below.");
+    } catch {
+      documentWindow?.close();
+      setError("The final headcount could not be generated. Confirm all four Sunday services have submitted their counts.");
     } finally {
       setHeadcountLoading(null);
     }
@@ -417,13 +449,17 @@ export function ServiceManagerDashboard() {
         <div className="flex w-full flex-col gap-3 sm:w-auto">
           <label className="min-w-48 text-xs font-bold text-slate-700"><span className="mb-2 flex items-center gap-2"><CalendarDays className="h-4 w-4 text-cyan-700" /> Report date</span><input type="date" value={date} onChange={(event) => { setDate(event.target.value); setHeadcountDocument(null); if (event.target.value) void loadAllServices(token, event.target.value); }} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-200" /></label>
           <button type="button" onClick={() => generateHeadcount("All services")} disabled={headcountLoading !== null || summary.loaded === 0} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 text-sm font-black text-white transition hover:bg-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600">
-            {headcountLoading === "All services" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Generate all headcounts
+            {headcountLoading === "All services" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Generate Sunday headcount
           </button>
+          {canViewFinalHeadcount && <button type="button" onClick={generateFinalHeadcount} disabled={headcountLoading !== null || summary.loaded === 0} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-black text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600">
+            {headcountLoading === "Final headcount" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} View final headcount
+          </button>}
         </div>
       </div>
 
       {error && <p role="alert" className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-800">{error}</p>}
       {headcountDocument?.scope === "All services" && <HeadcountDocumentNotice document={headcountDocument} />}
+      {headcountDocument?.scope === "Final headcount" && <HeadcountDocumentNotice document={headcountDocument} />}
 
       <div className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Metric label="Total worshippers" value={summary.worshippers} icon={Users} prominent />

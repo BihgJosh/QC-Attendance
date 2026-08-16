@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardList, Clock3, Eye, Loader2, Send } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, CheckCircle2, ClipboardList, Clock3, Eye, LayoutGrid, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,7 +89,7 @@ function Notice({ result, onClose }: { result: Result; onClose: () => void }) {
   }, [result, onClose]);
   if (!result) return null;
   const success = result.kind === "success";
-  return <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/55 p-4 backdrop-blur-sm" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="submission-result-title" aria-describedby="submission-result-message" className="w-full max-w-md overflow-hidden rounded-2xl border border-white/40 bg-background p-6 text-center shadow-[0_28px_90px_-28px_rgba(2,6,23,.72)] sm:p-8"><span className={`mx-auto grid h-16 w-16 place-items-center rounded-full ${success ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{success ? <CheckCircle2 className="h-8 w-8" /> : <AlertTriangle className="h-8 w-8" />}</span><h2 id="submission-result-title" className="mt-5 text-2xl font-bold tracking-[-0.03em]">{success ? "Report submitted" : "Submission unsuccessful"}</h2><p id="submission-result-message" className="mt-3 break-words text-sm leading-6 text-muted-foreground">{result.text}</p><Button ref={actionRef} type="button" variant={success ? "gradient" : "default"} onClick={onClose} className="mt-6 w-full">{success ? "Submit another report" : "Return to form"}</Button>{!success && <p className="mt-3 text-xs leading-5 text-muted-foreground">Your entries are still available so you can correct the issue and try again.</p>}</section></div>;
+  return <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/55 p-4 backdrop-blur-sm" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="submission-result-title" aria-describedby="submission-result-message" className="w-full max-w-md overflow-hidden rounded-2xl border border-white/40 bg-background p-6 text-center shadow-[0_28px_90px_-28px_rgba(2,6,23,.72)] sm:p-8"><span className={`mx-auto grid h-16 w-16 place-items-center rounded-full ${success ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>{success ? <CheckCircle2 className="h-8 w-8" /> : <AlertTriangle className="h-8 w-8" />}</span><h2 id="submission-result-title" className="mt-5 text-2xl font-bold tracking-[-0.03em]">{success ? "Report submitted" : "Submission unsuccessful"}</h2><p id="submission-result-message" className="mt-3 break-words text-sm leading-6 text-muted-foreground">{result.text}</p><div className="mt-6 grid gap-3"><Button ref={actionRef} type="button" variant={success ? "gradient" : "default"} onClick={onClose} className="w-full">{success ? "Submit another report" : "Return to form"}</Button>{success && <Link href="/service-tools" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-bold text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"><LayoutGrid className="h-4 w-4" /> Return to service tools</Link>}</div>{!success && <p className="mt-3 text-xs leading-5 text-muted-foreground">Your entries are still available so you can correct the issue and try again.</p>}</section></div>;
 }
 
 export function ServicePostForm() {

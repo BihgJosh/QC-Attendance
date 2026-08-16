@@ -152,7 +152,7 @@ const toneClasses = {
   emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
-export function ServiceToolsHub({ canViewServiceManager, canViewReportActivity }: { canViewServiceManager: boolean; canViewReportActivity: boolean }) {
+export function ServiceToolsHub({ canViewServiceManager, canViewFinalHeadcount, canViewReportActivity }: { canViewServiceManager: boolean; canViewFinalHeadcount: boolean; canViewReportActivity: boolean }) {
   const [activeId, setActiveId] = useState<ToolId | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const availableTools = tools.filter((tool) => (tool.id !== "manager" || canViewServiceManager) && (tool.id !== "report-activity" || canViewReportActivity));
@@ -262,7 +262,7 @@ export function ServiceToolsHub({ canViewServiceManager, canViewReportActivity }
                   <p className="mt-2 text-sm leading-6 text-slate-600">Choose a tool from the workflow menu to view its guide and open the form.</p>
                 </div>
               </div>
-            ) : activeTool.id === "manager" ? <motion.div key="manager" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceManagerDashboard /></motion.div> : activeTool.id === "report-activity" ? <motion.div key="report-activity" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0 p-3 sm:p-5"><ReportActivityDashboard /></motion.div> : <motion.div key={activeTool.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceToolForm tool={activeTool.id} /></motion.div>}
+            ) : activeTool.id === "manager" ? <motion.div key="manager" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceManagerDashboard canViewFinalHeadcount={canViewFinalHeadcount} /></motion.div> : activeTool.id === "report-activity" ? <motion.div key="report-activity" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0 p-3 sm:p-5"><ReportActivityDashboard /></motion.div> : <motion.div key={activeTool.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceToolForm tool={activeTool.id} /></motion.div>}
           </div>
         </div>
       </section>
