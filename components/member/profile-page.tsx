@@ -27,21 +27,32 @@ function daysInMonth(month: number | null) {
 }
 
 async function processImage(file: File) {
-  if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type)) throw new Error("Choose a JPG, PNG or WebP image.");
-  if (!file.size || file.size > 5 * 1024 * 1024) throw new Error("Choose an image smaller than 5 MB.");
-  const bitmap = await createImageBitmap(file);
-  const side = Math.min(bitmap.width, bitmap.height);
+  if (!file.type.startsWith("image/")) throw new Error("Choose an image from your device.");
+  if (!file.size || file.size > 15 * 1024 * 1024) throw new Error("Choose an image smaller than 15 MB.");
+  const objectUrl = URL.createObjectURL(file);
+  const source = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new window.Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("This phone cannot read that image format. Try a JPG, PNG or WebP photo.")); };
+    image.src = objectUrl;
+  });
+  const side = Math.min(source.naturalWidth, source.naturalHeight);
   const canvas = document.createElement("canvas");
   canvas.width = 512; canvas.height = 512;
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("This browser cannot process the image.");
-  context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 512, 512);
-  bitmap.close();
-  for (const quality of [0.82, 0.72, 0.62]) {
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-    if (blob && blob.size <= 400 * 1024) return new File([blob], "profile.webp", { type: "image/webp" });
+  if (!context) { URL.revokeObjectURL(objectUrl); throw new Error("This browser cannot process the image."); }
+  context.drawImage(source, (source.naturalWidth - side) / 2, (source.naturalHeight - side) / 2, side, side, 0, 0, 512, 512);
+  URL.revokeObjectURL(objectUrl);
+  for (const type of ["image/webp", "image/jpeg"]) {
+    for (const quality of [0.82, 0.7, 0.58]) {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+      if (blob && blob.size <= 400 * 1024 && blob.type === type) {
+        const extension = type === "image/webp" ? "webp" : "jpg";
+        return new File([blob], `profile.${extension}`, { type });
+      }
+    }
   }
-  throw new Error("This image could not be reduced below 400 KB. Try a simpler photo.");
+  throw new Error("This phone could not prepare the image. Try a JPG, PNG or WebP photo.");
 }
 
 export function ProfilePage() {
@@ -149,12 +160,12 @@ export function ProfilePage() {
             <p className="mt-1 break-all text-sm text-cyan-50/70">{profile.email}</p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-cyan-300/15 px-3 py-1.5 text-xs font-bold text-cyan-200"><ShieldCheck className="h-4 w-4" />{roleLabels[profile.role]}</div>
             <p className="mt-3 text-xs leading-5 text-white/55">Your role is assigned by an administrator and cannot be changed here.</p>
-            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={changePhoto} />
+            <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={changePhoto} />
             <div className="mt-6 grid gap-2">
               <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()} disabled={photoBusy}><Camera className="mr-2 h-4 w-4" />{profile.avatarUrl ? "Replace picture" : "Add profile picture"}</Button>
               {profile.avatarUrl && <Button type="button" variant="ghost" className="text-white/70 hover:bg-white/10 hover:text-white" onClick={removePhoto} disabled={photoBusy}><Trash2 className="mr-2 h-4 w-4" />Remove picture</Button>}
             </div>
-            <p className="mt-4 text-xs leading-5 text-white/45">JPG, PNG or WebP up to 5 MB. Images are cropped to 512 × 512 and stored below 400 KB.</p>
+            <p className="mt-4 text-xs leading-5 text-white/45">Choose a photo from your device (up to 15 MB). It will be cropped and optimized automatically.</p>
           </div>
         </aside>
 

@@ -303,11 +303,13 @@ Deno.serve(async (request) => {
       const profile = profiles[0] || {};
       const team = teamRows[0] || {};
       const otherNames = String(team["Other Names"] || "").trim().split(/\s+/).filter(Boolean);
+      const fallbackFirstName = otherNames.shift() || "";
+      const hasSavedProfile = Boolean(profiles[0]);
       return json({ profile: {
         email: session.email,
-        firstName: String(profile.first_name || otherNames.shift() || ""),
-        middleName: String(profile.middle_name || otherNames.join(" ")),
-        lastName: String(profile.last_name || team.Surname || ""),
+        firstName: String(hasSavedProfile ? profile.first_name || "" : fallbackFirstName),
+        middleName: String(hasSavedProfile ? profile.middle_name || "" : otherNames.join(" ")),
+        lastName: String(hasSavedProfile ? profile.last_name || "" : team.Surname || ""),
         phone: String(profile.phone || ""),
         birthMonth: profile.birth_month == null ? null : Number(profile.birth_month),
         birthDay: profile.birth_day == null ? null : Number(profile.birth_day),
@@ -373,12 +375,16 @@ Deno.serve(async (request) => {
       const session = await resolveMemberSession(body.token);
       if (!session) return json({ error: "Your session has expired." }, 401);
       const base64 = String(body.base64 || "");
+      const mimeType = body.mimeType === "image/jpeg" ? "image/jpeg" : "image/webp";
       let bytes: Uint8Array;
       try { bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0)); } catch { return json({ error: "The processed image is invalid." }, 400); }
       if (!bytes.length || bytes.length > 409600) return json({ error: "The processed profile picture must be 400 KB or smaller." }, 413);
-      if (String.fromCharCode(...bytes.slice(0, 4)) !== "RIFF" || String.fromCharCode(...bytes.slice(8, 12)) !== "WEBP") return json({ error: "The processed image must be WebP." }, 415);
-      const objectPath = `${await sha256(session.email)}.webp`;
-      await storage(`object/member-profile-photos/${objectPath}`, { method: "POST", headers: { "Content-Type": "image/webp", "x-upsert": "true" }, body: bytes });
+      const isWebp = String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
+      const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes.at(-2) === 0xff && bytes.at(-1) === 0xd9;
+      if ((mimeType === "image/webp" && !isWebp) || (mimeType === "image/jpeg" && !isJpeg)) return json({ error: "The processed image contents are invalid." }, 415);
+      const extension = mimeType === "image/jpeg" ? "jpg" : "webp";
+      const objectPath = `${await sha256(session.email)}.${extension}`;
+      await storage(`object/member-profile-photos/${objectPath}`, { method: "POST", headers: { "Content-Type": mimeType, "x-upsert": "true" }, body: bytes });
       await rest("member_profiles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, avatar_path: objectPath, updated_at: new Date().toISOString() }) });
       return json({ success: true, avatarUrl: await signedAvatarUrl(objectPath) });
     }
