@@ -94,9 +94,14 @@ async function dashboard(date: string, service: string) {
       }))),
     });
   }
-  const timer = timers[0] ? { timerName: timers[0].timer_name, serviceStart: timers[0].service_start, serviceEnd: timers[0].service_end, segments: timers[0].segments, generalObservation: timers[0].general_observation } : null;
-  const observer = observers[0] ? { observerName: observers[0].observer_name, reporterRole: observers[0].reporter_role, postedLocation: observers[0].posted_location, reportingLocation: observers[0].reporting_location, generalObservations: observers[0].general_observations, unitReports: observers[0].unit_reports, recommendations: observers[0].recommendations, conclusion: observers[0].conclusion } : null;
-  return { headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), timer, observer, emergencies: emergencies.map((row) => ({ id: row.id, service: row.service, location: row.location, description: row.description, reportedBy: row.reported_by, submittedAt: row.submitted_at, status: row.status })) };
+  const timer = timers[0] ? { timerName: timers[0].timer_name, reporterEmail: timers[0].reporter_email, serviceStart: timers[0].service_start, serviceEnd: timers[0].service_end, segments: timers[0].segments, generalObservation: timers[0].general_observation } : null;
+  const observer = observers[0] ? { observerName: observers[0].observer_name, reporterEmail: observers[0].reporter_email, reporterRole: observers[0].reporter_role, postedLocation: observers[0].posted_location, reportingLocation: observers[0].reporting_location, generalObservations: observers[0].general_observations, unitReports: observers[0].unit_reports, recommendations: observers[0].recommendations, conclusion: observers[0].conclusion } : null;
+  const postReporters = [...new Map(posts.map((row) => {
+    const name = String(row.submitted_by_name || row.reporter_name || "Unknown reporter");
+    const email = String(row.submitted_by_email || row.reporter_email || "").toLowerCase();
+    return [email || name.toLowerCase(), { name, email }];
+  })).values()];
+  return { headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), postReporters, timer, observer, emergencies: emergencies.map((row) => ({ id: row.id, service: row.service, location: row.location, description: row.description, reportedBy: row.reported_by, reporterEmail: row.reporter_email, submittedAt: row.submitted_at, status: row.status })) };
 }
 
 async function dailyReport(date: string) {
@@ -114,9 +119,9 @@ async function reportActivity(from = "", to = "") {
   const dateFilter = `${from ? `&report_date=gte.${encodeURIComponent(from)}` : ""}${to ? `&report_date=lte.${encodeURIComponent(to)}` : ""}`;
   const [posts, timers, observers, emergencies] = await Promise.all([
     rest(`service_post_reports?select=reporter_name,reporter_email,submitted_by_name,submitted_by_email,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
-    rest(`service_timer_logs?select=timer_name,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
-    rest(`service_observer_reports?select=observer_name,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
-    rest(`service_emergency_flags?select=reported_by,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
+    rest(`service_timer_logs?select=timer_name,reporter_email,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
+    rest(`service_observer_reports?select=observer_name,reporter_email,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
+    rest(`service_emergency_flags?select=reported_by,reporter_email,submitted_at,created_at${dateFilter}`) as Promise<Json[]>,
   ]);
   const users = new Map<string, { name: string; email: string; total: number; lastSubmittedAt: string; reportTypes: Record<string, number> }>();
   const add = (nameValue: unknown, emailValue: unknown, type: string, submittedValue: unknown, createdValue: unknown) => {
@@ -131,9 +136,9 @@ async function reportActivity(from = "", to = "") {
     users.set(key, current);
   };
   posts.forEach((row) => add(row.submitted_by_name || row.reporter_name, row.submitted_by_email || row.reporter_email, "Service Post", row.submitted_at, row.created_at));
-  timers.forEach((row) => add(row.timer_name, "", "Service Timer", row.submitted_at, row.created_at));
-  observers.forEach((row) => add(row.observer_name, "", "Observer Report", row.submitted_at, row.created_at));
-  emergencies.forEach((row) => add(row.reported_by, "", "Emergency Flag", row.submitted_at, row.created_at));
+  timers.forEach((row) => add(row.timer_name, row.reporter_email, "Service Timer", row.submitted_at, row.created_at));
+  observers.forEach((row) => add(row.observer_name, row.reporter_email, "Observer Report", row.submitted_at, row.created_at));
+  emergencies.forEach((row) => add(row.reported_by, row.reporter_email, "Emergency Flag", row.submitted_at, row.created_at));
   return [...users.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 }
 
@@ -167,7 +172,7 @@ Deno.serve(async (request) => {
     }
     if (operation === "emergency.list") {
       const date = encodeURIComponent(String(body.date || ""));
-      const rows = await rest(`service_emergency_flags?select=id,report_date,service,location,reported_by,description,status,submitted_at,submitted_at_ms&report_date=eq.${date}&order=submitted_at.desc.nullslast,created_at.desc`) as Json[];
+      const rows = await rest(`service_emergency_flags?select=id,report_date,service,location,reported_by,reporter_email,description,status,submitted_at,submitted_at_ms&report_date=eq.${date}&order=submitted_at.desc.nullslast,created_at.desc`) as Json[];
       return json({ ok: true, rows });
     }
     if (operation === "emergency.update") {

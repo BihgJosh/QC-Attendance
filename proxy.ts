@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMemberSession } from "@/lib/member-store";
-import { MEMBER_SESSION_COOKIE } from "@/lib/member-auth";
+import { getMemberSession, MemberStoreError } from "@/lib/member-store";
+import { MEMBER_SESSION_COOKIE, MEMBER_SESSION_MAX_AGE } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { isPrivilegedAdminEmail } from "@/lib/roles";
 
@@ -17,11 +17,25 @@ export async function proxy(request: NextRequest) {
       response.cookies.delete(MEMBER_SESSION_COOKIE);
       return response;
     }
-    return NextResponse.next();
-  } catch {
-    const response = NextResponse.redirect(login);
-    response.cookies.delete(MEMBER_SESSION_COOKIE);
+    const response = NextResponse.next();
+    response.cookies.set(MEMBER_SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: MEMBER_SESSION_MAX_AGE,
+    });
     return response;
+  } catch (error) {
+    if (error instanceof MemberStoreError && error.status === 401) {
+      const response = NextResponse.redirect(login);
+      response.cookies.delete(MEMBER_SESSION_COOKIE);
+      return response;
+    }
+    // A temporary gateway, database, or mobile-network failure must not destroy
+    // an otherwise valid 180-day login. The destination can show its own
+    // recoverable service error and the next request can validate the session.
+    return NextResponse.next();
   }
 }
 

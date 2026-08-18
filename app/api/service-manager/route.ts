@@ -13,6 +13,7 @@ import { updateEmergencyFlagStatus } from "@/lib/emergency-flag-sheet";
 import { callServiceReportGateway } from "@/lib/service-report-store";
 import { readMemberSession } from "@/lib/member-auth";
 import { resolveUserAccess } from "@/lib/member-store";
+import { attachDashboardIdentities } from "@/lib/report-identities";
 
 const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const ACTIONS = new Set(["checkPassword", "getDashboard", "getEmergencies", "updateEmergency", "generateReport", "generateHeadcount", "sendEmail"]);
@@ -145,7 +146,9 @@ export async function POST(request: Request) {
       const emergencyDate = abujaToday();
       if (action === "getEmergencies") {
         const result = await callServiceReportGateway<{ rows?: Record<string, unknown>[] }>("emergency.list", { date: emergencyDate });
-        return NextResponse.json({ ok: true, data: { emergencies: result.rows || [] } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+        const rawData = { emergencies: result.rows || [] };
+        const data = await attachDashboardIdentities(session.token, rawData).catch(() => rawData);
+        return NextResponse.json({ ok: true, data }, { headers: { "Cache-Control": "no-store, max-age=0" } });
       }
 
       const emergencyId = typeof body.emergencyId === "string" ? body.emergencyId : "";
@@ -298,6 +301,7 @@ export async function POST(request: Request) {
     const result = action === "getDashboard"
       ? await loadDashboard(date, service)
       : { ok: true, data: { assignments: access.assignments } };
+    if (action === "getDashboard" && result.data) result.data = await attachDashboardIdentities(session.token, result.data).catch(() => result.data!);
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

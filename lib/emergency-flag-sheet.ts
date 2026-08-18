@@ -17,6 +17,7 @@ export type EmergencyFlag = {
   submissionId: string;
   location: string;
   reportedBy: string;
+  reporterEmail: string;
   description: string;
 };
 
@@ -39,6 +40,7 @@ export async function appendEmergencyFlag(flag: EmergencyFlag) {
     service: "",
     location: flag.location,
     reported_by: flag.reportedBy,
+    reporter_email: flag.reporterEmail,
     description: flag.description,
     status: "Active",
     submitted_at: now.toISOString(),

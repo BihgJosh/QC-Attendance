@@ -15,6 +15,7 @@ type MemberOperation =
   | "profile.email-change-confirm"
   | "profile.image-upload"
   | "profile.image-delete"
+  | "profile.identities"
   | "member.list"
   | "member.reset"
   | "admin.list"
@@ -152,6 +153,9 @@ export type MemberProfile = {
   role: AppRole;
 };
 
+export type MemberIdentity = { name: string; email: string; avatarUrl: string | null };
+export type MemberIdentityReference = { name?: string; email?: string };
+
 export async function getMemberProfile(token: string) {
   const data = await callMemberGateway<{ profile: MemberProfile }>("profile.get", { token });
   return data.profile;
@@ -175,6 +179,11 @@ export function uploadMemberProfileImage(token: string, base64: string, mimeType
 
 export function deleteMemberProfileImage(token: string) {
   return callMemberGateway<{ success: boolean }>("profile.image-delete", { token });
+}
+
+export async function resolveMemberIdentities(token: string, references: MemberIdentityReference[]) {
+  const data = await callMemberGateway<{ identities: Record<string, MemberIdentity> }>("profile.identities", { token, references });
+  return data.identities;
 }
 
 export async function listMemberStatuses() {

@@ -18,20 +18,24 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import { MemberIdentityCard } from "@/components/member/member-identity";
+import type { MemberIdentity } from "@/lib/member-store";
 
 const SERVICES = ["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"] as const;
 type ServiceName = (typeof SERVICES)[number];
 
 type HeadcountRow = { department?: string; adults?: number; children?: number; total?: number };
-type Emergency = { id?: string; service?: string; location?: string; description?: string; reportedBy?: string; submittedAt?: string; status?: string };
+type Emergency = { id?: string; service?: string; location?: string; description?: string; reportedBy?: string; reporterEmail?: string; submittedAt?: string; status?: string; identity?: MemberIdentity };
 type TimerSegment = { label?: string; status?: string; min?: number; sec?: number };
+type PostReporter = { name?: string; email?: string; identity?: MemberIdentity };
 type DashboardData = {
   headcount?: { grandTotal?: number; byDepartment?: HeadcountRow[] };
   incidentCount?: number;
   emergencies?: Emergency[];
   ratings?: Record<string, string | number>;
-  timer?: { timerName?: string; serviceStart?: string; serviceEnd?: string; segments?: TimerSegment[]; generalObservation?: string } | null;
-  observer?: { observerName?: string; generalObservations?: string; unitReports?: Record<string, string>; recommendations?: string; conclusion?: string; reporterRole?: string; postedLocation?: string; reportingLocation?: string } | null;
+  postReporters?: PostReporter[];
+  timer?: { timerName?: string; reporterEmail?: string; identity?: MemberIdentity; serviceStart?: string; serviceEnd?: string; segments?: TimerSegment[]; generalObservation?: string } | null;
+  observer?: { observerName?: string; reporterEmail?: string; identity?: MemberIdentity; generalObservations?: string; unitReports?: Record<string, string>; recommendations?: string; conclusion?: string; reporterRole?: string; postedLocation?: string; reportingLocation?: string } | null;
 };
 
 type ServiceResult = { service: ServiceName; data: DashboardData | null; message?: string };
@@ -87,6 +91,12 @@ function textValue(value: unknown) {
   return typeof value === "string" || typeof value === "number" ? String(value) : undefined;
 }
 
+function identityValue(value: unknown): MemberIdentity | undefined {
+  const identity = recordValue(value);
+  if (!identity) return undefined;
+  return { name: textValue(identity.name) || "Unknown member", email: textValue(identity.email) || "", avatarUrl: textValue(identity.avatarUrl) || null };
+}
+
 function normalizeDashboardData(value: unknown): DashboardData | null {
   const source = recordValue(value);
   if (!source) return null;
@@ -106,18 +116,19 @@ function normalizeDashboardData(value: unknown): DashboardData | null {
     incidentCount: numberValue(source.incidentCount),
     emergencies: Array.isArray(source.emergencies) ? source.emergencies.flatMap((item) => {
       const emergency = recordValue(item);
-      return emergency ? [{ id: textValue(emergency.id), service: textValue(emergency.service), location: textValue(emergency.location), description: textValue(emergency.description), reportedBy: textValue(emergency.reportedBy ?? emergency.reported_by), submittedAt: textValue(emergency.submittedAt ?? emergency.submitted_at), status: textValue(emergency.status) }] : [];
+      return emergency ? [{ id: textValue(emergency.id), service: textValue(emergency.service), location: textValue(emergency.location), description: textValue(emergency.description), reportedBy: textValue(emergency.reportedBy ?? emergency.reported_by), reporterEmail: textValue(emergency.reporterEmail ?? emergency.reporter_email), submittedAt: textValue(emergency.submittedAt ?? emergency.submitted_at), status: textValue(emergency.status), identity: identityValue(emergency.identity) }] : [];
     }) : [],
     ratings: ratings ? Object.fromEntries(Object.entries(ratings).map(([key, rating]) => [key, typeof rating === "number" ? rating : textValue(rating) || "Not provided"])) : {},
+    postReporters: Array.isArray(source.postReporters) ? source.postReporters.flatMap((item) => { const reporter = recordValue(item); return reporter ? [{ name: textValue(reporter.name), email: textValue(reporter.email), identity: identityValue(reporter.identity) }] : []; }) : [],
     timer: timer ? {
-      timerName: textValue(timer.timerName), serviceStart: textValue(timer.serviceStart), serviceEnd: textValue(timer.serviceEnd), generalObservation: textValue(timer.generalObservation),
+      timerName: textValue(timer.timerName), reporterEmail: textValue(timer.reporterEmail), identity: identityValue(timer.identity), serviceStart: textValue(timer.serviceStart), serviceEnd: textValue(timer.serviceEnd), generalObservation: textValue(timer.generalObservation),
       segments: Array.isArray(timer.segments) ? timer.segments.flatMap((item) => {
         const segment = recordValue(item);
         return segment ? [{ label: textValue(segment.label), status: textValue(segment.status), min: numberValue(segment.min), sec: numberValue(segment.sec) }] : [];
       }) : [],
     } : null,
     observer: observer ? {
-      observerName: textValue(observer.observerName), generalObservations: textValue(observer.generalObservations), recommendations: textValue(observer.recommendations), conclusion: textValue(observer.conclusion), reporterRole: textValue(observer.reporterRole), postedLocation: textValue(observer.postedLocation), reportingLocation: textValue(observer.reportingLocation),
+      observerName: textValue(observer.observerName), reporterEmail: textValue(observer.reporterEmail), identity: identityValue(observer.identity), generalObservations: textValue(observer.generalObservations), recommendations: textValue(observer.recommendations), conclusion: textValue(observer.conclusion), reporterRole: textValue(observer.reporterRole), postedLocation: textValue(observer.postedLocation), reportingLocation: textValue(observer.reportingLocation),
       unitReports: unitReports ? Object.fromEntries(Object.entries(unitReports).map(([key, text]) => [key, textValue(text) || "Not provided"])) : {},
     } : null,
   };
@@ -389,16 +400,17 @@ export function ServiceManagerDashboard() {
         </ReportSection>
 
         <ReportSection title="Post ratings" icon={ClipboardList}>
+          {!!data.postReporters?.length && <div className="mb-4 flex flex-wrap gap-3">{data.postReporters.map((reporter, index) => <MemberIdentityCard key={reporter.email || `${reporter.name}-${index}`} identity={reporter.identity} fallbackName={reporter.name || "Unknown reporter"} fallbackEmail={reporter.email} compact />)}</div>}
           <div className="grid gap-3 sm:grid-cols-2">{Object.entries(data.ratings || {}).map(([label, rating]) => <div key={label} className="flex items-center justify-between gap-4 rounded-xl bg-slate-100 p-4"><span className="text-sm font-semibold text-slate-800">{label}</span><span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-black text-cyan-900 ring-1 ring-inset ring-cyan-300">{String(rating)}</span></div>)}</div>
           {!Object.keys(data.ratings || {}).length && <EmptyReport text="No post ratings were submitted." />}
         </ReportSection>
 
         <ReportSection title={`Service timer${data.timer?.timerName ? ` · ${data.timer.timerName}` : ""}`} icon={Clock3}>
-          {data.timer ? <><p className="mb-4 text-sm font-semibold text-slate-700">{data.timer.serviceStart || "Start unavailable"} — {data.timer.serviceEnd || "End unavailable"}</p><div className="grid gap-2">{(data.timer.segments || []).map((segment, index) => <div key={`${segment.label}-${index}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-100 p-4"><span className="text-sm font-semibold text-slate-900">{segment.label || "Unnamed segment"}</span><span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset ${segment.status === "On Time" ? "bg-emerald-100 text-emerald-900 ring-emerald-300" : "bg-amber-100 text-amber-950 ring-amber-300"}`}>{segment.status || "No data"}{segment.status && segment.status !== "On Time" && segment.status !== "No data" ? ` · ${numberValue(segment.min)}m ${numberValue(segment.sec)}s` : ""}</span></div>)}</div>{data.timer.generalObservation && <Note title="Timer observation" text={data.timer.generalObservation} />}</> : <EmptyReport text="No timer log was submitted." />}
+          {data.timer ? <><div className="mb-4"><MemberIdentityCard identity={data.timer.identity} fallbackName={data.timer.timerName || "Unknown timer"} fallbackEmail={data.timer.reporterEmail} /></div><p className="mb-4 text-sm font-semibold text-slate-700">{data.timer.serviceStart || "Start unavailable"} — {data.timer.serviceEnd || "End unavailable"}</p><div className="grid gap-2">{(data.timer.segments || []).map((segment, index) => <div key={`${segment.label}-${index}`} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-100 p-4"><span className="text-sm font-semibold text-slate-900">{segment.label || "Unnamed segment"}</span><span className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset ${segment.status === "On Time" ? "bg-emerald-100 text-emerald-900 ring-emerald-300" : "bg-amber-100 text-amber-950 ring-amber-300"}`}>{segment.status || "No data"}{segment.status && segment.status !== "On Time" && segment.status !== "No data" ? ` · ${numberValue(segment.min)}m ${numberValue(segment.sec)}s` : ""}</span></div>)}</div>{data.timer.generalObservation && <Note title="Timer observation" text={data.timer.generalObservation} />}</> : <EmptyReport text="No timer log was submitted." />}
         </ReportSection>
 
         <ReportSection title={`Observer report${data.observer?.observerName ? ` · ${data.observer.observerName}` : ""}`} icon={Eye}>
-          {data.observer ? <div className="space-y-3">{(data.observer.reporterRole || data.observer.reportingLocation || data.observer.postedLocation) && <Note title="Reporter details" text={[data.observer.reporterRole && `Who: ${data.observer.reporterRole}`, data.observer.postedLocation && `Posted at: ${data.observer.postedLocation}`, data.observer.reportingLocation && `Reporting location: ${data.observer.reportingLocation}`].filter(Boolean).join("\n")} />}{data.observer.generalObservations && <Note title="General observations" text={data.observer.generalObservations} />}{Object.entries(data.observer.unitReports || {}).map(([unit, text]) => <Note key={unit} title={unit} text={text} />)}{data.observer.recommendations && <Note title="Recommendations" text={data.observer.recommendations} />}{data.observer.conclusion && <Note title="Conclusion" text={data.observer.conclusion} />}</div> : <EmptyReport text="No observer report was submitted." />}
+          {data.observer ? <div className="space-y-3"><MemberIdentityCard identity={data.observer.identity} fallbackName={data.observer.observerName || "Unknown observer"} fallbackEmail={data.observer.reporterEmail} />{(data.observer.reporterRole || data.observer.reportingLocation || data.observer.postedLocation) && <Note title="Reporter details" text={[data.observer.reporterRole && `Who: ${data.observer.reporterRole}`, data.observer.postedLocation && `Posted at: ${data.observer.postedLocation}`, data.observer.reportingLocation && `Reporting location: ${data.observer.reportingLocation}`].filter(Boolean).join("\n")} />}{data.observer.generalObservations && <Note title="General observations" text={data.observer.generalObservations} />}{Object.entries(data.observer.unitReports || {}).map(([unit, text]) => <Note key={unit} title={unit} text={text} />)}{data.observer.recommendations && <Note title="Recommendations" text={data.observer.recommendations} />}{data.observer.conclusion && <Note title="Conclusion" text={data.observer.conclusion} />}</div> : <EmptyReport text="No observer report was submitted." />}
         </ReportSection>
       </div>
     );
@@ -469,7 +481,7 @@ function EmergencyActionQueue({ emergencies, loading, updatingId, message, onUpd
       const active = !emergency.status || emergency.status === "Active" || emergency.status === "Open";
       const busy = emergency.id === updatingId?.id;
       const statusTone = emergency.status === "Resolved" ? "bg-emerald-100 text-emerald-900" : emergency.status === "Escalated" ? "bg-amber-100 text-amber-950" : "bg-rose-100 text-rose-900";
-      return <article key={emergency.id || `${emergency.location}-${index}`} className="rounded-xl bg-white p-4 shadow-[0_6px_18px_rgba(127,29,29,0.08)]"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><p className="font-black text-slate-950">{emergency.location || "Location not provided"}</p><p className="mt-1 text-sm leading-5 text-slate-700">{emergency.description || "No description provided."}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${statusTone}`}>{emergency.status || "Active"}</span></div><p className="mt-2 break-words text-xs font-semibold text-slate-500">{emergency.reportedBy || "Unknown reporter"}{emergency.submittedAt ? ` · ${new Date(emergency.submittedAt).toLocaleString()}` : ""}</p>{active && emergency.id && <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Resolved")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Resolved" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} {busy && updatingId?.status === "Resolved" ? "Resolving" : "Mark resolved"}</button><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Escalated")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-black text-amber-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Escalated" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />} {busy && updatingId?.status === "Escalated" ? "Escalating" : "Escalate"}</button></div>}</article>;
+      return <article key={emergency.id || `${emergency.location}-${index}`} className="rounded-xl bg-white p-4 shadow-[0_6px_18px_rgba(127,29,29,0.08)]"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><p className="font-black text-slate-950">{emergency.location || "Location not provided"}</p><p className="mt-1 text-sm leading-5 text-slate-700">{emergency.description || "No description provided."}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${statusTone}`}>{emergency.status || "Active"}</span></div><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><MemberIdentityCard identity={emergency.identity} fallbackName={emergency.reportedBy || "Unknown reporter"} fallbackEmail={emergency.reporterEmail} compact />{emergency.submittedAt && <span className="text-xs font-semibold text-slate-500">{new Date(emergency.submittedAt).toLocaleString()}</span>}</div>{active && emergency.id && <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Resolved")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Resolved" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} {busy && updatingId?.status === "Resolved" ? "Resolving" : "Mark resolved"}</button><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Escalated")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-black text-amber-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Escalated" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />} {busy && updatingId?.status === "Escalated" ? "Escalating" : "Escalate"}</button></div>}</article>;
     })}</div> : <p className="mt-4 rounded-xl bg-white p-3 text-sm font-semibold text-slate-700">No emergency has been flagged today.</p>}
   </section>;
 }

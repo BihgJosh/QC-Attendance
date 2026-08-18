@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     }
 
     await appendServiceTimerLog({
-      submissionId, date, service, name: member.name, serviceStart, serviceEnd, segments,
+      submissionId, date, service, name: member.name, reporterEmail: session.email, serviceStart, serviceEnd, segments,
       extra: { name: text(rawExtra.name, 160), ...extraTiming },
       generalObservation: text(body.generalObservation),
     });

@@ -41,6 +41,7 @@ export type ServiceTimerLog = {
   date: string;
   service: string;
   name: string;
+  reporterEmail: string;
   serviceStart: string;
   serviceEnd: string;
   segments: Record<string, TimerSegment>;
@@ -60,6 +61,7 @@ export async function appendServiceTimerLog(log: ServiceTimerLog) {
     report_date: log.date,
     service: log.service,
     timer_name: log.name,
+    reporter_email: log.reporterEmail,
     service_start: log.serviceStart,
     service_end: log.serviceEnd,
     segments: log.segments,

@@ -23,6 +23,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ServiceManagerDashboard } from "@/components/public/service-manager-dashboard";
 import { ServiceToolForm } from "@/components/public/service-tool-forms";
 import { ReportActivityDashboard } from "@/components/public/report-activity-dashboard";
+import { IdentityAvatar } from "@/components/member/member-identity";
+import type { MemberIdentity } from "@/lib/member-store";
 
 const tools = [
   {
@@ -152,7 +154,7 @@ const toneClasses = {
   emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
-export function ServiceToolsHub({ canViewServiceManager, canViewReportActivity }: { canViewServiceManager: boolean; canViewReportActivity: boolean }) {
+export function ServiceToolsHub({ canViewServiceManager, canViewReportActivity, memberIdentity }: { canViewServiceManager: boolean; canViewReportActivity: boolean; memberIdentity: MemberIdentity }) {
   const [activeId, setActiveId] = useState<ToolId | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const availableTools = tools.filter((tool) => (tool.id !== "manager" || canViewServiceManager) && (tool.id !== "report-activity" || canViewReportActivity));
@@ -194,7 +196,7 @@ export function ServiceToolsHub({ canViewServiceManager, canViewReportActivity }
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Link href="/member/profile" className="flex h-10 w-10 items-center justify-center rounded-xl text-white/75 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label="Open my profile"><UserRound className="h-5 w-5" /></Link>
+            <Link href="/member/profile" className="flex h-11 w-11 items-center justify-center rounded-xl hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300" aria-label={`Open my profile, ${memberIdentity.name}`}><IdentityAvatar identity={memberIdentity} name={memberIdentity.name} size="sm" dark /></Link>
             <ThemeToggle />
             <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl text-white hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 md:hidden" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} aria-controls="service-tools-mobile-menu" onClick={() => setMenuOpen((value) => !value)}>
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

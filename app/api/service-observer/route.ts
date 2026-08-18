@@ -70,7 +70,7 @@ export async function POST(request: Request) {
 
     await appendServiceObserverReport({
       submissionId: UUID_PATTERN.test(text(body.submissionId, 36)) ? text(body.submissionId, 36) : randomUUID(),
-      date, service, observerName: member.name,
+      date, service, observerName: member.name, reporterEmail: session.email,
       generalObservations,
       unitsReported: savedUnits, unitReports: savedUnitReports,
       recommendations: text(body.recommendations),

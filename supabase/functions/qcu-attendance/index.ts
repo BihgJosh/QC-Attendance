@@ -3,7 +3,7 @@ const allowedOperations = new Set([
   "status.get", "status.update", "settings.get", "settings.update", "members.list",
   "attendance.device-check", "attendance.insert", "attendance.list", "migration.import",
   "member.status", "member.setup-complete", "member.authenticate", "member.session", "member.change-password", "member.logout",
-  "profile.get", "profile.update", "profile.email-change-request", "profile.email-change-confirm", "profile.image-upload", "profile.image-delete",
+  "profile.get", "profile.update", "profile.email-change-request", "profile.email-change-confirm", "profile.image-upload", "profile.image-delete", "profile.identities",
   "member.list", "member.reset", "admin.list", "admin.add", "admin.remove",
   "roles.list", "roles.resolve", "roles.upsert", "roles.remove", "assignments.upsert", "assignments.remove",
   "push.subscribe", "push.unsubscribe", "push.list", "push.deactivate",
@@ -316,6 +316,44 @@ Deno.serve(async (request) => {
         avatarUrl: await signedAvatarUrl(profile.avatar_path),
         role: roles[0]?.is_active === false ? "general_user" : String(roles[0]?.role || "general_user"),
       } });
+    }
+    if (operation === "profile.identities") {
+      const session = await resolveMemberSession(body.token);
+      if (!session) return json({ error: "Your session has expired." }, 401);
+      const references = (Array.isArray(body.references) ? body.references : []).slice(0, 100).flatMap((value) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+        const reference = value as Json;
+        const email = normalizeEmail(reference.email);
+        const name = String(reference.name || "").trim().replace(/\s+/g, " ").slice(0, 160);
+        return email || name ? [{ email, name }] : [];
+      });
+      const [profiles, teamRows] = await Promise.all([
+        rest("member_profiles?select=email,first_name,middle_name,last_name,avatar_path") as Promise<Json[]>,
+        rest("Team%20Data?select=Email,Surname,Other%20Names") as Promise<Json[]>,
+      ]);
+      const profileByEmail = new Map(profiles.map((profile) => [normalizeEmail(profile.email), profile]));
+      const teamByEmail = new Map<string, Json>();
+      const teamByName = new Map<string, Json | null>();
+      for (const team of teamRows) {
+        const email = normalizeEmail(team.Email);
+        const name = `${String(team["Other Names"] || "").trim()} ${String(team.Surname || "").trim()}`.trim().replace(/\s+/g, " ");
+        if (email) teamByEmail.set(email, team);
+        if (name) {
+          const key = name.toLocaleLowerCase();
+          teamByName.set(key, teamByName.has(key) ? null : team);
+        }
+      }
+      const identities: Record<string, unknown> = {};
+      await Promise.all(references.map(async (reference) => {
+        const key = reference.email || reference.name.toLocaleLowerCase();
+        const team = (reference.email ? teamByEmail.get(reference.email) : undefined) || teamByName.get(reference.name.toLocaleLowerCase()) || undefined;
+        const email = reference.email || normalizeEmail(team?.Email);
+        const profile = email ? profileByEmail.get(email) : undefined;
+        const profileName = profile ? [profile.first_name, profile.middle_name, profile.last_name].map((part) => String(part || "").trim()).filter(Boolean).join(" ") : "";
+        const teamName = team ? `${String(team["Other Names"] || "").trim()} ${String(team.Surname || "").trim()}`.trim().replace(/\s+/g, " ") : "";
+        identities[key] = { name: profileName || teamName || reference.name || email || "Unknown member", email, avatarUrl: await signedAvatarUrl(profile?.avatar_path) };
+      }));
+      return json({ identities });
     }
     if (operation === "profile.update") {
       const session = await resolveMemberSession(body.token);
