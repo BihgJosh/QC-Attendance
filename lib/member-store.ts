@@ -151,6 +151,7 @@ export type MemberProfile = {
   birthDay: number | null;
   avatarUrl: string | null;
   role: AppRole;
+  profileComplete: boolean;
 };
 
 export type MemberIdentity = { name: string; email: string; avatarUrl: string | null };

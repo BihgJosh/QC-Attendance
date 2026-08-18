@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type Role = "general_user" | "service_manager" | "hod" | "admin" | "super_admin";
-type Profile = { email: string; firstName: string; middleName: string; lastName: string; phone: string; birthMonth: number | null; birthDay: number | null; avatarUrl: string | null; role: Role };
+type Profile = { email: string; firstName: string; middleName: string; lastName: string; phone: string; birthMonth: number | null; birthDay: number | null; avatarUrl: string | null; role: Role; profileComplete: boolean };
 
 const roleLabels: Record<Role, string> = { general_user: "General User", service_manager: "Service Manager", hod: "HOD", admin: "Admin", super_admin: "Super Admin" };
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

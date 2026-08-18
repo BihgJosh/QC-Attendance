@@ -296,7 +296,7 @@ Deno.serve(async (request) => {
       const session = await resolveMemberSession(body.token);
       if (!session) return json({ error: "Your session has expired." }, 401);
       const [profiles, roles, teamRows] = await Promise.all([
-        rest(`member_profiles?select=first_name,middle_name,last_name,phone,birth_month,birth_day,avatar_path&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
+        rest(`member_profiles?select=first_name,middle_name,last_name,phone,birth_month,birth_day,avatar_path,profile_completed_at&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
         rest(`user_roles?select=role,is_active&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
         rest(`Team%20Data?select=Surname,Other%20Names&normalized_email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
       ]);
@@ -315,6 +315,7 @@ Deno.serve(async (request) => {
         birthDay: profile.birth_day == null ? null : Number(profile.birth_day),
         avatarUrl: await signedAvatarUrl(profile.avatar_path),
         role: roles[0]?.is_active === false ? "general_user" : String(roles[0]?.role || "general_user"),
+        profileComplete: Boolean(profile.profile_completed_at),
       } });
     }
     if (operation === "profile.identities") {
@@ -372,7 +373,7 @@ Deno.serve(async (request) => {
         if (birthday.getUTCMonth() !== birthMonth - 1 || birthday.getUTCDate() !== birthDay) return json({ error: "Choose a valid birthday." }, 400);
       }
       const now = new Date().toISOString();
-      await rest("member_profiles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, first_name: firstName, middle_name: middleName, last_name: lastName, phone, birth_month: birthMonth, birth_day: birthDay, updated_at: now }) });
+      await rest("member_profiles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, first_name: firstName, middle_name: middleName, last_name: lastName, phone, birth_month: birthMonth, birth_day: birthDay, profile_completed_at: now, updated_at: now }) });
       await rest(`Team%20Data?normalized_email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ Surname: lastName, "Other Names": [firstName, middleName].filter(Boolean).join(" ") }) });
       return json({ success: true });
     }

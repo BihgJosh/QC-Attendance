@@ -14,7 +14,7 @@ const AREAS = [
   "Main Church – FrontRow 3",
   "Main Church – FrontRow 4",
   "Main Church – BackRow 1",
-  "Main Church – BackRow 2 & Media",
+  "Main Church – BackRow 2 & Front Media",
   "Main Church – BackRow 3",
   "Main Church – BackRow 4 & Back Media",
   "Overflow – Row 1",
