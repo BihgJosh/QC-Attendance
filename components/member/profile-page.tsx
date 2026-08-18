@@ -27,20 +27,23 @@ function daysInMonth(month: number | null) {
 }
 
 async function processImage(file: File) {
-  if (!file.type.startsWith("image/")) throw new Error("Choose an image from your device.");
+  const extension = file.name.toLowerCase().split(".").pop() || "";
+  const imageExtensions = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif", "tif", "tiff", "bmp"]);
+  if (!file.type.startsWith("image/") && !imageExtensions.has(extension)) throw new Error("Choose a supported photo from your device.");
   if (!file.size || file.size > 15 * 1024 * 1024) throw new Error("Choose an image smaller than 15 MB.");
   const objectUrl = URL.createObjectURL(file);
-  const source = await new Promise<HTMLImageElement>((resolve, reject) => {
+  const source = await new Promise<HTMLImageElement | null>((resolve) => {
     const image = new window.Image();
     image.onload = () => resolve(image);
-    image.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("This phone cannot read that image format. Try a JPG, PNG or WebP photo.")); };
+    image.onerror = () => resolve(null);
     image.src = objectUrl;
   });
+  if (!source) { URL.revokeObjectURL(objectUrl); return file; }
   const side = Math.min(source.naturalWidth, source.naturalHeight);
   const canvas = document.createElement("canvas");
   canvas.width = 512; canvas.height = 512;
   const context = canvas.getContext("2d");
-  if (!context) { URL.revokeObjectURL(objectUrl); throw new Error("This browser cannot process the image."); }
+  if (!context) { URL.revokeObjectURL(objectUrl); return file; }
   context.drawImage(source, (source.naturalWidth - side) / 2, (source.naturalHeight - side) / 2, side, side, 0, 0, 512, 512);
   URL.revokeObjectURL(objectUrl);
   for (const type of ["image/webp", "image/jpeg"]) {
@@ -52,7 +55,7 @@ async function processImage(file: File) {
       }
     }
   }
-  throw new Error("This phone could not prepare the image. Try a JPG, PNG or WebP photo.");
+  return file;
 }
 
 export function ProfilePage() {
@@ -160,12 +163,12 @@ export function ProfilePage() {
             <p className="mt-1 break-all text-sm text-cyan-50/70">{profile.email}</p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-cyan-300/15 px-3 py-1.5 text-xs font-bold text-cyan-200"><ShieldCheck className="h-4 w-4" />{roleLabels[profile.role]}</div>
             <p className="mt-3 text-xs leading-5 text-white/55">Your role is assigned by an administrator and cannot be changed here.</p>
-            <input ref={fileRef} type="file" accept="image/*" className="sr-only" onChange={changePhoto} />
+            <input ref={fileRef} type="file" accept="image/*,.heic,.heif,.avif,.tif,.tiff,.bmp" className="sr-only" onChange={changePhoto} />
             <div className="mt-6 grid gap-2">
               <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()} disabled={photoBusy}><Camera className="mr-2 h-4 w-4" />{profile.avatarUrl ? "Replace picture" : "Add profile picture"}</Button>
               {profile.avatarUrl && <Button type="button" variant="ghost" className="text-white/70 hover:bg-white/10 hover:text-white" onClick={removePhoto} disabled={photoBusy}><Trash2 className="mr-2 h-4 w-4" />Remove picture</Button>}
             </div>
-            <p className="mt-4 text-xs leading-5 text-white/45">Choose a photo from your device (up to 15 MB). It will be cropped and optimized automatically.</p>
+            <p className="mt-4 text-xs leading-5 text-white/45">JPG, PNG, WebP, HEIC, HEIF, AVIF, GIF, TIFF or BMP up to 15 MB. Cropping and optimization are automatic.</p>
           </div>
         </aside>
 
