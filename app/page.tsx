@@ -26,10 +26,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MemberLogoutButton } from "@/components/member/logout-button";
+import { IdentityAvatar } from "@/components/member/member-identity";
 import { EmergencyAlertLoader } from "@/components/emergency-alert-loader";
 import { formatAbujaDateLong, formatAbujaTimeWithSeconds } from "@/lib/timezone";
-import { DEFAULT_HOMEPAGE_CONTENT, SERVICE_DAYS, type HomepageContent, type ServiceDay } from "@/lib/homepage-content";
+import { DEFAULT_HOMEPAGE_CONTENT, SERVICE_DAYS, postingMemberKey, type HomepageContent, type ServiceDay } from "@/lib/homepage-content";
 import type { BirthdayNoticeEntry } from "@/lib/birthday-types";
+import type { MemberIdentity } from "@/lib/member-store";
 
 const navigation = [
   { label: "Home", href: "#home" },
@@ -53,6 +55,7 @@ export default function HomePage() {
   const [content, setContent] = useState<HomepageContent>(DEFAULT_HOMEPAGE_CONTENT);
   const [postingDay, setPostingDay] = useState<ServiceDay>("Sunday");
   const [birthdays, setBirthdays] = useState<BirthdayNoticeEntry[]>([]);
+  const [postingIdentities, setPostingIdentities] = useState<Record<string, MemberIdentity>>({});
 
   useEffect(() => {
     const updateTime = () => {
@@ -79,9 +82,19 @@ export default function HomePage() {
       }
     };
 
+    const fetchPostingIdentities = async () => {
+      try {
+        const response = await fetch("/api/posting-identities", { cache: "no-store" });
+        if (response.ok) setPostingIdentities((await response.json()).identities || {});
+      } catch {
+        // Anonymous visitors and temporary profile failures keep the initials fallback.
+      }
+    };
+
     updateTime();
     fetchContent();
     fetchBirthdays();
+    fetchPostingIdentities();
     const clockInterval = setInterval(updateTime, 1000);
 
     return () => {
@@ -228,7 +241,7 @@ export default function HomePage() {
                 Standard
               </div>
             </div>
-            <div className="absolute -bottom-5 left-7 right-7 flex rotate-[-2deg] items-center justify-between rounded-xl bg-cyan-300 px-5 py-3 text-slate-950 shadow-xl">
+            <div className="absolute -bottom-5 left-7 right-7 flex rotate-[-2deg] items-center justify-between rounded-xl bg-cyan-300 px-5 py-3 text-cyan-950 shadow-xl">
               <span className="text-xs font-black uppercase tracking-[0.18em]">Excellence is a habit</span>
               <span className="text-xs font-semibold">QC / SOJ</span>
             </div>
@@ -288,7 +301,7 @@ export default function HomePage() {
                 return (
                   <article key={posting.id} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06]">
                     <div className="flex items-center gap-4 border-b border-white/10 p-4">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-xs font-black text-slate-950">{index + 1}</span>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-xs font-black text-cyan-950">{index + 1}</span>
                       <div className="min-w-0"><h3 className="font-semibold">{posting.name}</h3></div>
                     </div>
                     <div className="p-4">
@@ -306,7 +319,13 @@ export default function HomePage() {
                                     <div key={`${row.id}-${column}`}>
                                       <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-cyan-200/70">{column}</p>
                                       <ul className="mt-1.5 space-y-1.5">
-                                        {names.map((member, memberIndex) => <li key={`${member}-${memberIndex}`} className="flex items-start gap-2 text-xs text-white/80"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />{member}</li>)}
+                                        {names.map((member, memberIndex) => {
+                                          const identity = postingIdentities[postingMemberKey(member)];
+                                          return <li key={`${postingMemberKey(member)}-${memberIndex}`} className="flex min-w-0 items-center gap-2.5 text-xs text-white/80">
+                                            <IdentityAvatar identity={identity} name={identity?.name || member.name} size="sm" dark />
+                                            <span className="min-w-0 break-words font-medium">{identity?.name || member.name}</span>
+                                          </li>;
+                                        })}
                                       </ul>
                                     </div>
                                   );

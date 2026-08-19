@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DEFAULT_HOMEPAGE_CONTENT, SERVICE_DAYS, type HomepageContent, type ServiceDay } from "@/lib/homepage-content";
+import { DEFAULT_HOMEPAGE_CONTENT, SERVICE_DAYS, formatPostingMember, parsePostingMember, type HomepageContent, type PostingMember, type ServiceDay } from "@/lib/homepage-content";
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -310,10 +310,11 @@ function PostingMatrixEditor({ posting, onChange, onDelete }: { posting: Homepag
   const [expanded, setExpanded] = useState(posting.id.endsWith("main-auditorium"));
 
   const updateCell = (rowIndex: number, columnIndex: number, value: string) => {
+    const members = value.split("\n").map(parsePostingMember).filter((member): member is PostingMember => Boolean(member));
     onChange({
       ...posting,
       rows: posting.rows.map((row, currentRow) => currentRow === rowIndex
-        ? { ...row, assignments: row.assignments.map((names, currentColumn) => currentColumn === columnIndex ? value.split("\n") : names) }
+        ? { ...row, assignments: row.assignments.map((names, currentColumn) => currentColumn === columnIndex ? members : names) }
         : row),
     });
   };
@@ -358,7 +359,7 @@ function PostingMatrixEditor({ posting, onChange, onDelete }: { posting: Homepag
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
                   <p className="flex items-center gap-2 text-sm font-bold"><Table2 className="h-4 w-4 text-primary" /> Service teamsheet</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Enter one member per line in the correct service and role.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Enter one member per line. Use Name &lt;email@example.com&gt; to connect their profile picture.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={addRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Add service</Button>
@@ -393,7 +394,7 @@ function PostingMatrixEditor({ posting, onChange, onDelete }: { posting: Homepag
                         </th>
                         {posting.columns.map((column, columnIndex) => (
                           <td key={`${row.id}-${columnIndex}`} className="border-r border-border/70 p-2 last:border-r-0">
-                            <textarea aria-label={`${posting.name}, ${row.label}, ${column}`} value={(row.assignments[columnIndex] || []).join("\n")} onChange={(event) => updateCell(rowIndex, columnIndex, event.target.value)} rows={2} maxLength={2000} placeholder="Member name" className="min-h-16 w-full resize-y rounded-lg border border-input bg-background/70 px-3 py-2 text-xs leading-5 outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20" />
+                            <textarea aria-label={`${posting.name}, ${row.label}, ${column}`} value={(row.assignments[columnIndex] || []).map(formatPostingMember).join("\n")} onChange={(event) => updateCell(rowIndex, columnIndex, event.target.value)} rows={2} maxLength={2000} placeholder="Member Name <email@example.com>" className="min-h-16 w-full resize-y rounded-lg border border-input bg-background/70 px-3 py-2 text-xs leading-5 outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20" />
                           </td>
                         ))}
                       </tr>

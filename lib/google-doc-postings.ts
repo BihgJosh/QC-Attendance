@@ -2,7 +2,7 @@ import "server-only";
 
 import { google, type docs_v1 } from "googleapis";
 import { getGoogleEnv } from "@/lib/env";
-import { normalizeHomepageContent, type Posting, type ServiceDay } from "@/lib/homepage-content";
+import { normalizeHomepageContent, parsePostingMember, type Posting, type PostingMember, type ServiceDay } from "@/lib/homepage-content";
 
 type ParsedTable = { context: string; cells: string[][] };
 
@@ -58,11 +58,13 @@ function clean(value: string) {
   return value.replace(/[\t\r]+/g, " ").replace(/[ ]{2,}/g, " ").trim();
 }
 
-function splitNames(value: string): string[] {
+function splitMembers(value: string): PostingMember[] {
   return value
     .split(/\n+|\s*[;•●▪]\s*/)
     .map((name) => clean(name).replace(/^[-–—]\s*/, ""))
     .filter((name) => Boolean(name) && !/^(?:-|—|n\/?a|none|tbc|awaiting assignment)$/i.test(name))
+    .map(parsePostingMember)
+    .filter((member): member is PostingMember => Boolean(member))
     .slice(0, 20);
 }
 
@@ -98,7 +100,7 @@ function parseTable(table: ParsedTable, tableIndex: number, requestedDay: Servic
   const columns = header.slice(1).map((column, index) => column || `Position ${index + 1}`).slice(0, 8);
   if (!columns.length) return null;
 
-  const dataRows = rows.slice(headerIndex + 1).filter((row) => clean(row[0]) && row.slice(1).some((cell) => splitNames(cell).length));
+  const dataRows = rows.slice(headerIndex + 1).filter((row) => clean(row[0]) && row.slice(1).some((cell) => splitMembers(cell).length));
   if (!dataRows.length) return null;
 
   name = name
@@ -116,7 +118,7 @@ function parseTable(table: ParsedTable, tableIndex: number, requestedDay: Servic
     rows: dataRows.slice(0, 12).map((row, rowIndex) => ({
       id: `${id}-row-${rowIndex + 1}`,
       label: row[0].slice(0, 60),
-      assignments: columns.map((_, columnIndex) => splitNames(row[columnIndex + 1] || "")),
+      assignments: columns.map((_, columnIndex) => splitMembers(row[columnIndex + 1] || "")),
     })),
   };
 }
