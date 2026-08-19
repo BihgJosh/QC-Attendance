@@ -35,8 +35,8 @@ with sync_playwright() as p:
         "version": 5,
         "announcements": [],
         "postings": [
-            {"id": "sunday-main-auditorium", "day": "Sunday", "name": "Main auditorium", "role": "Order", "columns": ["Team"], "rows": [{"id": "sun-row", "label": "1st Service", "assignments": [[{"name": "Existing Member", "email": ""}]]}]},
-            {"id": "thursday-main-auditorium", "day": "Thursday", "name": "Main auditorium", "role": "Order", "columns": ["Team"], "rows": [{"id": "thu-row", "label": "Thursday Service", "assignments": [[{"name": "Existing Member", "email": ""}]]}]},
+            {"id": "sunday-main-auditorium", "day": "Sunday", "name": "Main auditorium", "role": "Order", "columns": ["Team"], "rows": [{"id": "sun-row", "label": "1st Service", "assignments": [["Existing Member"]]}]},
+            {"id": "thursday-main-auditorium", "day": "Thursday", "name": "Main auditorium", "role": "Order", "columns": ["Team"], "rows": [{"id": "thu-row", "label": "Thursday Service", "assignments": [["Existing Member"]]}]},
         ],
         "uniformItems": [],
         "uniformNote": "Uniform note",
@@ -62,7 +62,7 @@ with sync_playwright() as p:
                     "name": "Imported foyer",
                     "role": "Imported from the approved Google Doc",
                     "columns": ["Team"],
-                    "rows": [{"id": "sunday-imported-foyer-row-1", "label": "1st Service", "assignments": [[{"name": "Test Member", "email": "test.member@example.com"}]]}],
+                    "rows": [{"id": "sunday-imported-foyer-row-1", "label": "1st Service", "assignments": [["Test Member"]]}],
                 }],
             }),
         ),
@@ -77,7 +77,7 @@ with sync_playwright() as p:
     page.get_by_role("button", name="Fetch Sunday draft").click()
     page.get_by_text("Unsaved draft — review it, then save before notifying.").wait_for()
     page.get_by_role("button", name="Expand Imported foyer").click()
-    assert page.get_by_label("Imported foyer, 1st Service, Team").input_value() == "Test Member <test.member@example.com>"
+    assert page.get_by_label("Imported foyer, 1st Service, Team").input_value() == "Test Member"
     assert page.get_by_role("button", name="Notify Team").is_disabled()
 
     page.get_by_label("Service day").select_option("Thursday")

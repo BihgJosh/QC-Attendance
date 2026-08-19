@@ -12,12 +12,7 @@ export interface Announcement {
 export interface PostingRow {
   id: string;
   label: string;
-  assignments: PostingMember[][];
-}
-
-export interface PostingMember {
-  name: string;
-  email: string;
+  assignments: string[][];
 }
 
 export interface Posting {
@@ -89,44 +84,10 @@ function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
-function cleanEmail(value: unknown) {
-  if (!isString(value)) return "";
-  const email = value.trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email.slice(0, 254) : "";
-}
-
-export function parsePostingMember(value: unknown): PostingMember | null {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    const member = value as Partial<PostingMember>;
-    const email = cleanEmail(member.email);
-    const name = isString(member.name) ? member.name.trim().replace(/\s+/g, " ").slice(0, 100) : "";
-    return name || email ? { name: name || email, email } : null;
-  }
-  if (!isString(value)) return null;
-  const line = value.trim().replace(/\s+/g, " ");
-  if (!line) return null;
-  const angleMatch = line.match(/^(.*?)\s*<([^<>\s]+@[^<>\s]+)>$/);
-  const pipeMatch = line.match(/^(.*?)\s*[|]\s*([^|\s]+@[^|\s]+)$/);
-  const match = angleMatch || pipeMatch;
-  if (match) {
-    const email = cleanEmail(match[2]);
-    const name = match[1].trim().slice(0, 100);
-    return name || email ? { name: name || email, email } : null;
-  }
-  const email = cleanEmail(line);
-  return { name: email || line.slice(0, 100), email };
-}
-
-export function formatPostingMember(member: PostingMember) {
-  return member.email && member.name.toLowerCase() !== member.email ? `${member.name} <${member.email}>` : member.name;
-}
-
-export function postingMemberKey(member: Pick<PostingMember, "name" | "email">) {
-  return member.email.trim().toLowerCase() || member.name.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function cleanMembers(value: unknown): PostingMember[] {
-  return Array.isArray(value) ? value.map(parsePostingMember).filter((member): member is PostingMember => Boolean(member)).slice(0, 20) : [];
+function cleanNames(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter(isString).map((name) => name.trim().slice(0, 100)).filter(Boolean).slice(0, 20)
+    : [];
 }
 
 function cleanImageUrl(value: unknown) {
@@ -158,7 +119,7 @@ function cleanMatrixPostings(items: unknown[], fallbackDay: ServiceDay, prefixId
           return [{
             id: isString(row.id) ? `${id}-row-${rowIndex + 1}` : `${id}-row-${rowIndex + 1}`,
             label: row.label.trim().slice(0, 60),
-            assignments: columns.map((_, columnIndex) => cleanMembers(rawAssignments[columnIndex])),
+            assignments: columns.map((_, columnIndex) => cleanNames(rawAssignments[columnIndex])),
           }];
         })
       : [];
@@ -182,7 +143,7 @@ function migrateLegacyPostings(candidate: Partial<HomepageContent>): Posting[] {
   const sunday = createDayPostings("Sunday").map((template) => {
     const baseId = template.id.replace("sunday-", "");
     const oldPosting = legacy.find((posting) => aliases[baseId]?.includes(String(posting.id)));
-    const oldNames = cleanMembers(oldPosting?.members).filter((member) => member.name.toLowerCase() !== "awaiting assignment");
+    const oldNames = cleanNames(oldPosting?.members).filter((name) => name.toLowerCase() !== "awaiting assignment");
     if (!oldNames.length) return template;
     return {
       ...template,
