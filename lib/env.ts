@@ -22,7 +22,6 @@ export function getOptionalEnv(name: string) {
 export function getGoogleEnv() {
   return {
     sheetId: getEnv("GOOGLE_SHEET_ID"),
-    postingsDocumentId: getOptionalEnv("GOOGLE_POSTINGS_DOCUMENT_ID") || "15WPtZZeKYKCvZDDycKyw5aHJFQZcVltMoQme2p4N-iQ",
     serviceAccountEmail: getEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
     privateKey: getEnv("GOOGLE_PRIVATE_KEY")?.replace(/\\n/g, "\n"),
   };

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BellRing, ChevronDown, ChevronUp, FileDown, ImagePlus, Loader2, Megaphone, Plus, Save, ShieldCheck, Shirt, Table2, Trash2, Upload, Users } from "lucide-react";
+import { BellRing, ChevronDown, ChevronUp, ImagePlus, Loader2, Megaphone, Plus, Save, Shirt, Table2, Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,9 +37,6 @@ export function ContentManager() {
   const [notifyingSection, setNotifyingSection] = useState<"announcements" | "postings" | "uniform" | null>(null);
   const [openPanel, setOpenPanel] = useState<"announcements" | "postings" | "uniform">("announcements");
   const [postingDay, setPostingDay] = useState<ServiceDay>("Sunday");
-  const [fetchingPostings, setFetchingPostings] = useState(false);
-  const [dirtyPostingDays, setDirtyPostingDays] = useState<ServiceDay[]>([]);
-  const [postingImport, setPostingImport] = useState<Partial<Record<ServiceDay, { title: string; documentId: string; fetchedAt: string; sections: number; warnings: string[] }>>>({});
   const [uploadingUniformImage, setUploadingUniformImage] = useState(false);
 
   useEffect(() => {
@@ -49,11 +46,6 @@ export function ContentManager() {
       .catch(() => toast.error("Homepage content could not be loaded."))
       .finally(() => setLoading(false));
   }, []);
-
-  const updatePostingDraft = (nextPostings: HomepageContent["postings"]) => {
-    setContent((current) => ({ ...current, postings: nextPostings }));
-    setDirtyPostingDays((current) => current.includes(postingDay) ? current : [...current, postingDay]);
-  };
 
   const saveSection = async (section: "announcements" | "postings" | "uniform") => {
     setSavingSection(section);
@@ -70,8 +62,7 @@ export function ContentManager() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Publishing failed");
-      setContent((current) => section === "postings" ? data.content : { ...data.content, postings: current.postings });
-      if (section === "postings") setDirtyPostingDays((current) => current.filter((day) => day !== postingDay));
+      setContent(data.content);
       toast.success(`${section === "uniform" ? "Uniform" : section[0].toUpperCase() + section.slice(1)} saved to the homepage.`);
       return true;
     } catch (error) {
@@ -91,12 +82,7 @@ export function ContentManager() {
   const notifySection = async (section: "announcements" | "postings" | "uniform") => {
     setNotifyingSection(section);
     try {
-      if (section === "postings") {
-        if (dirtyPostingDays.includes(postingDay)) {
-          toast.error(`Save the ${postingDay} draft before notifying the team.`);
-          return;
-        }
-      } else if (!(await saveSection(section))) return;
+      if (!(await saveSection(section))) return;
       const response = await fetch("/api/admin/notifications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -110,33 +96,6 @@ export function ContentManager() {
       toast.error(error instanceof Error ? error.message : "The team could not be notified.");
     } finally {
       setNotifyingSection(null);
-    }
-  };
-
-  const fetchPostingDraft = async () => {
-    setFetchingPostings(true);
-    try {
-      const response = await fetch(`/api/admin/postings/import?day=${encodeURIComponent(postingDay)}`, { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "The Google Doc could not be fetched.");
-      if (!Array.isArray(data.postings) || data.postings.length === 0) throw new Error(`No ${postingDay} postings were found in the document.`);
-      const otherDays = content.postings.filter((posting) => posting.day !== postingDay);
-      updatePostingDraft([...otherDays, ...data.postings]);
-      setPostingImport((current) => ({
-        ...current,
-        [postingDay]: {
-          title: String(data.title || "Google Doc"),
-          documentId: String(data.documentId || ""),
-          fetchedAt: String(data.fetchedAt || new Date().toISOString()),
-          sections: data.postings.length,
-          warnings: Array.isArray(data.warnings) ? data.warnings.map(String) : [],
-        },
-      }));
-      toast.success(`${data.postings.length} ${postingDay} section${data.postings.length === 1 ? "" : "s"} loaded as an editable draft.`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "The Google Doc could not be fetched.");
-    } finally {
-      setFetchingPostings(false);
     }
   };
 
@@ -230,40 +189,12 @@ export function ContentManager() {
                 </select>
               </div>
 
-              <div className="flex flex-col justify-between gap-4 rounded-2xl bg-slate-950 p-4 text-white sm:flex-row sm:items-center">
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 text-sm font-bold"><ShieldCheck className="h-4 w-4 text-cyan-300" /> Import into a protected draft</p>
-                  <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-300">Fetch {postingDay} assignments from the approved Google Doc. You can edit every field before anything appears on the homepage.</p>
-                  {postingImport[postingDay] && (
-                    <div className="mt-2 text-xs text-cyan-200" role="status" aria-live="polite">
-                      <p className="break-words">Loaded {postingImport[postingDay]?.sections} section{postingImport[postingDay]?.sections === 1 ? "" : "s"} from {postingImport[postingDay]?.documentId ? <a href={`https://docs.google.com/document/d/${postingImport[postingDay]?.documentId}/edit`} target="_blank" rel="noreferrer" className="font-semibold underline underline-offset-2 hover:text-white">{postingImport[postingDay]?.title}</a> : postingImport[postingDay]?.title}. This is not published.</p>
-                      {postingImport[postingDay]?.warnings.map((warning) => <p key={warning} className="mt-1 text-amber-200">{warning}</p>)}
-                    </div>
-                  )}
-                </div>
-                <Button type="button" variant="outline" className="shrink-0 border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" disabled={fetchingPostings || savingSection !== null || notifyingSection !== null} onClick={() => void fetchPostingDraft()}>
-                  {fetchingPostings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                  {fetchingPostings ? "Fetching…" : `Fetch ${postingDay} draft`}
-                </Button>
-              </div>
-
               {content.postings.filter((posting) => posting.day === postingDay).map((posting) => (
-                <PostingMatrixEditor key={posting.id} posting={posting} onChange={(nextPosting) => updatePostingDraft(content.postings.map((item) => item.id === posting.id ? nextPosting : item))} onDelete={() => updatePostingDraft(content.postings.filter((item) => item.id !== posting.id))} />
+                <PostingMatrixEditor key={posting.id} posting={posting} onChange={(nextPosting) => setContent({ ...content, postings: content.postings.map((item) => item.id === posting.id ? nextPosting : item) })} onDelete={() => setContent({ ...content, postings: content.postings.filter((item) => item.id !== posting.id) })} />
               ))}
-              {content.postings.filter((posting) => posting.day === postingDay).length === 0 && (
-                <div className="rounded-2xl border border-dashed border-border p-6 text-center">
-                  <p className="font-semibold">No {postingDay} sections in this draft</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Fetch the Google Doc or add a section manually.</p>
-                </div>
-              )}
               <div className="flex flex-col-reverse justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
-                <Button type="button" variant="outline" onClick={() => updatePostingDraft([...content.postings, createNewPosting(postingDay)])}><Plus className="mr-2 h-4 w-4" /> Add {postingDay} section</Button>
-                <div className="space-y-2 sm:text-right">
-                  <p className={`text-xs font-medium ${dirtyPostingDays.includes(postingDay) ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`} role="status">
-                    {dirtyPostingDays.includes(postingDay) ? "Unsaved draft — review it, then save before notifying." : "Published version ready — you may notify the team."}
-                  </p>
-                  <SectionActions section="postings" saveLabel={`Save ${postingDay} postings`} saving={savingSection === "postings"} notifying={notifyingSection === "postings"} disabled={savingSection !== null || notifyingSection !== null || fetchingPostings} notifyDisabled={dirtyPostingDays.includes(postingDay)} notifyTitle={dirtyPostingDays.includes(postingDay) ? `Save the ${postingDay} draft before notifying the team` : undefined} onSave={() => saveSection("postings")} onNotify={() => notifySection("postings")} />
-                </div>
+                <Button type="button" variant="outline" onClick={() => setContent({ ...content, postings: [...content.postings, createNewPosting(postingDay)] })}><Plus className="mr-2 h-4 w-4" /> Add {postingDay} section</Button>
+                <SectionActions section="postings" saveLabel={`Save ${postingDay} postings`} saving={savingSection === "postings"} notifying={notifyingSection === "postings"} disabled={savingSection !== null || notifyingSection !== null} onSave={() => saveSection("postings")} onNotify={() => notifySection("postings")} />
               </div>
             </div>
           )}
@@ -446,10 +377,10 @@ function SaveSectionButton({ label, saving, disabled, onClick }: { label: string
   );
 }
 
-function SectionActions({ section, saveLabel, saving, notifying, disabled, notifyDisabled = false, notifyTitle, onSave, onNotify }: { section: string; saveLabel: string; saving: boolean; notifying: boolean; disabled: boolean; notifyDisabled?: boolean; notifyTitle?: string; onSave: () => void; onNotify: () => void }) {
+function SectionActions({ section, saveLabel, saving, notifying, disabled, onSave, onNotify }: { section: string; saveLabel: string; saving: boolean; notifying: boolean; disabled: boolean; onSave: () => void; onNotify: () => void }) {
   return <div className="flex flex-col gap-2 sm:flex-row">
     <SaveSectionButton label={saveLabel} saving={saving} disabled={disabled} onClick={onSave} />
-    <Button type="button" variant="outline" className="min-w-36 border-cyan-600/40 text-cyan-800 hover:bg-cyan-50 dark:text-cyan-200 dark:hover:bg-cyan-950/40" disabled={disabled || notifyDisabled} title={notifyTitle} onClick={onNotify} aria-label={`Notify team about saved ${section}`}>
+    <Button type="button" variant="outline" className="min-w-36 border-cyan-600/40 text-cyan-800 hover:bg-cyan-50 dark:text-cyan-200 dark:hover:bg-cyan-950/40" disabled={disabled} onClick={onNotify} aria-label={`Notify team about saved ${section}`}>
       {notifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BellRing className="mr-2 h-4 w-4" />}
       {notifying ? "Notifying…" : "Notify Team"}
     </Button>
