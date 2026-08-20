@@ -94,7 +94,7 @@ function textValue(value: unknown) {
 function identityValue(value: unknown): MemberIdentity | undefined {
   const identity = recordValue(value);
   if (!identity) return undefined;
-  return { name: textValue(identity.name) || "Unknown member", email: textValue(identity.email) || "", avatarUrl: textValue(identity.avatarUrl) || null };
+  return { name: textValue(identity.name) || "Unknown member", email: textValue(identity.email) || "", phone: textValue(identity.phone) || "", avatarUrl: textValue(identity.avatarUrl) || null };
 }
 
 function normalizeDashboardData(value: unknown): DashboardData | null {

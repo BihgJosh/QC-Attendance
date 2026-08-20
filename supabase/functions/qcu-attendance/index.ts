@@ -347,7 +347,7 @@ Deno.serve(async (request) => {
         return email || name ? [{ email, name }] : [];
       });
       const [profiles, teamRows] = await Promise.all([
-        rest("member_profiles?select=email,first_name,middle_name,last_name,avatar_path") as Promise<Json[]>,
+        rest("member_profiles?select=email,first_name,middle_name,last_name,phone,avatar_path") as Promise<Json[]>,
         rest("Team%20Data?select=Email,Surname,Other%20Names") as Promise<Json[]>,
       ]);
       const profileByEmail = new Map(profiles.map((profile) => [normalizeEmail(profile.email), profile]));
@@ -370,7 +370,7 @@ Deno.serve(async (request) => {
         const profile = email ? profileByEmail.get(email) : undefined;
         const profileName = profile ? [profile.first_name, profile.middle_name, profile.last_name].map((part) => String(part || "").trim()).filter(Boolean).join(" ") : "";
         const teamName = team ? `${String(team["Other Names"] || "").trim()} ${String(team.Surname || "").trim()}`.trim().replace(/\s+/g, " ") : "";
-        identities[key] = { name: profileName || teamName || reference.name || email || "Unknown member", email, avatarUrl: await signedAvatarUrl(profile?.avatar_path) };
+        identities[key] = { name: profileName || teamName || reference.name || email || "Unknown member", email, phone: String(profile?.phone || "").trim(), avatarUrl: await signedAvatarUrl(profile?.avatar_path) };
       }));
       return json({ identities });
     }

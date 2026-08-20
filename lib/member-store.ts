@@ -157,7 +157,7 @@ export type MemberProfile = {
   profileComplete: boolean;
 };
 
-export type MemberIdentity = { name: string; email: string; avatarUrl: string | null };
+export type MemberIdentity = { name: string; email: string; phone: string; avatarUrl: string | null };
 export type MemberIdentityReference = { name?: string; email?: string };
 
 export async function getMemberProfile(token: string) {

@@ -18,6 +18,7 @@ export default async function ServiceToolsPage() {
   const memberIdentity = {
     name: profile ? [profile.firstName, profile.middleName, profile.lastName].filter(Boolean).join(" ") : session.email,
     email: session.email,
+    phone: profile?.phone || "",
     avatarUrl: profile?.avatarUrl || null,
   };
   const canViewServiceManager = ["service_manager", "admin", "super_admin"].includes(access.role);

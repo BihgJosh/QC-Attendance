@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Mail, MapPin } from "lucide-react";
+import { ChevronDown, Mail, MapPin, Phone } from "lucide-react";
 import { IdentityAvatar } from "@/components/member/member-identity";
 import { postingMemberKey, type Posting, type PostingMember, type ServiceDay } from "@/lib/homepage-content";
 import type { MemberIdentity } from "@/lib/member-store";
@@ -24,6 +24,8 @@ function appliesToService(rowLabel: string, token: string) {
 function MemberPass({ member, identity, loading }: { member: PostingMember; identity?: MemberIdentity; loading: boolean }) {
   const displayName = identity?.name || member.name;
   const email = identity?.email || member.email;
+  const phone = identity?.phone || "";
+  const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, "")}` : "";
 
   return (
     <li className="relative min-w-0 overflow-hidden rounded-2xl bg-white p-3 text-slate-950 shadow-[0_1px_2px_rgba(15,23,42,.08),0_12px_28px_-22px_rgba(15,23,42,.7)]">
@@ -32,10 +34,16 @@ function MemberPass({ member, identity, loading }: { member: PostingMember; iden
         <IdentityAvatar identity={identity} name={displayName} size="md" />
         <div className="min-w-0 flex-1">
           <p className="break-words text-sm font-extrabold tracking-tight">{displayName}</p>
-          <p className="mt-1 flex min-w-0 items-center gap-1.5 text-[11px] text-slate-600">
-            <Mail className="h-3 w-3 shrink-0 text-cyan-700" />
-            <span className="break-all">{email || (loading ? "Loading profile…" : "Email unavailable")}</span>
-          </p>
+          <div className="mt-1.5 flex min-w-0 flex-col gap-1 text-[11px] text-slate-600 sm:flex-row sm:flex-wrap sm:gap-x-4">
+            {email ? <a href={`mailto:${email}`} className="inline-flex min-h-5 min-w-0 items-center gap-1.5 rounded-sm hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600">
+              <Mail className="h-3 w-3 shrink-0 text-cyan-700" />
+              <span className="break-all">{email}</span>
+            </a> : <span className="inline-flex min-h-5 items-center gap-1.5"><Mail className="h-3 w-3 shrink-0 text-cyan-700" />{loading ? "Loading profile…" : "Email unavailable"}</span>}
+            {phoneHref ? <a href={phoneHref} className="inline-flex min-h-5 items-center gap-1.5 rounded-sm font-medium hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600" aria-label={`Call ${displayName} at ${phone}`}>
+              <Phone className="h-3 w-3 shrink-0 text-cyan-700" />
+              <span>{phone}</span>
+            </a> : <span className="inline-flex min-h-5 items-center gap-1.5 text-slate-500"><Phone className="h-3 w-3 shrink-0 text-cyan-700" />{loading ? "Loading phone…" : "Phone unavailable"}</span>}
+          </div>
         </div>
         <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500">QC</span>
       </div>
