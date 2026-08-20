@@ -174,8 +174,8 @@ export function confirmMemberEmailChange(token: string, code: string) {
   return callMemberGateway<{ success: boolean; email: string; token: string }>("profile.email-change-confirm", { token, code });
 }
 
-export function uploadMemberProfileImage(token: string, base64: string, mimeType: "image/webp" | "image/jpeg") {
-  return callMemberGateway<{ success: boolean; avatarUrl: string }>("profile.image-upload", { token, base64, mimeType });
+export function uploadMemberProfileImage(token: string, base64: string, mimeType: "image/webp", requestId: string) {
+  return callMemberGateway<{ success: boolean; avatarUrl: string }>("profile.image-upload", { token, base64, mimeType, requestId });
 }
 
 export function deleteMemberProfileImage(token: string) {

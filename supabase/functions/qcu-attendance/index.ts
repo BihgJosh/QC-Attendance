@@ -414,17 +414,27 @@ Deno.serve(async (request) => {
       const session = await resolveMemberSession(body.token);
       if (!session) return json({ error: "Your session has expired." }, 401);
       const base64 = String(body.base64 || "");
-      const mimeType = body.mimeType === "image/jpeg" ? "image/jpeg" : "image/webp";
+      const requestId = String(body.requestId || "");
+      if (body.mimeType !== "image/webp") return json({ error: "Profile pictures must be processed as WebP." }, 415);
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) return json({ error: "The upload request is invalid." }, 400);
       let bytes: Uint8Array;
       try { bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0)); } catch { return json({ error: "The processed image is invalid." }, 400); }
       if (!bytes.length || bytes.length > 409600) return json({ error: "The processed profile picture must be 400 KB or smaller." }, 413);
       const isWebp = String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP";
-      const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes.at(-2) === 0xff && bytes.at(-1) === 0xd9;
-      if ((mimeType === "image/webp" && !isWebp) || (mimeType === "image/jpeg" && !isJpeg)) return json({ error: "The processed image contents are invalid." }, 415);
-      const extension = mimeType === "image/jpeg" ? "jpg" : "webp";
-      const objectPath = `${await sha256(session.email)}.${extension}`;
-      await storage(`object/member-profile-photos/${objectPath}`, { method: "POST", headers: { "Content-Type": mimeType, "x-upsert": "true" }, body: bytes });
-      await rest("member_profiles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, avatar_path: objectPath, updated_at: new Date().toISOString() }) });
+      if (!isWebp) return json({ error: "The processed image contents are invalid." }, 415);
+      const previousRows = await rest(`member_profiles?select=avatar_path&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Json[];
+      const previousPath = String(previousRows[0]?.avatar_path || "");
+      const objectPath = `${await sha256(session.email)}/${requestId}.webp`;
+      await storage(`object/member-profile-photos/${objectPath}`, { method: "POST", headers: { "Content-Type": "image/webp", "x-upsert": "true" }, body: bytes });
+      try {
+        await rest("member_profiles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, avatar_path: objectPath, updated_at: new Date().toISOString() }) });
+      } catch (error) {
+        if (previousPath !== objectPath) await storage("object/member-profile-photos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [objectPath] }) }).catch(() => null);
+        throw error;
+      }
+      if (previousPath && previousPath !== objectPath) {
+        await storage("object/member-profile-photos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [previousPath] }) }).catch(() => null);
+      }
       return json({ success: true, avatarUrl: await signedAvatarUrl(objectPath) });
     }
     if (operation === "profile.image-delete") {
@@ -432,8 +442,8 @@ Deno.serve(async (request) => {
       if (!session) return json({ error: "Your session has expired." }, 401);
       const rows = await rest(`member_profiles?select=avatar_path&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Json[];
       const objectPath = String(rows[0]?.avatar_path || "");
-      if (objectPath) await storage("object/member-profile-photos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [objectPath] }) });
       await rest(`member_profiles?email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ avatar_path: null, updated_at: new Date().toISOString() }) });
+      if (objectPath) await storage("object/member-profile-photos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [objectPath] }) }).catch(() => null);
       return json({ success: true });
     }
     if (operation === "member.list") {

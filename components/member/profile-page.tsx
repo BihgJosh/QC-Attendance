@@ -28,34 +28,93 @@ function daysInMonth(month: number | null) {
 
 async function processImage(file: File) {
   const extension = file.name.toLowerCase().split(".").pop() || "";
-  const imageExtensions = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif", "tif", "tiff", "bmp"]);
+  const imageExtensions = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif"]);
   if (!file.type.startsWith("image/") && !imageExtensions.has(extension)) throw new Error("Choose a supported photo from your device.");
   if (!file.size || file.size > 15 * 1024 * 1024) throw new Error("Choose an image smaller than 15 MB.");
-  const objectUrl = URL.createObjectURL(file);
+  let workingFile = file;
+  if (extension === "heic" || extension === "heif" || file.type === "image/heic" || file.type === "image/heif") {
+    try {
+      const { heicTo } = await import("heic-to/csp");
+      const converted = await heicTo({ blob: file, type: "image/jpeg", quality: 0.9 });
+      workingFile = new File([converted], "profile-source.jpg", { type: "image/jpeg" });
+    } catch {
+      throw new Error("This iPhone photo could not be read. Try exporting it as JPG, then upload it again.");
+    }
+  }
+  try {
+    const { default: imageCompression } = await import("browser-image-compression");
+    workingFile = await imageCompression(workingFile, {
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1024,
+      useWebWorker: true,
+      fileType: "image/jpeg",
+      initialQuality: 0.9,
+      maxIteration: 5,
+    });
+  } catch {
+    // The server still validates and normalizes formats unsupported by this browser.
+  }
+  const objectUrl = URL.createObjectURL(workingFile);
   const source = await new Promise<HTMLImageElement | null>((resolve) => {
     const image = new window.Image();
     image.onload = () => resolve(image);
     image.onerror = () => resolve(null);
     image.src = objectUrl;
   });
-  if (!source) { URL.revokeObjectURL(objectUrl); return file; }
+  if (!source) { URL.revokeObjectURL(objectUrl); throw new Error("This photo could not be processed on your device. Try a JPG or PNG version."); }
   const side = Math.min(source.naturalWidth, source.naturalHeight);
-  const canvas = document.createElement("canvas");
-  canvas.width = 512; canvas.height = 512;
-  const context = canvas.getContext("2d");
-  if (!context) { URL.revokeObjectURL(objectUrl); return file; }
-  context.drawImage(source, (source.naturalWidth - side) / 2, (source.naturalHeight - side) / 2, side, side, 0, 0, 512, 512);
-  URL.revokeObjectURL(objectUrl);
-  for (const type of ["image/webp", "image/jpeg"]) {
-    for (const quality of [0.82, 0.7, 0.58]) {
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
-      if (blob && blob.size <= 400 * 1024 && blob.type === type) {
-        const extension = type === "image/webp" ? "webp" : "jpg";
-        return new File([blob], `profile.${extension}`, { type });
+  try {
+    for (const size of [512, 448, 384]) {
+      const canvas = document.createElement("canvas");
+      canvas.width = size; canvas.height = size;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Your browser could not prepare this photo. Close other tabs and try again.");
+      context.drawImage(source, (source.naturalWidth - side) / 2, (source.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+      for (const quality of [0.82, 0.7, 0.58, 0.46]) {
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
+        if (blob && blob.size <= 400 * 1024 && blob.type === "image/webp") {
+          const processed = new File([blob], "profile.webp", { type: "image/webp" });
+          return { file: processed, previewUrl: URL.createObjectURL(processed) };
+        }
       }
     }
+    throw new Error("Your browser could not reduce this photo for upload. Try a JPG or PNG version.");
+  } finally {
+    URL.revokeObjectURL(objectUrl);
   }
-  return file;
+}
+
+function createRequestId() {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
+
+type PhotoCandidate = { file: File; previewUrl: string; originalName: string; requestId: string };
+
+function uploadPhoto(form: FormData, onProgress: (progress: number) => void, signal: AbortSignal) {
+  return new Promise<{ avatarUrl: string }>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", "/api/member/profile/image");
+    request.timeout = 60_000;
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+    };
+    request.onload = () => {
+      let data: { avatarUrl?: string; error?: string } = {};
+      try { data = JSON.parse(request.responseText); } catch { /* handled below */ }
+      if (request.status >= 200 && request.status < 300 && data.avatarUrl) resolve({ avatarUrl: data.avatarUrl });
+      else reject(new Error(data.error || "The profile picture could not be uploaded. Try again."));
+    };
+    request.onerror = () => reject(new Error("The upload was interrupted. Check your connection and try again."));
+    request.ontimeout = () => reject(new Error("The upload took too long. Check your connection and try again."));
+    request.onabort = () => reject(new DOMException("Upload cancelled.", "AbortError"));
+    signal.addEventListener("abort", () => request.abort(), { once: true });
+    request.send(form);
+  });
 }
 
 export function ProfilePage() {
@@ -64,11 +123,16 @@ export function ProfilePage() {
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoCandidate, setPhotoCandidate] = useState<PhotoCandidate | null>(null);
+  const [photoError, setPhotoError] = useState("");
+  const [photoProgress, setPhotoProgress] = useState(0);
   const [emailBusy, setEmailBusy] = useState(false);
   const [pendingEmail, setPendingEmail] = useState("");
   const [code, setCode] = useState("");
   const [verificationSent, setVerificationSent] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef("");
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const dayCount = useMemo(() => daysInMonth(profile?.birthMonth ?? null), [profile?.birthMonth]);
 
   async function load() {
@@ -82,6 +146,10 @@ export function ProfilePage() {
     finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, []);
+  useEffect(() => () => {
+    uploadAbortRef.current?.abort();
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }, []);
 
   function set<K extends keyof Profile>(key: K, value: Profile[K]) { setProfile((current) => current ? { ...current, [key]: value } : current); }
 
@@ -96,16 +164,41 @@ export function ProfilePage() {
     finally { setSaving(false); }
   }
 
+  function clearPhotoCandidate() {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = "";
+    setPhotoCandidate(null);
+    setPhotoError("");
+    setPhotoProgress(0);
+  }
+
   async function changePhoto(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0]; event.target.value = ""; if (!selected) return;
     setPhotoBusy(true);
+    setPhotoError("");
     try {
-      const image = await processImage(selected); const form = new FormData(); form.set("image", image);
-      const response = await fetch("/api/member/profile/image", { method: "POST", body: form });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error);
-      set("avatarUrl", data.avatarUrl); toast.success("Profile picture updated.");
-    } catch (error) { toast.error((error as Error).message); }
+      const processed = await processImage(selected);
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = processed.previewUrl;
+      setPhotoCandidate({ ...processed, originalName: selected.name, requestId: createRequestId() });
+    } catch (error) { const message = (error as Error).message; setPhotoError(message); toast.error(message); }
     finally { setPhotoBusy(false); }
+  }
+
+  async function confirmPhoto() {
+    if (!photoCandidate) return;
+    setPhotoBusy(true); setPhotoError(""); setPhotoProgress(0);
+    uploadAbortRef.current?.abort();
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    try {
+      const form = new FormData(); form.set("image", photoCandidate.file); form.set("requestId", photoCandidate.requestId);
+      const data = await uploadPhoto(form, setPhotoProgress, controller.signal);
+      set("avatarUrl", data.avatarUrl);
+      clearPhotoCandidate();
+      toast.success("Profile picture updated.");
+    } catch (error) { if ((error as Error).name !== "AbortError") { const message = (error as Error).message; setPhotoError(message); toast.error(message); } }
+    finally { if (uploadAbortRef.current === controller) { uploadAbortRef.current = null; setPhotoBusy(false); } }
   }
 
   async function removePhoto() {
@@ -155,20 +248,26 @@ export function ProfilePage() {
         <aside className="overflow-hidden rounded-2xl bg-[#07152f] text-white shadow-[0_24px_70px_-34px_rgba(2,6,23,.8)] lg:sticky lg:top-6">
           <div className="relative h-28 bg-[radial-gradient(circle_at_15%_20%,rgba(57,169,219,.8),transparent_45%),linear-gradient(135deg,#102d5c,#6d0e83)]" />
           <div className="px-6 pb-7">
-            <div className="relative -mt-14 h-28 w-28 overflow-hidden rounded-full bg-cyan-100 text-cyan-950 ring-4 ring-[#07152f] shadow-lg">
-              {profile.avatarUrl ? <img src={profile.avatarUrl} alt={`${profile.firstName} ${profile.lastName}`} className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-3xl font-bold">{initials(profile)}</span>}
+            <div className="relative -mt-14 h-28 w-28 overflow-hidden rounded-full bg-cyan-100 text-cyan-950 ring-4 ring-[#07152f] shadow-lg" aria-busy={photoBusy}>
+              {photoCandidate?.previewUrl ? <img src={photoCandidate.previewUrl} alt="New profile picture preview" className="h-full w-full object-cover" /> : profile.avatarUrl ? <img src={profile.avatarUrl} alt={`${profile.firstName} ${profile.lastName}`} className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-3xl font-bold">{initials(profile)}</span>}
               {photoBusy && <span className="absolute inset-0 grid place-items-center bg-slate-950/60"><Loader2 className="h-6 w-6 animate-spin" /></span>}
             </div>
             <h1 className="mt-5 text-2xl font-bold tracking-[-.03em]">{[profile.firstName, profile.middleName, profile.lastName].filter(Boolean).join(" ") || "My Profile"}</h1>
             <p className="mt-1 break-all text-sm text-cyan-50/70">{profile.email}</p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-cyan-300/15 px-3 py-1.5 text-xs font-bold text-cyan-200"><ShieldCheck className="h-4 w-4" />{roleLabels[profile.role]}</div>
             <p className="mt-3 text-xs leading-5 text-white/55">Your role is assigned by an administrator and cannot be changed here.</p>
-            <input ref={fileRef} type="file" accept="image/*,.heic,.heif,.avif,.tif,.tiff,.bmp" className="sr-only" onChange={changePhoto} />
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,.heic,.heif,.avif" className="sr-only" onChange={changePhoto} />
             <div className="mt-6 grid gap-2">
-              <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()} disabled={photoBusy}><Camera className="mr-2 h-4 w-4" />{profile.avatarUrl ? "Replace picture" : "Add profile picture"}</Button>
-              {profile.avatarUrl && <Button type="button" variant="ghost" className="text-white/70 hover:bg-white/10 hover:text-white" onClick={removePhoto} disabled={photoBusy}><Trash2 className="mr-2 h-4 w-4" />Remove picture</Button>}
+              <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()} disabled={photoBusy}><Camera className="mr-2 h-4 w-4" />{photoCandidate ? "Choose another" : profile.avatarUrl ? "Replace picture" : "Add profile picture"}</Button>
+              {photoCandidate ? <div className="rounded-xl bg-white/10 p-3">
+                <p className="truncate text-xs font-semibold text-white/80">Ready: {photoCandidate.originalName}</p>
+                <p className="mt-1 text-xs leading-4 text-white/55">{photoCandidate.previewUrl ? "This preview shows the square crop that will be saved." : "Preview is unavailable on this device; the photo will be securely processed during upload."}</p>
+                {photoBusy && <div className="mt-3" role="status" aria-live="polite"><div className="h-1.5 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-label="Profile picture upload" aria-valuemin={0} aria-valuemax={100} aria-valuenow={photoProgress}><div className="h-full rounded-full bg-cyan-300 transition-[width]" style={{ width: `${photoProgress}%` }} /></div><p className="mt-1 text-xs text-cyan-100">{photoProgress < 100 ? `Uploading ${photoProgress}%` : "Processing and saving photo…"}</p></div>}
+                <div className="mt-3 grid grid-cols-2 gap-2"><Button type="button" variant="ghost" className="min-h-11 text-white/75 hover:bg-white/10 hover:text-white" onClick={clearPhotoCandidate} disabled={photoBusy}>Cancel</Button><Button type="button" className="min-h-11 bg-cyan-600 text-white hover:bg-cyan-500" onClick={confirmPhoto} disabled={photoBusy}>{photoBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}Upload</Button></div>
+              </div> : profile.avatarUrl && <Button type="button" variant="ghost" className="text-white/70 hover:bg-white/10 hover:text-white" onClick={removePhoto} disabled={photoBusy}><Trash2 className="mr-2 h-4 w-4" />Remove picture</Button>}
             </div>
-            <p className="mt-4 text-xs leading-5 text-white/45">JPG, PNG, WebP, HEIC, HEIF, AVIF, GIF, TIFF or BMP up to 15 MB. Cropping and optimization are automatic.</p>
+            {photoError && <div role="alert" className="mt-3 rounded-xl bg-red-400/15 px-3 py-2.5 text-xs leading-5 text-red-100"><p>{photoError}</p>{photoCandidate && <button type="button" className="mt-1 min-h-11 font-bold underline underline-offset-4" onClick={confirmPhoto} disabled={photoBusy}>Try upload again</button>}</div>}
+            <p className="mt-4 text-xs leading-5 text-white/55">JPG, PNG, WebP, HEIC, HEIF, AVIF or GIF up to 15 MB. Cropping and optimization are automatic.</p>
           </div>
         </aside>
 
