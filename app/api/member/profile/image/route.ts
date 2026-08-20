@@ -51,7 +51,9 @@ export async function POST(request: Request) {
     const extension = objectPath.toLowerCase().split(".").pop() || "";
     const optimized = await optimizeImage(input, extension).catch(() => null);
     if (!optimized) return NextResponse.json({ error: "This photo format could not be read. Try another image or export it as JPG." }, { status: 415 });
-    return NextResponse.json(await uploadMemberProfileImage(session.token, optimized.toString("base64"), "image/webp", requestId));
+    const result = await uploadMemberProfileImage(session.token, optimized.toString("base64"), "image/webp", requestId);
+    console.info("[profile-image] Finalized", { requestId, inputBytes: input.length, outputBytes: optimized.length });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("[profile-image] Staged photo processing failed", error);
     const status = error instanceof MemberStoreError ? error.status : 500;

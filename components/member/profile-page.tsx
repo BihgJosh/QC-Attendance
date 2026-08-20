@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck, Camera, Check, Loader2, MailCheck, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { Upload } from "tus-js-client";
+import { DetailedError, Upload } from "tus-js-client";
 import { MemberLogoutButton } from "@/components/member/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -55,10 +55,69 @@ function createRequestId() {
 
 type PhotoCandidate = { file: File; previewUrl: string; originalName: string; requestId: string; mimeType: string; extension: string };
 type PhotoStage = { endpoint: string; bucket: string; objectPath: string; uploadToken: string };
+type PhotoUploadPhase = "stage" | "transfer" | "finalize";
 
-async function responseJson<T>(response: Response, fallback: string): Promise<T> {
+class PhotoUploadFailure extends Error {
+  phase: PhotoUploadPhase;
+  status: number;
+  providerMessage: string;
+
+  constructor(message: string, phase: PhotoUploadPhase, status = 0, providerMessage = "") {
+    super(message);
+    this.name = "PhotoUploadFailure";
+    this.phase = phase;
+    this.status = status;
+    this.providerMessage = providerMessage;
+  }
+}
+
+function uploadReference(requestId: string) {
+  return requestId.slice(0, 8).toUpperCase();
+}
+
+function cleanProviderMessage(value: unknown) {
+  let message = typeof value === "string" ? value : "";
+  try {
+    const parsed = JSON.parse(message) as { error?: unknown; message?: unknown };
+    message = typeof parsed.message === "string" ? parsed.message : typeof parsed.error === "string" ? parsed.error : message;
+  } catch { /* Non-JSON storage responses are handled as plain text. */ }
+  return message.replace(/([?&]token=)[^&\s)]+/gi, "$1[redacted]").replace(/\s+/g, " ").trim().slice(0, 180);
+}
+
+function transferFailure(error: Error | DetailedError, requestId: string) {
+  const status = error instanceof DetailedError ? error.originalResponse?.getStatus() || 0 : 0;
+  const providerMessage = cleanProviderMessage(error instanceof DetailedError ? error.originalResponse?.getBody() : error.message);
+  const reference = uploadReference(requestId);
+  if (!status) return new PhotoUploadFailure(`Your phone could not reach secure photo storage. Switch between Wi-Fi and mobile data, then retry. Reference ${reference}.`, "transfer", 0, providerMessage || error.message);
+  if (status === 401 || status === 403) return new PhotoUploadFailure(`Secure storage rejected the upload authorization (HTTP ${status}). Choose the photo again and retry. Reference ${reference}.`, "transfer", status, providerMessage);
+  if (status === 409) return new PhotoUploadFailure(`Another photo upload is still active (HTTP 409). Wait a moment, then retry. Reference ${reference}.`, "transfer", status, providerMessage);
+  if (status === 413) return new PhotoUploadFailure(`Secure storage rejected the photo as too large (HTTP 413). Choose a smaller photo. Reference ${reference}.`, "transfer", status, providerMessage);
+  if (status === 429 || status >= 500) return new PhotoUploadFailure(`Secure photo storage is temporarily unavailable (HTTP ${status}). Retry shortly. Reference ${reference}.`, "transfer", status, providerMessage);
+  const detail = providerMessage ? `: ${providerMessage}` : "";
+  return new PhotoUploadFailure(`Secure storage refused the upload (HTTP ${status}${detail}). Reference ${reference}.`, "transfer", status, providerMessage);
+}
+
+function reportPhotoUpload(candidate: PhotoCandidate, phase: PhotoUploadPhase, event: "failed" | "completed", details: { status?: number; progress?: number; error?: string } = {}) {
+  const body = JSON.stringify({
+    requestId: candidate.requestId,
+    phase,
+    event,
+    status: details.status || 0,
+    progress: details.progress ?? 0,
+    error: cleanProviderMessage(details.error),
+    mimeType: candidate.mimeType,
+    extension: candidate.extension,
+    size: candidate.file.size,
+  });
+  void fetch("/api/member/profile/image/telemetry", { method: "POST", headers: { "Content-Type": "application/json" }, body, keepalive: true }).catch(() => undefined);
+}
+
+async function responseJson<T>(response: Response, fallback: string, phase: "stage" | "finalize", requestId: string): Promise<T> {
   const data = await response.json().catch(() => ({})) as { error?: string } & Partial<T>;
-  if (!response.ok) throw new Error(data.error || fallback);
+  if (!response.ok) {
+    const message = data.error || `${fallback} (HTTP ${response.status})`;
+    throw new PhotoUploadFailure(`${message} Reference ${uploadReference(requestId)}.`, phase, response.status, data.error || "");
+  }
   return data as T;
 }
 
@@ -80,6 +139,7 @@ export function ProfilePage() {
   const uploadRef = useRef<Upload | null>(null);
   const uploadRejectRef = useRef<((reason?: unknown) => void) | null>(null);
   const photoBusyRef = useRef(false);
+  const photoProgressRef = useRef(0);
   const dayCount = useMemo(() => daysInMonth(profile?.birthMonth ?? null), [profile?.birthMonth]);
 
   async function load() {
@@ -117,6 +177,7 @@ export function ProfilePage() {
     setPhotoCandidate(null);
     setPhotoError("");
     setPhotoProgress(0);
+    photoProgressRef.current = 0;
   }
 
   function hidePhotoPreview() {
@@ -145,6 +206,7 @@ export function ProfilePage() {
     if (!photoCandidate || photoBusyRef.current) return;
     photoBusyRef.current = true;
     setPhotoBusy(true); setPhotoError(""); setPhotoProgress(0);
+    photoProgressRef.current = 0;
     void uploadRef.current?.abort();
     let upload: Upload | null = null;
     try {
@@ -152,7 +214,7 @@ export function ProfilePage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: photoCandidate.requestId, mimeType: photoCandidate.mimeType, extension: photoCandidate.extension, size: photoCandidate.file.size }),
       });
-      const stage = await responseJson<PhotoStage>(stageResponse, "The secure upload could not be started. Try again.");
+      const stage = await responseJson<PhotoStage>(stageResponse, "The secure upload could not be started. Try again.", "stage", photoCandidate.requestId);
       upload = new Upload(photoCandidate.file, {
         endpoint: stage.endpoint,
         headers: { "x-signature": stage.uploadToken, "x-upsert": "true" },
@@ -162,7 +224,11 @@ export function ProfilePage() {
         uploadDataDuringCreation: true,
         removeFingerprintOnSuccess: true,
         metadata: { bucketName: stage.bucket, objectName: stage.objectPath, contentType: photoCandidate.mimeType, cacheControl: "3600" },
-        onProgress: (uploaded, total) => setPhotoProgress(Math.round((uploaded / total) * 100)),
+        onProgress: (uploaded, total) => {
+          const progress = Math.round((uploaded / total) * 100);
+          photoProgressRef.current = progress;
+          setPhotoProgress(progress);
+        },
       });
       uploadRef.current = upload;
       const previous = await upload.findPreviousUploads();
@@ -170,7 +236,7 @@ export function ProfilePage() {
       await new Promise<void>((resolve, reject) => {
         if (!upload) { reject(new Error("The secure upload could not be started.")); return; }
         uploadRejectRef.current = reject;
-        upload.options.onError = () => reject(new Error("The secure upload was refused. Check your connection and try again."));
+        upload.options.onError = (error) => reject(transferFailure(error, photoCandidate.requestId));
         upload.options.onSuccess = () => resolve();
         upload.start();
       });
@@ -179,11 +245,12 @@ export function ProfilePage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: photoCandidate.requestId, objectPath: stage.objectPath }),
       });
-      const data = await responseJson<{ avatarUrl: string }>(finalizeResponse, "The uploaded photo could not be processed. Try again.");
+      const data = await responseJson<{ avatarUrl: string }>(finalizeResponse, "The uploaded photo could not be processed. Try again.", "finalize", photoCandidate.requestId);
       set("avatarUrl", data.avatarUrl);
+      reportPhotoUpload(photoCandidate, "finalize", "completed", { status: finalizeResponse.status, progress: 100 });
       clearPhotoCandidate();
       toast.success("Profile picture updated.");
-    } catch (error) { if ((error as Error).name !== "AbortError") { const message = (error as Error).message || "The upload was interrupted. Check your connection and try again."; setPhotoError(message); toast.error(message); } }
+    } catch (error) { if ((error as Error).name !== "AbortError") { const failure = error instanceof PhotoUploadFailure ? error : new PhotoUploadFailure((error as Error).message || `The upload was interrupted. Reference ${uploadReference(photoCandidate.requestId)}.`, "transfer", 0, (error as Error).message); reportPhotoUpload(photoCandidate, failure.phase, "failed", { status: failure.status, progress: photoProgressRef.current, error: failure.providerMessage || failure.message }); setPhotoError(failure.message); toast.error(failure.message); } }
     finally { if (uploadRef.current === upload || upload === null) { uploadRef.current = null; uploadRejectRef.current = null; photoBusyRef.current = false; setPhotoBusy(false); } }
   }
 
