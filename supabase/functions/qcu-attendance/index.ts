@@ -414,9 +414,11 @@ Deno.serve(async (request) => {
       const session = await resolveMemberSession(body.token);
       if (!session) return json({ error: "Your session has expired." }, 401);
       const base64 = String(body.base64 || "");
-      const requestId = String(body.requestId || "");
+      const suppliedRequestId = String(body.requestId || "");
       if (body.mimeType !== "image/webp") return json({ error: "Profile pictures must be processed as WebP." }, 415);
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) return json({ error: "The upload request is invalid." }, 400);
+      const requestId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(suppliedRequestId)
+        ? suppliedRequestId
+        : (await sha256(base64)).slice(0, 32);
       let bytes: Uint8Array;
       try { bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0)); } catch { return json({ error: "The processed image is invalid." }, 400); }
       if (!bytes.length || bytes.length > 409600) return json({ error: "The processed profile picture must be 400 KB or smaller." }, 413);
