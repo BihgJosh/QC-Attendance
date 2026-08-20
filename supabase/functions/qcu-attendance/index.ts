@@ -442,9 +442,10 @@ Deno.serve(async (request) => {
       const signed = await storage(`object/upload/sign/${PROFILE_STAGING_BUCKET}/${encodedStoragePath(objectPath)}`, {
         method: "POST", headers: { "Content-Type": "application/json", "x-upsert": "true" }, body: "{}",
       });
-      const signedPath = String(signed.url || signed.signedURL || signed.signedUrl || "");
-      const uploadToken = signedPath ? new URL(signedPath, supabaseUrl).searchParams.get("token") || "" : "";
-      if (uploadToken.split(".").length !== 3) throw new Error("Profile photo staging did not return a valid upload token.");
+      // Supabase resumable uploads require the token returned by createSignedUploadUrl
+      // in x-signature. A token parsed from the signed URL is not interchangeable.
+      const uploadToken = String(signed.token || "");
+      if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(uploadToken)) throw new Error("Profile photo staging did not return a valid upload token.");
       const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
       return json({
         uploadToken,
