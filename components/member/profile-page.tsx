@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck, Camera, Check, Loader2, MailCheck, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
+import { Upload } from "tus-js-client";
 import { MemberLogoutButton } from "@/components/member/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -26,62 +27,21 @@ function daysInMonth(month: number | null) {
   return month ? new Date(2000, month, 0).getDate() : 31;
 }
 
-async function processImage(file: File) {
-  const extension = file.name.toLowerCase().split(".").pop() || "";
-  const imageExtensions = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif"]);
-  if (!file.type.startsWith("image/") && !imageExtensions.has(extension)) throw new Error("Choose a supported photo from your device.");
-  if (!file.size || file.size > 15 * 1024 * 1024) throw new Error("Choose an image smaller than 15 MB.");
-  let workingFile = file;
-  if (extension === "heic" || extension === "heif" || file.type === "image/heic" || file.type === "image/heif") {
-    try {
-      const { heicTo } = await import("heic-to/csp");
-      const converted = await heicTo({ blob: file, type: "image/jpeg", quality: 0.9 });
-      workingFile = new File([converted], "profile-source.jpg", { type: "image/jpeg" });
-    } catch {
-      throw new Error("This iPhone photo could not be read. Try exporting it as JPG, then upload it again.");
-    }
-  }
-  try {
-    const { default: imageCompression } = await import("browser-image-compression");
-    workingFile = await imageCompression(workingFile, {
-      maxSizeMB: 1,
-      maxWidthOrHeight: 1024,
-      useWebWorker: true,
-      fileType: "image/jpeg",
-      initialQuality: 0.9,
-      maxIteration: 5,
-    });
-  } catch {
-    // The server still validates and normalizes formats unsupported by this browser.
-  }
-  const objectUrl = URL.createObjectURL(workingFile);
-  const source = await new Promise<HTMLImageElement | null>((resolve) => {
-    const image = new window.Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => resolve(null);
-    image.src = objectUrl;
-  });
-  if (!source) { URL.revokeObjectURL(objectUrl); throw new Error("This photo could not be processed on your device. Try a JPG or PNG version."); }
-  const side = Math.min(source.naturalWidth, source.naturalHeight);
-  try {
-    for (const size of [512, 448, 384]) {
-      const canvas = document.createElement("canvas");
-      canvas.width = size; canvas.height = size;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Your browser could not prepare this photo. Close other tabs and try again.");
-      context.drawImage(source, (source.naturalWidth - side) / 2, (source.naturalHeight - side) / 2, side, side, 0, 0, size, size);
-      for (const quality of [0.82, 0.7, 0.58, 0.46]) {
-        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-        if (blob && blob.size <= 400 * 1024 && blob.type === "image/webp") {
-          const processed = new File([blob], "profile.webp", { type: "image/webp" });
-          return { file: processed, previewUrl: URL.createObjectURL(processed) };
-        }
-      }
-    }
-    throw new Error("Your browser could not reduce this photo for upload. Try a JPG or PNG version.");
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
+const photoTypes: Record<string, string> = {
+  jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp",
+  heic: "image/heic", heif: "image/heif", avif: "image/avif", gif: "image/gif",
+};
+const extensionByPhotoType = Object.fromEntries(Object.entries(photoTypes).map(([extension, mimeType]) => [mimeType, extension === "jpeg" ? "jpg" : extension]));
+
+function preparePhoto(file: File) {
+  const suppliedExtension = file.name.toLowerCase().split(".").pop() || "";
+  const suppliedMimeType = file.type.toLowerCase();
+  const mimeType = extensionByPhotoType[suppliedMimeType] ? suppliedMimeType : photoTypes[suppliedExtension];
+  const extension = extensionByPhotoType[mimeType];
+  if (!mimeType || !extension) throw new Error("Choose a supported photo from your device.");
+  if (!file.size || file.size > 15 * 1024 * 1024) throw new Error("Choose an image no larger than 15 MB.");
+  const previewUrl = extension === "heic" || extension === "heif" ? "" : URL.createObjectURL(file);
+  return { file, previewUrl, mimeType, extension };
 }
 
 function createRequestId() {
@@ -93,28 +53,13 @@ function createRequestId() {
   return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
 }
 
-type PhotoCandidate = { file: File; previewUrl: string; originalName: string; requestId: string };
+type PhotoCandidate = { file: File; previewUrl: string; originalName: string; requestId: string; mimeType: string; extension: string };
+type PhotoStage = { endpoint: string; bucket: string; objectPath: string; uploadToken: string };
 
-function uploadPhoto(form: FormData, onProgress: (progress: number) => void, signal: AbortSignal) {
-  return new Promise<{ avatarUrl: string }>((resolve, reject) => {
-    const request = new XMLHttpRequest();
-    request.open("POST", "/api/member/profile/image");
-    request.timeout = 60_000;
-    request.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
-    };
-    request.onload = () => {
-      let data: { avatarUrl?: string; error?: string } = {};
-      try { data = JSON.parse(request.responseText); } catch { /* handled below */ }
-      if (request.status >= 200 && request.status < 300 && data.avatarUrl) resolve({ avatarUrl: data.avatarUrl });
-      else reject(new Error(data.error || "The profile picture could not be uploaded. Try again."));
-    };
-    request.onerror = () => reject(new Error("The upload was interrupted. Check your connection and try again."));
-    request.ontimeout = () => reject(new Error("The upload took too long. Check your connection and try again."));
-    request.onabort = () => reject(new DOMException("Upload cancelled.", "AbortError"));
-    signal.addEventListener("abort", () => request.abort(), { once: true });
-    request.send(form);
-  });
+async function responseJson<T>(response: Response, fallback: string): Promise<T> {
+  const data = await response.json().catch(() => ({})) as { error?: string } & Partial<T>;
+  if (!response.ok) throw new Error(data.error || fallback);
+  return data as T;
 }
 
 export function ProfilePage() {
@@ -132,7 +77,9 @@ export function ProfilePage() {
   const [verificationSent, setVerificationSent] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef("");
-  const uploadAbortRef = useRef<AbortController | null>(null);
+  const uploadRef = useRef<Upload | null>(null);
+  const uploadRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+  const photoBusyRef = useRef(false);
   const dayCount = useMemo(() => daysInMonth(profile?.birthMonth ?? null), [profile?.birthMonth]);
 
   async function load() {
@@ -147,7 +94,7 @@ export function ProfilePage() {
   }
   useEffect(() => { void load(); }, []);
   useEffect(() => () => {
-    uploadAbortRef.current?.abort();
+    void uploadRef.current?.abort();
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
   }, []);
 
@@ -172,33 +119,72 @@ export function ProfilePage() {
     setPhotoProgress(0);
   }
 
-  async function changePhoto(event: ChangeEvent<HTMLInputElement>) {
+  function hidePhotoPreview() {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = "";
+    setPhotoCandidate((current) => current ? { ...current, previewUrl: "" } : current);
+  }
+
+  function cancelPhotoUpload() {
+    void uploadRef.current?.abort();
+    uploadRejectRef.current?.(new DOMException("Upload cancelled.", "AbortError"));
+  }
+
+  function changePhoto(event: ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0]; event.target.value = ""; if (!selected) return;
-    setPhotoBusy(true);
     setPhotoError("");
     try {
-      const processed = await processImage(selected);
+      const prepared = preparePhoto(selected);
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-      previewUrlRef.current = processed.previewUrl;
-      setPhotoCandidate({ ...processed, originalName: selected.name, requestId: createRequestId() });
+      previewUrlRef.current = prepared.previewUrl;
+      setPhotoCandidate({ ...prepared, originalName: selected.name, requestId: createRequestId() });
     } catch (error) { const message = (error as Error).message; setPhotoError(message); toast.error(message); }
-    finally { setPhotoBusy(false); }
   }
 
   async function confirmPhoto() {
-    if (!photoCandidate) return;
+    if (!photoCandidate || photoBusyRef.current) return;
+    photoBusyRef.current = true;
     setPhotoBusy(true); setPhotoError(""); setPhotoProgress(0);
-    uploadAbortRef.current?.abort();
-    const controller = new AbortController();
-    uploadAbortRef.current = controller;
+    void uploadRef.current?.abort();
+    let upload: Upload | null = null;
     try {
-      const form = new FormData(); form.set("image", photoCandidate.file); form.set("requestId", photoCandidate.requestId);
-      const data = await uploadPhoto(form, setPhotoProgress, controller.signal);
+      const stageResponse = await fetch("/api/member/profile/image/stage", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: photoCandidate.requestId, mimeType: photoCandidate.mimeType, extension: photoCandidate.extension, size: photoCandidate.file.size }),
+      });
+      const stage = await responseJson<PhotoStage>(stageResponse, "The secure upload could not be started. Try again.");
+      upload = new Upload(photoCandidate.file, {
+        endpoint: stage.endpoint,
+        headers: { "x-signature": stage.uploadToken },
+        chunkSize: 6 * 1024 * 1024,
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        fingerprint: async () => `qcu-profile-${photoCandidate.requestId}-${photoCandidate.file.size}`,
+        uploadDataDuringCreation: true,
+        removeFingerprintOnSuccess: true,
+        metadata: { bucketName: stage.bucket, objectName: stage.objectPath, contentType: photoCandidate.mimeType, cacheControl: "3600" },
+        onProgress: (uploaded, total) => setPhotoProgress(Math.round((uploaded / total) * 100)),
+      });
+      uploadRef.current = upload;
+      const previous = await upload.findPreviousUploads();
+      if (previous[0]) upload.resumeFromPreviousUpload(previous[0]);
+      await new Promise<void>((resolve, reject) => {
+        if (!upload) { reject(new Error("The secure upload could not be started.")); return; }
+        uploadRejectRef.current = reject;
+        upload.options.onError = reject;
+        upload.options.onSuccess = () => resolve();
+        upload.start();
+      });
+      setPhotoProgress(100);
+      const finalizeResponse = await fetch("/api/member/profile/image", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: photoCandidate.requestId, objectPath: stage.objectPath }),
+      });
+      const data = await responseJson<{ avatarUrl: string }>(finalizeResponse, "The uploaded photo could not be processed. Try again.");
       set("avatarUrl", data.avatarUrl);
       clearPhotoCandidate();
       toast.success("Profile picture updated.");
-    } catch (error) { if ((error as Error).name !== "AbortError") { const message = (error as Error).message; setPhotoError(message); toast.error(message); } }
-    finally { if (uploadAbortRef.current === controller) { uploadAbortRef.current = null; setPhotoBusy(false); } }
+    } catch (error) { if ((error as Error).name !== "AbortError") { const message = (error as Error).message || "The upload was interrupted. Check your connection and try again."; setPhotoError(message); toast.error(message); } }
+    finally { if (uploadRef.current === upload || upload === null) { uploadRef.current = null; uploadRejectRef.current = null; photoBusyRef.current = false; setPhotoBusy(false); } }
   }
 
   async function removePhoto() {
@@ -249,25 +235,25 @@ export function ProfilePage() {
           <div className="relative h-28 bg-[radial-gradient(circle_at_15%_20%,rgba(57,169,219,.8),transparent_45%),linear-gradient(135deg,#102d5c,#6d0e83)]" />
           <div className="px-6 pb-7">
             <div className="relative -mt-14 h-28 w-28 overflow-hidden rounded-full bg-cyan-100 text-cyan-950 ring-4 ring-[#07152f] shadow-lg" aria-busy={photoBusy}>
-              {photoCandidate?.previewUrl ? <img src={photoCandidate.previewUrl} alt="New profile picture preview" className="h-full w-full object-cover" /> : profile.avatarUrl ? <img src={profile.avatarUrl} alt={`${profile.firstName} ${profile.lastName}`} className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-3xl font-bold">{initials(profile)}</span>}
+              {photoCandidate?.previewUrl ? <img src={photoCandidate.previewUrl} alt="New profile picture preview" className="h-full w-full object-cover" onError={hidePhotoPreview} /> : profile.avatarUrl ? <img src={profile.avatarUrl} alt={`${profile.firstName} ${profile.lastName}`} className="h-full w-full object-cover" /> : <span className="grid h-full place-items-center text-3xl font-bold">{initials(profile)}</span>}
               {photoBusy && <span className="absolute inset-0 grid place-items-center bg-slate-950/60"><Loader2 className="h-6 w-6 animate-spin" /></span>}
             </div>
             <h1 className="mt-5 text-2xl font-bold tracking-[-.03em]">{[profile.firstName, profile.middleName, profile.lastName].filter(Boolean).join(" ") || "My Profile"}</h1>
             <p className="mt-1 break-all text-sm text-cyan-50/70">{profile.email}</p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-cyan-300/15 px-3 py-1.5 text-xs font-bold text-cyan-200"><ShieldCheck className="h-4 w-4" />{roleLabels[profile.role]}</div>
             <p className="mt-3 text-xs leading-5 text-white/55">Your role is assigned by an administrator and cannot be changed here.</p>
-            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,.heic,.heif,.avif" className="sr-only" onChange={changePhoto} />
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,.heic,.heif,.avif" aria-label="Choose profile picture" className="sr-only" onChange={changePhoto} />
             <div className="mt-6 grid gap-2">
               <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()} disabled={photoBusy}><Camera className="mr-2 h-4 w-4" />{photoCandidate ? "Choose another" : profile.avatarUrl ? "Replace picture" : "Add profile picture"}</Button>
               {photoCandidate ? <div className="rounded-xl bg-white/10 p-3">
                 <p className="truncate text-xs font-semibold text-white/80">Ready: {photoCandidate.originalName}</p>
-                <p className="mt-1 text-xs leading-4 text-white/55">{photoCandidate.previewUrl ? "This preview shows the square crop that will be saved." : "Preview is unavailable on this device; the photo will be securely processed during upload."}</p>
+                <p className="mt-1 text-xs leading-4 text-white/55">{photoCandidate.previewUrl ? "Preview only. Cropping and optimization happen securely after upload." : "Preview is unavailable for this format; the server will securely process it after upload."}</p>
                 {photoBusy && <div className="mt-3" role="status" aria-live="polite"><div className="h-1.5 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-label="Profile picture upload" aria-valuemin={0} aria-valuemax={100} aria-valuenow={photoProgress}><div className="h-full rounded-full bg-cyan-300 transition-[width]" style={{ width: `${photoProgress}%` }} /></div><p className="mt-1 text-xs text-cyan-100">{photoProgress < 100 ? `Uploading ${photoProgress}%` : "Processing and saving photo…"}</p></div>}
-                <div className="mt-3 grid grid-cols-2 gap-2"><Button type="button" variant="ghost" className="min-h-11 text-white/75 hover:bg-white/10 hover:text-white" onClick={clearPhotoCandidate} disabled={photoBusy}>Cancel</Button><Button type="button" className="min-h-11 bg-cyan-600 text-white hover:bg-cyan-500" onClick={confirmPhoto} disabled={photoBusy}>{photoBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}Upload</Button></div>
+                <div className="mt-3 grid grid-cols-2 gap-2"><Button type="button" variant="ghost" className="min-h-11 text-white/75 hover:bg-white/10 hover:text-white" onClick={photoBusy ? cancelPhotoUpload : clearPhotoCandidate}>{photoBusy ? "Cancel upload" : "Cancel"}</Button><Button type="button" className="min-h-11 bg-cyan-600 text-white hover:bg-cyan-500" onClick={confirmPhoto} disabled={photoBusy}>{photoBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}Upload</Button></div>
               </div> : profile.avatarUrl && <Button type="button" variant="ghost" className="text-white/70 hover:bg-white/10 hover:text-white" onClick={removePhoto} disabled={photoBusy}><Trash2 className="mr-2 h-4 w-4" />Remove picture</Button>}
             </div>
             {photoError && <div role="alert" className="mt-3 rounded-xl bg-red-400/15 px-3 py-2.5 text-xs leading-5 text-red-100"><p>{photoError}</p>{photoCandidate && <button type="button" className="mt-1 min-h-11 font-bold underline underline-offset-4" onClick={confirmPhoto} disabled={photoBusy}>Try upload again</button>}</div>}
-            <p className="mt-4 text-xs leading-5 text-white/55">JPG, PNG, WebP, HEIC, HEIF, AVIF or GIF up to 15 MB. Cropping and optimization are automatic.</p>
+            <p className="mt-4 text-xs leading-5 text-white/55">JPG, PNG, WebP, HEIC, HEIF, AVIF or GIF up to 15 MB. Your phone uploads the original; the server handles cropping and optimization.</p>
           </div>
         </aside>
 

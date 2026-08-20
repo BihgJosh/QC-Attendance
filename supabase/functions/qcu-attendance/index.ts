@@ -3,7 +3,7 @@ const allowedOperations = new Set([
   "status.get", "status.update", "settings.get", "settings.update", "members.list",
   "attendance.device-check", "attendance.insert", "attendance.list", "migration.import",
   "member.status", "member.setup-complete", "member.authenticate", "member.session", "member.change-password", "member.logout",
-  "profile.get", "profile.update", "profile.email-change-request", "profile.email-change-confirm", "profile.image-upload", "profile.image-delete", "profile.identities",
+  "profile.get", "profile.update", "profile.email-change-request", "profile.email-change-confirm", "profile.image-upload", "profile.image-delete", "profile.image-stage-create", "profile.image-stage-read", "profile.image-stage-delete", "profile.identities",
   "member.list", "member.reset", "admin.list", "admin.add", "admin.remove",
   "roles.list", "roles.resolve", "roles.upsert", "roles.remove", "assignments.upsert", "assignments.remove",
   "push.subscribe", "push.unsubscribe", "push.list", "push.deactivate",
@@ -71,11 +71,29 @@ async function storage(path: string, init: RequestInit = {}) {
 async function signedAvatarUrl(path: unknown) {
   const objectPath = String(path || "");
   if (!objectPath) return null;
-  const result = await storage(`object/sign/member-profile-photos/${encodeURIComponent(objectPath)}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn: 3600 }),
+  return signedStorageUrl("member-profile-photos", objectPath, 3600);
+}
+
+function encodedStoragePath(path: string) {
+  return path.split("/").map((part) => encodeURIComponent(part)).join("/");
+}
+
+async function signedStorageUrl(bucket: string, objectPath: string, expiresIn: number) {
+  const result = await storage(`object/sign/${bucket}/${encodedStoragePath(objectPath)}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn }),
   });
   const signed = String(result.signedURL || result.signedUrl || "");
   return signed ? `${supabaseUrl}/storage/v1${signed}` : null;
+}
+
+const PROFILE_STAGING_BUCKET = "member-profile-photo-staging";
+const PROFILE_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/avif", "image/gif"]);
+const PROFILE_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif", "avif", "gif"]);
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validProfileStagePath(emailHash: string, objectPath: string) {
+  const prefix = `${emailHash}/source.`;
+  return objectPath.startsWith(prefix) && PROFILE_IMAGE_EXTENSIONS.has(objectPath.slice(prefix.length));
 }
 
 const PROTECTED_BOOTSTRAP_EMAILS = new Set(["joshuaagusa001@gmail.com"]);
@@ -409,6 +427,46 @@ Deno.serve(async (request) => {
       const newEmail = normalizeEmail(challenge.new_email);
       await rest("rpc/complete_member_email_change", { method: "POST", body: JSON.stringify({ old_email: session.email, replacement_email: newEmail }) });
       return json({ success: true, email: newEmail, token: await createMemberSession(newEmail) });
+    }
+    if (operation === "profile.image-stage-create") {
+      const session = await resolveMemberSession(body.token);
+      if (!session) return json({ error: "Your session has expired." }, 401);
+      const requestId = String(body.requestId || "");
+      const mimeType = String(body.mimeType || "").toLowerCase();
+      const extension = String(body.extension || "").toLowerCase();
+      const size = Number(body.size);
+      if (!UUID_V4.test(requestId) || !PROFILE_IMAGE_MIME_TYPES.has(mimeType) || !PROFILE_IMAGE_EXTENSIONS.has(extension) || !Number.isInteger(size) || size < 1 || size > 15 * 1024 * 1024) {
+        return json({ error: "Choose a supported profile picture up to 15 MB." }, 400);
+      }
+      const objectPath = `${await sha256(session.email)}/source.${extension}`;
+      const signed = await storage(`object/upload/sign/${PROFILE_STAGING_BUCKET}/${encodedStoragePath(objectPath)}`, {
+        method: "POST", headers: { "Content-Type": "application/json", "x-upsert": "true" }, body: "{}",
+      });
+      const signedPath = String(signed.url || signed.signedURL || signed.signedUrl || "");
+      const uploadToken = String(signed.token || (signedPath ? new URL(signedPath, supabaseUrl).searchParams.get("token") || "" : ""));
+      if (!uploadToken) throw new Error("Profile photo staging did not return an upload token.");
+      const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
+      return json({
+        uploadToken,
+        endpoint: `https://${projectRef}.storage.supabase.co/storage/v1/upload/resumable`,
+        bucket: PROFILE_STAGING_BUCKET,
+        objectPath,
+      });
+    }
+    if (operation === "profile.image-stage-read" || operation === "profile.image-stage-delete") {
+      const session = await resolveMemberSession(body.token);
+      if (!session) return json({ error: "Your session has expired." }, 401);
+      const requestId = String(body.requestId || "");
+      const objectPath = String(body.objectPath || "");
+      const emailHash = await sha256(session.email);
+      if (!UUID_V4.test(requestId) || !validProfileStagePath(emailHash, objectPath)) return json({ error: "The staged profile picture is invalid." }, 400);
+      if (operation === "profile.image-stage-read") {
+        const signedUrl = await signedStorageUrl(PROFILE_STAGING_BUCKET, objectPath, 300);
+        if (!signedUrl) throw new Error("The staged profile picture could not be opened.");
+        return json({ signedUrl });
+      }
+      await storage("object/member-profile-photo-staging", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [objectPath] }) }).catch(() => null);
+      return json({ success: true });
     }
     if (operation === "profile.image-upload") {
       const session = await resolveMemberSession(body.token);

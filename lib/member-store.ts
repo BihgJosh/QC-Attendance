@@ -15,6 +15,9 @@ type MemberOperation =
   | "profile.email-change-confirm"
   | "profile.image-upload"
   | "profile.image-delete"
+  | "profile.image-stage-create"
+  | "profile.image-stage-read"
+  | "profile.image-stage-delete"
   | "profile.identities"
   | "member.list"
   | "member.reset"
@@ -176,6 +179,18 @@ export function confirmMemberEmailChange(token: string, code: string) {
 
 export function uploadMemberProfileImage(token: string, base64: string, mimeType: "image/webp", requestId: string) {
   return callMemberGateway<{ success: boolean; avatarUrl: string }>("profile.image-upload", { token, base64, mimeType, requestId });
+}
+
+export function createMemberProfileImageStage(token: string, input: { requestId: string; mimeType: string; extension: string; size: number }) {
+  return callMemberGateway<{ uploadToken: string; endpoint: string; bucket: string; objectPath: string }>("profile.image-stage-create", { token, ...input });
+}
+
+export function readMemberProfileImageStage(token: string, input: { requestId: string; objectPath: string }) {
+  return callMemberGateway<{ signedUrl: string }>("profile.image-stage-read", { token, ...input });
+}
+
+export function deleteMemberProfileImageStage(token: string, input: { requestId: string; objectPath: string }) {
+  return callMemberGateway<{ success: boolean }>("profile.image-stage-delete", { token, ...input });
 }
 
 export function deleteMemberProfileImage(token: string) {
