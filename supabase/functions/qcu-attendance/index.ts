@@ -443,8 +443,8 @@ Deno.serve(async (request) => {
         method: "POST", headers: { "Content-Type": "application/json", "x-upsert": "true" }, body: "{}",
       });
       const signedPath = String(signed.url || signed.signedURL || signed.signedUrl || "");
-      const uploadToken = String(signed.token || (signedPath ? new URL(signedPath, supabaseUrl).searchParams.get("token") || "" : ""));
-      if (!uploadToken) throw new Error("Profile photo staging did not return an upload token.");
+      const uploadToken = signedPath ? new URL(signedPath, supabaseUrl).searchParams.get("token") || "" : "";
+      if (uploadToken.split(".").length !== 3) throw new Error("Profile photo staging did not return a valid upload token.");
       const projectRef = new URL(supabaseUrl).hostname.split(".")[0];
       return json({
         uploadToken,

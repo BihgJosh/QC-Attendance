@@ -155,7 +155,7 @@ export function ProfilePage() {
       const stage = await responseJson<PhotoStage>(stageResponse, "The secure upload could not be started. Try again.");
       upload = new Upload(photoCandidate.file, {
         endpoint: stage.endpoint,
-        headers: { "x-signature": stage.uploadToken },
+        headers: { "x-signature": stage.uploadToken, "x-upsert": "true" },
         chunkSize: 6 * 1024 * 1024,
         retryDelays: [0, 3000, 5000, 10000, 20000],
         fingerprint: async () => `qcu-profile-${photoCandidate.requestId}-${photoCandidate.file.size}`,
@@ -170,7 +170,7 @@ export function ProfilePage() {
       await new Promise<void>((resolve, reject) => {
         if (!upload) { reject(new Error("The secure upload could not be started.")); return; }
         uploadRejectRef.current = reject;
-        upload.options.onError = reject;
+        upload.options.onError = () => reject(new Error("The secure upload was refused. Check your connection and try again."));
         upload.options.onSuccess = () => resolve();
         upload.start();
       });
