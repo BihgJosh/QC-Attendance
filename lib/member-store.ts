@@ -182,7 +182,7 @@ export function uploadMemberProfileImage(token: string, base64: string, mimeType
 }
 
 export function createMemberProfileImageStage(token: string, input: { requestId: string; mimeType: string; extension: string; size: number }) {
-  return callMemberGateway<{ uploadToken: string; endpoint: string; bucket: string; objectPath: string }>("profile.image-stage-create", { token, ...input });
+  return callMemberGateway<{ signedUrl: string; bucket: string; objectPath: string }>("profile.image-stage-create", { token, ...input });
 }
 
 export function readMemberProfileImageStage(token: string, input: { requestId: string; objectPath: string }) {

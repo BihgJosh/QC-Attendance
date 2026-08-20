@@ -5,7 +5,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, BadgeCheck, Camera, Check, Loader2, MailCheck, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
-import { DetailedError, Upload } from "tus-js-client";
 import { MemberLogoutButton } from "@/components/member/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -54,7 +53,7 @@ function createRequestId() {
 }
 
 type PhotoCandidate = { file: File; previewUrl: string; originalName: string; requestId: string; mimeType: string; extension: string };
-type PhotoStage = { endpoint: string; bucket: string; objectPath: string; uploadToken: string };
+type PhotoStage = { signedUrl: string; bucket: string; objectPath: string };
 type PhotoUploadPhase = "stage" | "transfer" | "finalize";
 
 class PhotoUploadFailure extends Error {
@@ -84,9 +83,8 @@ function cleanProviderMessage(value: unknown) {
   return message.replace(/([?&]token=)[^&\s)]+/gi, "$1[redacted]").replace(/\s+/g, " ").trim().slice(0, 180);
 }
 
-function transferFailure(error: Error | DetailedError, requestId: string) {
-  const status = error instanceof DetailedError ? error.originalResponse?.getStatus() || 0 : 0;
-  const providerMessage = cleanProviderMessage(error instanceof DetailedError ? error.originalResponse?.getBody() : error.message);
+function transferFailure(error: Error, requestId: string, status = 0, responseBody = "") {
+  const providerMessage = cleanProviderMessage(responseBody || error.message);
   const reference = uploadReference(requestId);
   if (!status) return new PhotoUploadFailure(`Your phone could not reach secure photo storage. Switch between Wi-Fi and mobile data, then retry. Reference ${reference}.`, "transfer", 0, providerMessage || error.message);
   if (status === 401 || status === 403) return new PhotoUploadFailure(`Secure storage rejected the upload authorization (HTTP ${status}). Choose the photo again and retry. Reference ${reference}.`, "transfer", status, providerMessage);
@@ -136,8 +134,7 @@ export function ProfilePage() {
   const [verificationSent, setVerificationSent] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef("");
-  const uploadRef = useRef<Upload | null>(null);
-  const uploadRejectRef = useRef<((reason?: unknown) => void) | null>(null);
+  const uploadRef = useRef<XMLHttpRequest | null>(null);
   const photoBusyRef = useRef(false);
   const photoProgressRef = useRef(0);
   const dayCount = useMemo(() => daysInMonth(profile?.birthMonth ?? null), [profile?.birthMonth]);
@@ -154,7 +151,7 @@ export function ProfilePage() {
   }
   useEffect(() => { void load(); }, []);
   useEffect(() => () => {
-    void uploadRef.current?.abort();
+    uploadRef.current?.abort();
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
   }, []);
 
@@ -187,8 +184,7 @@ export function ProfilePage() {
   }
 
   function cancelPhotoUpload() {
-    void uploadRef.current?.abort();
-    uploadRejectRef.current?.(new DOMException("Upload cancelled.", "AbortError"));
+    uploadRef.current?.abort();
   }
 
   function changePhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -207,38 +203,33 @@ export function ProfilePage() {
     photoBusyRef.current = true;
     setPhotoBusy(true); setPhotoError(""); setPhotoProgress(0);
     photoProgressRef.current = 0;
-    void uploadRef.current?.abort();
-    let upload: Upload | null = null;
+    uploadRef.current?.abort();
+    let upload: XMLHttpRequest | null = null;
     try {
       const stageResponse = await fetch("/api/member/profile/image/stage", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestId: photoCandidate.requestId, mimeType: photoCandidate.mimeType, extension: photoCandidate.extension, size: photoCandidate.file.size }),
       });
       const stage = await responseJson<PhotoStage>(stageResponse, "The secure upload could not be started. Try again.", "stage", photoCandidate.requestId);
-      upload = new Upload(photoCandidate.file, {
-        endpoint: stage.endpoint,
-        headers: { "x-signature": stage.uploadToken, "x-upsert": "true" },
-        chunkSize: 6 * 1024 * 1024,
-        retryDelays: [0, 3000, 5000, 10000, 20000],
-        fingerprint: async () => `qcu-profile-${photoCandidate.requestId}-${photoCandidate.file.size}`,
-        uploadDataDuringCreation: true,
-        removeFingerprintOnSuccess: true,
-        metadata: { bucketName: stage.bucket, objectName: stage.objectPath, contentType: photoCandidate.mimeType, cacheControl: "3600" },
-        onProgress: (uploaded, total) => {
-          const progress = Math.round((uploaded / total) * 100);
-          photoProgressRef.current = progress;
-          setPhotoProgress(progress);
-        },
-      });
+      upload = new XMLHttpRequest();
       uploadRef.current = upload;
-      const previous = await upload.findPreviousUploads();
-      if (previous[0]) upload.resumeFromPreviousUpload(previous[0]);
       await new Promise<void>((resolve, reject) => {
         if (!upload) { reject(new Error("The secure upload could not be started.")); return; }
-        uploadRejectRef.current = reject;
-        upload.options.onError = (error) => reject(transferFailure(error, photoCandidate.requestId));
-        upload.options.onSuccess = () => resolve();
-        upload.start();
+        upload.open("PUT", stage.signedUrl);
+        upload.setRequestHeader("Content-Type", photoCandidate.mimeType);
+        upload.setRequestHeader("x-upsert", "true");
+        upload.upload.onprogress = (event) => {
+          if (!event.lengthComputable) return;
+          const progress = Math.round((event.loaded / event.total) * 100);
+          photoProgressRef.current = progress;
+          setPhotoProgress(progress);
+        };
+        upload.onerror = () => reject(transferFailure(new Error("Network request failed."), photoCandidate.requestId));
+        upload.onabort = () => reject(new DOMException("Upload cancelled.", "AbortError"));
+        upload.onload = () => upload && upload.status >= 200 && upload.status < 300
+          ? resolve()
+          : reject(transferFailure(new Error("Storage rejected the upload."), photoCandidate.requestId, upload?.status || 0, upload?.responseText || ""));
+        upload.send(photoCandidate.file);
       });
       setPhotoProgress(100);
       const finalizeResponse = await fetch("/api/member/profile/image", {
@@ -251,7 +242,7 @@ export function ProfilePage() {
       clearPhotoCandidate();
       toast.success("Profile picture updated.");
     } catch (error) { if ((error as Error).name !== "AbortError") { const failure = error instanceof PhotoUploadFailure ? error : new PhotoUploadFailure((error as Error).message || `The upload was interrupted. Reference ${uploadReference(photoCandidate.requestId)}.`, "transfer", 0, (error as Error).message); reportPhotoUpload(photoCandidate, failure.phase, "failed", { status: failure.status, progress: photoProgressRef.current, error: failure.providerMessage || failure.message }); setPhotoError(failure.message); toast.error(failure.message); } }
-    finally { if (uploadRef.current === upload || upload === null) { uploadRef.current = null; uploadRejectRef.current = null; photoBusyRef.current = false; setPhotoBusy(false); } }
+    finally { if (uploadRef.current === upload || upload === null) { uploadRef.current = null; photoBusyRef.current = false; setPhotoBusy(false); } }
   }
 
   async function removePhoto() {
