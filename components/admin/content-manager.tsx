@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { BellRing, ChevronDown, ChevronUp, ImagePlus, Loader2, Megaphone, Plus, Save, Shirt, Table2, Trash2, Upload, Users } from "lucide-react";
+import { BellRing, ChevronDown, ChevronUp, ImagePlus, Loader2, Mail, Megaphone, Plus, RotateCcw, Save, Search, Shirt, Table2, Trash2, Upload, UserRound, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DEFAULT_HOMEPAGE_CONTENT, SERVICE_DAYS, type HomepageContent, type ServiceDay } from "@/lib/homepage-content";
+import { createBlankDayPostings, DEFAULT_HOMEPAGE_CONTENT, SERVICE_DAYS, type HomepageContent, type PostingMember, type ServiceDay } from "@/lib/homepage-content";
+
+type PostingDirectoryMember = { name: string; email: string };
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -22,10 +24,38 @@ function createNewPosting(day: ServiceDay) {
     name: "New section",
     role: "Section responsibility",
     columns: ["Team"],
-    rows: ["1st Service", "2nd Service", "3rd Service", "4th Service"].map((label, index) => ({
+    rows: (day === "Sunday" ? ["1st Service", "2nd Service", "3rd Service", "4th Service"] : ["Thursday Service"]).map((label, index) => ({
       id: `${id}-row-${index + 1}`,
       label,
       assignments: [[]],
+    })),
+  };
+}
+
+function comparableName(value: string) {
+  return value.toLowerCase().replace(/\b(?:bro|brother|sis|sister|mr|mrs|miss|ms|pst|pastor)\.?\b/g, " ").replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+}
+
+function linkLegacyMembers(content: HomepageContent, directory: PostingDirectoryMember[]): HomepageContent {
+  return {
+    ...content,
+    postings: content.postings.map((posting) => ({
+      ...posting,
+      rows: posting.rows.map((row) => ({
+        ...row,
+        assignments: row.assignments.map((members) => members.map((member) => {
+          if (member.email) return member;
+          const target = comparableName(member.name);
+          const targetTokens = target.split(" ").filter(Boolean);
+          const matches = targetTokens.length ? directory.filter((candidate) => {
+            const candidateName = comparableName(candidate.name);
+            if (candidateName === target) return true;
+            const candidateTokens = candidateName.split(" ");
+            return targetTokens.every((token) => candidateTokens.includes(token));
+          }) : [];
+          return matches.length === 1 ? matches[0] : member;
+        })),
+      })),
     })),
   };
 }
@@ -38,16 +68,49 @@ export function ContentManager() {
   const [openPanel, setOpenPanel] = useState<"announcements" | "postings" | "uniform">("announcements");
   const [postingDay, setPostingDay] = useState<ServiceDay>("Sunday");
   const [uploadingUniformImage, setUploadingUniformImage] = useState(false);
+  const [postingMembers, setPostingMembers] = useState<PostingDirectoryMember[]>([]);
+  const [postingMembersLoading, setPostingMembersLoading] = useState(true);
+  const [postingMembersError, setPostingMembersError] = useState("");
+  const [confirmResetPostings, setConfirmResetPostings] = useState(false);
 
   useEffect(() => {
-    fetch("/api/content")
-      .then((response) => response.ok ? response.json() : Promise.reject())
-      .then(setContent)
-      .catch(() => toast.error("Homepage content could not be loaded."))
-      .finally(() => setLoading(false));
+    const loadContent = fetch("/api/content").then(async (response) => {
+      if (!response.ok) throw new Error("Homepage content could not be loaded.");
+      return response.json() as Promise<HomepageContent>;
+    });
+    const loadMembers = fetch("/api/admin/posting-members", { cache: "no-store" }).then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Team directory unavailable.");
+      return data.members as PostingDirectoryMember[];
+    });
+
+    Promise.allSettled([loadContent, loadMembers]).then(([contentResult, membersResult]) => {
+      const members = membersResult.status === "fulfilled" ? membersResult.value : [];
+      if (membersResult.status === "fulfilled") {
+        setPostingMembers(members);
+        setPostingMembersError("");
+      } else {
+        setPostingMembersError(membersResult.reason instanceof Error ? membersResult.reason.message : "Team directory unavailable.");
+      }
+      if (contentResult.status === "fulfilled") setContent(linkLegacyMembers(contentResult.value, members));
+      else toast.error("Homepage content could not be loaded.");
+    }).finally(() => {
+      setLoading(false);
+      setPostingMembersLoading(false);
+    });
   }, []);
 
   const saveSection = async (section: "announcements" | "postings" | "uniform") => {
+    if (section === "postings") {
+      const unresolved = content.postings
+        .filter((posting) => posting.day === postingDay)
+        .flatMap((posting) => posting.rows.flatMap((row) => row.assignments.flat()))
+        .filter((member) => !member.email);
+      if (unresolved.length) {
+        toast.error(`${unresolved.length} posting ${unresolved.length === 1 ? "entry is" : "entries are"} not linked to a team profile. Remove and reselect ${unresolved.length === 1 ? "it" : "them"} before saving.`);
+        return false;
+      }
+    }
     setSavingSection(section);
     try {
       const sectionContent = section === "announcements"
@@ -184,13 +247,34 @@ export function ContentManager() {
                   <Label htmlFor="posting-service-day" className="text-[10px] uppercase tracking-[0.16em] text-primary">Service day</Label>
                   <p className="mt-1 text-xs text-muted-foreground">Sunday and Thursday assignments are stored independently.</p>
                 </div>
-                <select id="posting-service-day" value={postingDay} onChange={(event) => setPostingDay(event.target.value as ServiceDay)} className="h-11 min-w-48 rounded-xl border border-input bg-background px-4 text-sm font-semibold outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20">
+                <select id="posting-service-day" value={postingDay} onChange={(event) => { setPostingDay(event.target.value as ServiceDay); setConfirmResetPostings(false); }} className="h-11 min-w-48 rounded-xl border border-input bg-background px-4 text-sm font-semibold outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20">
                   {SERVICE_DAYS.map((day) => <option key={day} value={day}>{day} service</option>)}
                 </select>
               </div>
 
+              <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/55 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold">Standard posting template</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Clear this {postingDay} draft and restore the standard locations, services and roles. Nothing changes on the homepage until you save.</p>
+                </div>
+                {confirmResetPostings ? (
+                  <div className="flex shrink-0 flex-wrap gap-2" role="group" aria-label="Confirm posting reset">
+                    <Button type="button" variant="ghost" onClick={() => setConfirmResetPostings(false)}>Cancel</Button>
+                    <Button type="button" variant="destructive" onClick={() => {
+                      setContent((current) => ({ ...current, postings: [...current.postings.filter((posting) => posting.day !== postingDay), ...createBlankDayPostings(postingDay)] }));
+                      setConfirmResetPostings(false);
+                      toast.success(`${postingDay} draft cleared. Add members, then save to publish it.`);
+                    }}><RotateCcw className="mr-2 h-4 w-4" />Clear draft</Button>
+                  </div>
+                ) : (
+                  <Button type="button" variant="outline" className="shrink-0 text-destructive hover:bg-destructive/5" onClick={() => setConfirmResetPostings(true)}><RotateCcw className="mr-2 h-4 w-4" />Clear & start new</Button>
+                )}
+              </div>
+
+              {postingMembersError ? <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{postingMembersError} Name suggestions are unavailable; existing assignments remain safe.</p> : null}
+
               {content.postings.filter((posting) => posting.day === postingDay).map((posting) => (
-                <PostingMatrixEditor key={posting.id} posting={posting} onChange={(nextPosting) => setContent({ ...content, postings: content.postings.map((item) => item.id === posting.id ? nextPosting : item) })} onDelete={() => setContent({ ...content, postings: content.postings.filter((item) => item.id !== posting.id) })} />
+                <PostingMatrixEditor key={posting.id} posting={posting} members={postingMembers} membersLoading={postingMembersLoading} onChange={(nextPosting) => setContent({ ...content, postings: content.postings.map((item) => item.id === posting.id ? nextPosting : item) })} onDelete={() => setContent({ ...content, postings: content.postings.filter((item) => item.id !== posting.id) })} />
               ))}
               <div className="flex flex-col-reverse justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
                 <Button type="button" variant="outline" onClick={() => setContent({ ...content, postings: [...content.postings, createNewPosting(postingDay)] })}><Plus className="mr-2 h-4 w-4" /> Add {postingDay} section</Button>
@@ -237,14 +321,14 @@ export function ContentManager() {
   );
 }
 
-function PostingMatrixEditor({ posting, onChange, onDelete }: { posting: HomepageContent["postings"][number]; onChange: (posting: HomepageContent["postings"][number]) => void; onDelete: () => void }) {
+function PostingMatrixEditor({ posting, members, membersLoading, onChange, onDelete }: { posting: HomepageContent["postings"][number]; members: PostingDirectoryMember[]; membersLoading: boolean; onChange: (posting: HomepageContent["postings"][number]) => void; onDelete: () => void }) {
   const [expanded, setExpanded] = useState(posting.id.endsWith("main-auditorium"));
 
-  const updateCell = (rowIndex: number, columnIndex: number, value: string) => {
+  const updateCell = (rowIndex: number, columnIndex: number, value: PostingMember[]) => {
     onChange({
       ...posting,
       rows: posting.rows.map((row, currentRow) => currentRow === rowIndex
-        ? { ...row, assignments: row.assignments.map((names, currentColumn) => currentColumn === columnIndex ? value.split("\n") : names) }
+        ? { ...row, assignments: row.assignments.map((assignedMembers, currentColumn) => currentColumn === columnIndex ? value : assignedMembers) }
         : row),
     });
   };
@@ -289,7 +373,7 @@ function PostingMatrixEditor({ posting, onChange, onDelete }: { posting: Homepag
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
                   <p className="flex items-center gap-2 text-sm font-bold"><Table2 className="h-4 w-4 text-primary" /> Service teamsheet</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Enter one member per line in the correct service and role.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Search the official team list. Every selection carries the member&apos;s name and email to the homepage profile card.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={addRow}><Plus className="mr-1.5 h-3.5 w-3.5" /> Add service</Button>
@@ -324,7 +408,13 @@ function PostingMatrixEditor({ posting, onChange, onDelete }: { posting: Homepag
                         </th>
                         {posting.columns.map((column, columnIndex) => (
                           <td key={`${row.id}-${columnIndex}`} className="border-r border-border/70 p-2 last:border-r-0">
-                            <textarea aria-label={`${posting.name}, ${row.label}, ${column}`} value={(row.assignments[columnIndex] || []).join("\n")} onChange={(event) => updateCell(rowIndex, columnIndex, event.target.value)} rows={2} maxLength={2000} placeholder="Member name" className="min-h-16 w-full resize-y rounded-lg border border-input bg-background/70 px-3 py-2 text-xs leading-5 outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20" />
+                            <PostingAssignmentEditor
+                              label={`${posting.name}, ${row.label}, ${column}`}
+                              value={row.assignments[columnIndex] || []}
+                              members={members}
+                              loading={membersLoading}
+                              onChange={(value) => updateCell(rowIndex, columnIndex, value)}
+                            />
                           </td>
                         ))}
                       </tr>
@@ -336,6 +426,85 @@ function PostingMatrixEditor({ posting, onChange, onDelete }: { posting: Homepag
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function memberInitials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "QC";
+}
+
+function PostingAssignmentEditor({ label, value, members, loading, onChange }: { label: string; value: PostingMember[]; members: PostingDirectoryMember[]; loading: boolean; onChange: (value: PostingMember[]) => void }) {
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const normalizedQuery = query.trim().toLowerCase();
+  const selectedEmails = new Set(value.map((member) => member.email.toLowerCase()).filter(Boolean));
+  const suggestions = members
+    .filter((member) => !selectedEmails.has(member.email.toLowerCase()))
+    .filter((member) => !normalizedQuery || `${member.name} ${member.email}`.toLowerCase().includes(normalizedQuery))
+    .slice(0, 6);
+  const listId = `posting-suggestions-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 60)}`;
+
+  const addMember = (member: PostingDirectoryMember) => {
+    onChange([...value, member]);
+    setQuery("");
+    setFocused(false);
+    setActiveIndex(0);
+  };
+
+  return (
+    <div className="min-w-56 space-y-2">
+      {value.length ? (
+        <ul className="space-y-2">
+          {value.map((member, index) => (
+            <li key={`${member.email || member.name}-${index}`} className="flex min-w-0 items-center gap-2 rounded-xl border border-border/70 bg-card p-2 shadow-sm">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cyan-100 text-xs font-black text-cyan-900 ring-1 ring-inset ring-cyan-200">{memberInitials(member.name)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block break-words text-xs font-bold">{member.name}</span>
+                {member.email ? <span className="mt-0.5 flex min-w-0 items-center gap-1 break-all text-xs text-muted-foreground"><Mail className="h-3 w-3 shrink-0" />{member.email}</span> : <span className="mt-0.5 block text-xs font-semibold text-amber-700 dark:text-amber-300">Profile not linked — remove and reselect</span>}
+              </span>
+              <Button type="button" variant="ghost" size="icon" className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive" aria-label={`Remove ${member.name} from ${label}`} onClick={() => onChange(value.filter((_, memberIndex) => memberIndex !== index))}><X className="h-4 w-4" /></Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={query}
+          onFocus={() => { setFocused(true); setActiveIndex(0); }}
+          onBlur={() => setFocused(false)}
+          onChange={(event) => { setQuery(event.target.value); setFocused(true); setActiveIndex(0); }}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowDown" && suggestions.length) { event.preventDefault(); setFocused(true); setActiveIndex((index) => Math.min(index + 1, suggestions.length - 1)); }
+            if (event.key === "ArrowUp" && suggestions.length) { event.preventDefault(); setFocused(true); setActiveIndex((index) => Math.max(index - 1, 0)); }
+            if (event.key === "Enter" && suggestions[activeIndex]) { event.preventDefault(); addMember(suggestions[activeIndex]); }
+            if (event.key === "Escape") { setFocused(false); setQuery(""); setActiveIndex(0); }
+          }}
+          role="combobox"
+          aria-label={`Add member to ${label}`}
+          aria-controls={listId}
+          aria-expanded={focused && !loading && suggestions.length > 0}
+          aria-autocomplete="list"
+          aria-activedescendant={focused && suggestions[activeIndex] ? `${listId}-option-${activeIndex}` : undefined}
+          placeholder={loading ? "Loading team members…" : "Search name or email"}
+          disabled={loading || !members.length}
+          className="h-11 pl-9 text-xs"
+        />
+        {focused && !loading && suggestions.length > 0 ? (
+          <div id={listId} role="listbox" aria-label={`Suggested members for ${label}`} className="mt-1 max-h-64 overflow-y-auto rounded-xl border border-border bg-popover p-1 shadow-[0_2px_5px_rgba(15,23,42,.08),0_20px_42px_-24px_rgba(15,23,42,.4)]">
+            {suggestions.map((member, index) => (
+              <button key={member.email} id={`${listId}-option-${index}`} type="button" role="option" aria-selected={activeIndex === index} onMouseEnter={() => setActiveIndex(index)} onMouseDown={(event) => event.preventDefault()} onClick={() => addMember(member)} className={`flex min-h-12 w-full items-center gap-2 rounded-lg px-2 py-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${activeIndex === index ? "bg-muted" : "hover:bg-muted"}`}>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-xs font-black text-primary">{memberInitials(member.name)}</span>
+                <span className="min-w-0"><span className="block truncate text-xs font-bold">{member.name}</span><span className="block truncate text-xs text-muted-foreground">{member.email}</span></span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {focused && !loading && normalizedQuery && !suggestions.length ? <p className="mt-1 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">No unselected team member matches “{query.trim()}”.</p> : null}
+      </div>
     </div>
   );
 }

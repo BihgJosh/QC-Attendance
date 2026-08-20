@@ -12,7 +12,12 @@ export interface Announcement {
 export interface PostingRow {
   id: string;
   label: string;
-  assignments: string[][];
+  assignments: PostingMember[][];
+}
+
+export interface PostingMember {
+  name: string;
+  email: string;
 }
 
 export interface Posting {
@@ -36,6 +41,10 @@ export interface HomepageContent {
   updatedAt?: string;
 }
 
+export function postingMemberKey(member: Pick<PostingMember, "name" | "email">) {
+  return member.email.trim().toLowerCase() || member.name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 const sundayRows = ["1st Service", "2nd Service", "3rd Service", "4th Service"];
 const thursdayRows = ["Thursday Service"];
 
@@ -55,26 +64,26 @@ function createPosting(day: ServiceDay, baseId: string, name: string, role: stri
   };
 }
 
-function createDayPostings(day: ServiceDay): Posting[] {
+export function createBlankDayPostings(day: ServiceDay): Posting[] {
   const rows = day === "Sunday" ? sundayRows : thursdayRows;
   return [
-    createPosting(day, "main-auditorium", "Main auditorium", "Order & service flow", ["Team"], rows),
-    createPosting(day, "overflow", "Overflow", "Flow & support", ["Row 1", "Row 2", "Row 3", "Row 4"], rows),
+    createPosting(day, "service-managers", "Service managers", "Service leadership & coordination", ["Manager"], day === "Sunday" ? ["1st & 2nd", "3rd & 4th"] : rows),
     createPosting(day, "children-section", "Children section", "Safety & order", ["Entrance", "Exit"], rows),
+    createPosting(day, "overflow", "Overflow tent", "Flow & support", ["Row 1", "Row 2", "Row 3", "Row 4"], rows),
     createPosting(day, "outside", "Outside", "Exterior flow & access", ["Position 1", "Position 2", "Position 3"], rows),
     createPosting(day, "observation", "Observation", "Quality monitoring", ["Observer"], rows),
-    createPosting(day, "timers", "Timers", "Service timing & coordination", ["Timer"], day === "Sunday" ? ["1st & 2nd", "3rd & 4th"] : rows),
+    createPosting(day, "timers", "QC timer", "Service timing & coordination", ["Timer"], day === "Sunday" ? ["1st & 2nd", "3rd & 4th"] : rows),
   ];
 }
 
 export const DEFAULT_HOMEPAGE_CONTENT: HomepageContent = {
-  version: 5,
+  version: 6,
   announcements: [
     { id: "briefing", date: "This Sunday", title: "Pre-service briefing", copy: "All QC members are expected at the main auditorium 45 minutes before the first service.", accent: "primary" },
     { id: "assigned-post", date: "Unit notice", title: "Stay at your assigned post", copy: "Confirm your post with your team lead before service and remain available until handover.", accent: "accent" },
     { id: "excellence", date: "Reminder", title: "Excellence in every detail", copy: "Arrive prepared, dress correctly and escalate every concern through the proper channel.", accent: "success" },
   ],
-  postings: [...createDayPostings("Sunday"), ...createDayPostings("Thursday")],
+  postings: [...createBlankDayPostings("Sunday"), ...createBlankDayPostings("Thursday")],
   uniformItems: ["Crisp white long-sleeve shirt", "Black tailored trousers", "Plain black covered shoes", "QC identification tag"],
   uniformNote: "Team leads may communicate special uniform instructions for specific services.",
   uniformImageUrl: "",
@@ -84,9 +93,27 @@ function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
-function cleanNames(value: unknown): string[] {
+function cleanEmail(value: unknown) {
+  if (!isString(value)) return "";
+  const email = value.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email.slice(0, 254) : "";
+}
+
+export function parsePostingMember(value: unknown): PostingMember | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const member = value as Partial<PostingMember>;
+    const email = cleanEmail(member.email);
+    const name = isString(member.name) ? member.name.trim().replace(/\s+/g, " ").slice(0, 100) : "";
+    return name || email ? { name: name || email, email } : null;
+  }
+  if (!isString(value)) return null;
+  const name = value.trim().replace(/\s+/g, " ").slice(0, 100);
+  return name ? { name, email: "" } : null;
+}
+
+function cleanMembers(value: unknown): PostingMember[] {
   return Array.isArray(value)
-    ? value.filter(isString).map((name) => name.trim().slice(0, 100)).filter(Boolean).slice(0, 20)
+    ? value.map(parsePostingMember).filter((member): member is PostingMember => Boolean(member)).slice(0, 20)
     : [];
 }
 
@@ -119,7 +146,7 @@ function cleanMatrixPostings(items: unknown[], fallbackDay: ServiceDay, prefixId
           return [{
             id: isString(row.id) ? `${id}-row-${rowIndex + 1}` : `${id}-row-${rowIndex + 1}`,
             label: row.label.trim().slice(0, 60),
-            assignments: columns.map((_, columnIndex) => cleanNames(rawAssignments[columnIndex])),
+            assignments: columns.map((_, columnIndex) => cleanMembers(rawAssignments[columnIndex])),
           }];
         })
       : [];
@@ -137,20 +164,20 @@ function cleanMatrixPostings(items: unknown[], fallbackDay: ServiceDay, prefixId
 function migrateLegacyPostings(candidate: Partial<HomepageContent>): Posting[] {
   const legacy = Array.isArray(candidate.postings) ? candidate.postings as unknown as Array<Record<string, unknown>> : [];
   const aliases: Record<string, string[]> = {
-    "main-auditorium": ["main-auditorium", "auditorium"], overflow: ["overflow"], outside: ["outside", "main-entrance"],
+    "service-managers": ["service-managers", "main-auditorium", "auditorium"], overflow: ["overflow"], outside: ["outside", "main-entrance"],
     "children-section": ["children-section"], observation: ["observation"], timers: ["timers"],
   };
-  const sunday = createDayPostings("Sunday").map((template) => {
+  const sunday = createBlankDayPostings("Sunday").map((template) => {
     const baseId = template.id.replace("sunday-", "");
     const oldPosting = legacy.find((posting) => aliases[baseId]?.includes(String(posting.id)));
-    const oldNames = cleanNames(oldPosting?.members).filter((name) => name.toLowerCase() !== "awaiting assignment");
+    const oldNames = cleanMembers(oldPosting?.members).filter((member) => member.name.toLowerCase() !== "awaiting assignment");
     if (!oldNames.length) return template;
     return {
       ...template,
       rows: template.rows.map((row, rowIndex) => ({ ...row, assignments: row.assignments.map((names, columnIndex) => rowIndex === 0 && columnIndex === 0 ? oldNames : names) })),
     };
   });
-  return [...sunday, ...createDayPostings("Thursday")];
+  return [...sunday, ...createBlankDayPostings("Thursday")];
 }
 
 export function normalizeHomepageContent(value: unknown): HomepageContent {
@@ -173,10 +200,10 @@ export function normalizeHomepageContent(value: unknown): HomepageContent {
     : [];
 
   let postings: Posting[];
-  if (Array.isArray(candidate.postings) && (candidate.version === 4 || candidate.version === 5)) {
+  if (Array.isArray(candidate.postings) && (candidate.version === 4 || candidate.version === 5 || candidate.version === 6)) {
     postings = cleanMatrixPostings(candidate.postings, "Sunday", false);
   } else if (Array.isArray(candidate.postings) && candidate.version === 3) {
-    postings = [...cleanMatrixPostings(candidate.postings, "Sunday", true), ...createDayPostings("Thursday")];
+    postings = [...cleanMatrixPostings(candidate.postings, "Sunday", true), ...createBlankDayPostings("Thursday")];
   } else {
     postings = migrateLegacyPostings(candidate);
   }
@@ -186,7 +213,7 @@ export function normalizeHomepageContent(value: unknown): HomepageContent {
     : [];
 
   return {
-    version: 5,
+    version: 6,
     announcements: Array.isArray(candidate.announcements) ? announcements : DEFAULT_HOMEPAGE_CONTENT.announcements,
     postings: Array.isArray(candidate.postings) ? postings : DEFAULT_HOMEPAGE_CONTENT.postings,
     uniformItems: Array.isArray(candidate.uniformItems) ? uniformItems : DEFAULT_HOMEPAGE_CONTENT.uniformItems,

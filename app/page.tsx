@@ -27,9 +27,11 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MemberLogoutButton } from "@/components/member/logout-button";
 import { EmergencyAlertLoader } from "@/components/emergency-alert-loader";
+import { PostingBoard } from "@/components/public/posting-board";
 import { formatAbujaDateLong, formatAbujaTimeWithSeconds } from "@/lib/timezone";
 import { DEFAULT_HOMEPAGE_CONTENT, SERVICE_DAYS, type HomepageContent, type ServiceDay } from "@/lib/homepage-content";
 import type { BirthdayNoticeEntry } from "@/lib/birthday-types";
+import type { MemberIdentity } from "@/lib/member-store";
 
 const navigation = [
   { label: "Home", href: "#home" },
@@ -53,6 +55,8 @@ export default function HomePage() {
   const [content, setContent] = useState<HomepageContent>(DEFAULT_HOMEPAGE_CONTENT);
   const [postingDay, setPostingDay] = useState<ServiceDay>("Sunday");
   const [birthdays, setBirthdays] = useState<BirthdayNoticeEntry[]>([]);
+  const [postingIdentities, setPostingIdentities] = useState<Record<string, MemberIdentity>>({});
+  const [postingIdentitiesLoading, setPostingIdentitiesLoading] = useState(true);
 
   useEffect(() => {
     const updateTime = () => {
@@ -79,9 +83,21 @@ export default function HomePage() {
       }
     };
 
+    const fetchPostingIdentities = async () => {
+      try {
+        const response = await fetch("/api/posting-identities", { cache: "no-store" });
+        if (response.ok) setPostingIdentities((await response.json()).identities || {});
+      } catch {
+        // The posting board keeps its initials and legacy names when profiles are temporarily unavailable.
+      } finally {
+        setPostingIdentitiesLoading(false);
+      }
+    };
+
     updateTime();
     fetchContent();
     fetchBirthdays();
+    fetchPostingIdentities();
     const clockInterval = setInterval(updateTime, 1000);
 
     return () => {
@@ -228,7 +244,7 @@ export default function HomePage() {
                 Standard
               </div>
             </div>
-            <div className="absolute -bottom-5 left-7 right-7 flex rotate-[-2deg] items-center justify-between rounded-xl bg-cyan-300 px-5 py-3 text-slate-950 shadow-xl">
+            <div className="absolute -bottom-5 left-7 right-7 flex rotate-[-2deg] items-center justify-between rounded-xl bg-cyan-300 px-5 py-3 text-cyan-950 shadow-xl">
               <span className="text-xs font-black uppercase tracking-[0.18em]">Excellence is a habit</span>
               <span className="text-xs font-semibold">QC / SOJ</span>
             </div>
@@ -268,59 +284,20 @@ export default function HomePage() {
             <div className="absolute right-0 top-0 h-80 w-80 translate-x-1/3 -translate-y-1/3 rounded-full bg-primary/30 blur-3xl" />
             <div className="relative flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Current posting</p>
                 <h2 className="mt-5 max-w-3xl text-4xl font-bold tracking-[-0.045em] sm:text-5xl">Every member. Every post. One clear view.</h2>
-                <p className="mt-4 max-w-2xl text-sm leading-6 text-white/55">All published assignments are shown below—no opening cards or scrolling inside the board.</p>
+                <p className="mt-4 max-w-2xl text-sm leading-6 text-white/60">Choose a service, then open its dropdown to see every location, role and member profile at a glance.</p>
               </div>
               <div className="flex min-w-64 items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.07] p-3">
                 <div>
                   <label htmlFor="public-posting-day" className="text-[9px] font-bold uppercase tracking-[0.16em] text-cyan-200">Service day</label>
                   <p className="text-xs text-white/50">Choose a schedule</p>
                 </div>
-                <select id="public-posting-day" value={postingDay} onChange={(event) => setPostingDay(event.target.value as ServiceDay)} className="h-10 min-w-32 rounded-xl border border-white/15 bg-slate-900 px-3 text-sm font-semibold text-white outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/20">
+                <select id="public-posting-day" value={postingDay} onChange={(event) => setPostingDay(event.target.value as ServiceDay)} className="h-11 min-w-32 rounded-xl border border-white/15 bg-slate-900 px-3 text-sm font-semibold text-white outline-none focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/20">
                   {SERVICE_DAYS.map((day) => <option key={day} value={day}>{day}</option>)}
                 </select>
               </div>
             </div>
-            <div className="relative mt-8 grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {content.postings.filter((posting) => posting.day === postingDay).map((posting, index) => {
-                const assignedRows = posting.rows.filter((row) => row.assignments.some((names) => names.length > 0));
-                return (
-                  <article key={posting.id} className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06]">
-                    <div className="flex items-center gap-4 border-b border-white/10 p-4">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cyan-300 text-xs font-black text-slate-950">{index + 1}</span>
-                      <div className="min-w-0"><h3 className="font-semibold">{posting.name}</h3></div>
-                    </div>
-                    <div className="p-4">
-                      <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-200">Members posted here</p>
-                      {assignedRows.length ? (
-                        <div className="space-y-3">
-                          {assignedRows.map((row) => (
-                            <div key={row.id} className="rounded-xl bg-white/[0.05] p-3">
-                              <p className="mb-2 text-xs font-bold text-white">{row.label}</p>
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                {posting.columns.map((column, columnIndex) => {
-                                  const names = row.assignments[columnIndex] || [];
-                                  if (!names.length) return null;
-                                  return (
-                                    <div key={`${row.id}-${column}`}>
-                                      <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-cyan-200/70">{column}</p>
-                                      <ul className="mt-1.5 space-y-1.5">
-                                        {names.map((member, memberIndex) => <li key={`${member}-${memberIndex}`} className="flex items-start gap-2 text-xs text-white/80"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />{member}</li>)}
-                                      </ul>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : <p className="rounded-xl bg-white/[0.04] p-3 text-xs text-white/50">No members have been assigned yet.</p>}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+            <PostingBoard postings={content.postings.filter((posting) => posting.day === postingDay)} day={postingDay} identities={postingIdentities} identitiesLoading={postingIdentitiesLoading} />
             <p className="relative mt-6 text-xs leading-5 text-white/50">Posting assignments are confirmed by team leads during the pre-service briefing.</p>
           </div>
 
