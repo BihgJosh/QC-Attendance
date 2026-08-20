@@ -1,7 +1,6 @@
 alter table public.member_profiles
 add column if not exists profile_completed_at timestamptz;
 
--- Preserve completion for members who saved their personal details before this flag existed.
 update public.member_profiles
 set profile_completed_at = updated_at
 where profile_completed_at is null

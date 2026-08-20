@@ -1,3 +1,5 @@
+-- Replaces the pending reporter-identity migration that accidentally shared
+-- version 202608180001 with the profile-completion migration.
 alter table public.service_timer_logs
   add column if not exists reporter_email text;
 
@@ -16,6 +18,9 @@ create index if not exists service_observer_reports_reporter_email_idx
 create index if not exists service_emergency_flags_reporter_email_idx
   on public.service_emergency_flags (lower(reporter_email));
 
-comment on column public.service_timer_logs.reporter_email is 'Authenticated member email used to resolve reporter identity.';
-comment on column public.service_observer_reports.reporter_email is 'Authenticated member email used to resolve reporter identity.';
-comment on column public.service_emergency_flags.reporter_email is 'Authenticated member email used to resolve reporter identity.';
+comment on column public.service_timer_logs.reporter_email is
+  'Authenticated member email used to resolve reporter identity.';
+comment on column public.service_observer_reports.reporter_email is
+  'Authenticated member email used to resolve reporter identity.';
+comment on column public.service_emergency_flags.reporter_email is
+  'Authenticated member email used to resolve reporter identity.';
