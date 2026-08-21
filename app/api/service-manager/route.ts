@@ -14,8 +14,9 @@ import { callServiceReportGateway } from "@/lib/service-report-store";
 import { readMemberSession } from "@/lib/member-auth";
 import { resolveUserAccess } from "@/lib/member-store";
 import { attachDashboardIdentities } from "@/lib/report-identities";
+import { isValidServiceReportName, STANDARD_SERVICE_REPORTS } from "@/lib/service-report-services";
 
-const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
+const SERVICES = new Set<string>(STANDARD_SERVICE_REPORTS);
 const ACTIONS = new Set(["checkPassword", "getDashboard", "getEmergencies", "updateEmergency", "generateReport", "generateHeadcount", "sendEmail"]);
 
 function abujaToday() {
@@ -138,7 +139,7 @@ export async function POST(request: Request) {
     if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     const isAllServicesHeadcount = action === "generateHeadcount" && service === "All services";
     const isEmergencyAction = action === "getEmergencies" || action === "updateEmergency";
-    if (action !== "checkPassword" && (!isIsoCalendarDate(date) || (!isEmergencyAction && !SERVICES.has(service) && !isAllServicesHeadcount))) {
+    if (action !== "checkPassword" && (!isIsoCalendarDate(date) || (!isEmergencyAction && !isValidServiceReportName(service) && !isAllServicesHeadcount))) {
       return NextResponse.json({ ok: false, message: "Choose a valid date and service." }, { status: 400 });
     }
 

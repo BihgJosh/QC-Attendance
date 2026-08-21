@@ -4,8 +4,8 @@ import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { resolveUserAccess } from "@/lib/member-store";
 import { appendServicePostReport } from "@/lib/service-post-sheet";
 import { isIsoCalendarDate } from "@/lib/validation";
+import { isValidServiceReportName, namedServiceReport } from "@/lib/service-report-services";
 
-const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const RATINGS = new Set(["Excellent", "Good", "Needs Improvement", "Poor"]);
 const RATING_SCORES: Record<string, number> = { Excellent: 4, Good: 3, "Needs Improvement": 2, Poor: 1 };
 
@@ -44,14 +44,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Choose who this report is for." }, { status: 400 });
     }
 
-    const service = text(body.service, 40);
+    const service = namedServiceReport(text(body.service, 100), text(body.specialServiceName, 80));
     const submissionId = text(body.submissionId, 36);
     const date = text(body.date, 10);
     const area = text(body.area, 160);
     const adultsHeadcount = count(body.adultsHeadcount);
     const childrenHeadcount = count(body.childrenHeadcount);
     const observationFields = ["preparedness", "neatness", "orderliness", "conduct", "compliance", "coordination"] as const;
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId) || !isIsoCalendarDate(date) || !SERVICES.has(service) || !area || adultsHeadcount === null || childrenHeadcount === null) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId) || !isIsoCalendarDate(date) || !isValidServiceReportName(service) || !area || adultsHeadcount === null || childrenHeadcount === null) {
       return NextResponse.json({ ok: false, message: "Complete the date, service, area and headcounts correctly." }, { status: 400 });
     }
     const selectedRatings = observationFields.map((field) => text(body[field], 30)).filter(Boolean);

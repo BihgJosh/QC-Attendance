@@ -7,8 +7,8 @@ import {
   type TimerSegment,
 } from "@/lib/service-timer-sheet";
 import { isClockTime, isIsoCalendarDate } from "@/lib/validation";
+import { isValidServiceReportName, namedServiceReport } from "@/lib/service-report-services";
 
-const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const STATUSES = new Set(["", "On Time", "Overshot", "Finished Early"]);
 
 function text(value: unknown, max = 2_000) {
@@ -41,10 +41,10 @@ export async function POST(request: Request) {
 
     const date = text(body.date, 10);
     const submissionId = text(body.submissionId, 36);
-    const service = text(body.service, 40);
+    const service = namedServiceReport(text(body.service, 100), text(body.specialServiceName, 80));
     const serviceStart = text(body.serviceStart, 5);
     const serviceEnd = text(body.serviceEnd, 5);
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId) || !isIsoCalendarDate(date) || !SERVICES.has(service)) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId) || !isIsoCalendarDate(date) || !isValidServiceReportName(service)) {
       return NextResponse.json({ ok: false, message: "Complete the date and service correctly." }, { status: 400 });
     }
     if ((serviceStart && !isClockTime(serviceStart)) || (serviceEnd && !isClockTime(serviceEnd))) {

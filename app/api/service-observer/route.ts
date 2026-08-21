@@ -7,8 +7,8 @@ import {
 } from "@/lib/service-observer-sheet";
 import { isIsoCalendarDate } from "@/lib/validation";
 import { randomUUID } from "crypto";
+import { isValidServiceReportName, namedServiceReport } from "@/lib/service-report-services";
 
-const SERVICES = new Set(["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"]);
 const UNITS = new Set<string>(SERVICE_OBSERVER_UNITS);
 const REPORTER_ROLES = new Set(["Service Observer", "QC member"]);
 const REPORTING_LOCATIONS = new Set(["Outside", "Emporium", "Toilet", "Children Section", "Vendors", "Overflow", "Main Auditorium"]);
@@ -31,8 +31,8 @@ export async function POST(request: Request) {
     if (!body) return NextResponse.json({ ok: false, message: "Invalid observer report." }, { status: 400 });
 
     const date = text(body.date, 10);
-    const service = text(body.service, 40);
-    if (!isIsoCalendarDate(date) || !SERVICES.has(service)) {
+    const service = namedServiceReport(text(body.service, 100), text(body.specialServiceName, 80));
+    if (!isIsoCalendarDate(date) || !isValidServiceReportName(service)) {
       return NextResponse.json({ ok: false, message: "Complete the date and service correctly." }, { status: 400 });
     }
     const rawUnits = Array.isArray(body.unitsReported) ? body.unitsReported : [];
