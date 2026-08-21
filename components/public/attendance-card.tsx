@@ -10,6 +10,7 @@ import { CustomSelect } from "@/components/ui/custom-select";
 import { toast } from "sonner";
 import { formatAbujaTime } from "@/lib/timezone";
 import { getDeviceId } from "@/lib/device-id";
+import { SPECIAL_SERVICE_PREFIX } from "@/types";
 import {
   Loader2, MapPin, User, CheckCircle2, Sparkles,
   Satellite, Navigation, AlertCircle, Check, Church, Shield,
@@ -36,6 +37,7 @@ const GPS_PHASES: GpsPhase[] = [
 export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
   const [name, setName] = useState(memberName);
   const [service, setService] = useState<ServiceType>("Sunday");
+  const [specialServiceName, setSpecialServiceName] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [successData, setSuccessData] = useState<{ name: string; time: string } | null>(null);
@@ -186,7 +188,9 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
 
         try {
           const body: Record<string, any> = {
-            name, service, latitude, longitude, browser, device, deviceId,
+            name,
+            service: service === "Other" ? `${SPECIAL_SERVICE_PREFIX}${specialServiceName.trim().replace(/\s+/g, " ")}` : service,
+            latitude, longitude, browser, device, deviceId,
           };
           if (adminPw) body.adminPassword = adminPw;
 
@@ -249,6 +253,13 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
     if (nameError) {
       toast.error("Name not found in the whitelist.", {
         description: "Check your spelling or try a different combination of your names.",
+      });
+      return;
+    }
+
+    if (service === "Other" && specialServiceName.trim().length < 2) {
+      toast.error("Enter the special service name.", {
+        description: "For example: Convention, Wedding, Conference or Special Programme.",
       });
       return;
     }
@@ -383,12 +394,33 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
                     { value: "Other", label: "Other Service" },
                   ]}
                   value={service}
-                  onChange={(v) => setService(v as ServiceType)}
+                  onChange={(v) => {
+                    setService(v as ServiceType);
+                    if (v !== "Other") setSpecialServiceName("");
+                  }}
                   placeholder="Select service"
                   icon={<Church className="w-4 h-4" />}
                   disabled={loading || !isOpen}
                 />
               </div>
+
+              {service === "Other" && (
+                <div className="space-y-2">
+                  <Label htmlFor="specialServiceName" className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Special service name
+                  </Label>
+                  <Input
+                    id="specialServiceName"
+                    value={specialServiceName}
+                    onChange={(event) => setSpecialServiceName(event.target.value)}
+                    maxLength={80}
+                    placeholder="e.g. Convention or Wedding Service"
+                    required
+                    disabled={loading || !isOpen}
+                  />
+                  <p className="text-xs text-muted-foreground">This name will identify the service in both attendance reports.</p>
+                </div>
+              )}
 
               {/* Name field with autocomplete */}
               <div className="space-y-2 relative">

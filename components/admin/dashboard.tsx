@@ -232,8 +232,9 @@ export function Dashboard() {
 
   /* Service filter */
   if (serviceFilter !== "All") {
-    approved = approved.filter((r) => r.service === serviceFilter);
-    rejected = rejected.filter((r) => r.service === serviceFilter);
+    const matchesService = (value: string) => serviceFilter === "Other" ? value === "Other" || value.startsWith("Other — ") : value === serviceFilter;
+    approved = approved.filter((r) => matchesService(r.service));
+    rejected = rejected.filter((r) => matchesService(r.service));
   }
 
   approved = invalidDateRange ? [] : filterByDate(approved);

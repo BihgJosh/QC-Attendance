@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     };
     validateAuditFilters(filters);
     const matrix = await buildAttendanceAudit(filters);
-    const sheet = await writeAttendanceAudit(matrix);
+    const sheet = await writeAttendanceAudit(matrix, filters);
     return NextResponse.json({ ...sheet, memberCount: matrix.members.length, serviceCount: matrix.columns.length, approvedCount: matrix.approvedCount });
   } catch (error) {
     console.error("[attendance-audit] generation failed", error);

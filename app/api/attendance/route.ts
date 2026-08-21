@@ -4,7 +4,7 @@ import { calculateDistance } from "@/lib/geofencing";
 import { getAttendanceEnvConfig } from "@/lib/env";
 import { formatAbujaTime, formatAbujaDate } from "@/lib/timezone";
 import { isValidAdminPassword } from "@/lib/auth";
-import { ALLOWED_SERVICES, type AttendanceRecord } from "@/types";
+import { isAllowedAttendanceService, type AttendanceRecord } from "@/types";
 import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 
@@ -26,7 +26,8 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json({ error: "Invalid or missing attendance fields." }, { status: 400 });
     }
-    if (!ALLOWED_SERVICES.includes(service as (typeof ALLOWED_SERVICES)[number])) {
+    const normalizedService = service.trim().replace(/\s+/g, " ");
+    if (!isAllowedAttendanceService(normalizedService)) {
       return NextResponse.json({ error: "Invalid service type." }, { status: 400 });
     }
     if (browser !== undefined && !boundedString(browser, 1, 80)) {
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
     const now = new Date();
     const record: AttendanceRecord = {
       date: formatAbujaDate(now),
-      service,
+      service: normalizedService,
       memberName: name,
       time: formatAbujaTime(now),
       latitude: latitude.toString(),

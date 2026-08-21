@@ -4,6 +4,7 @@ import { google, sheets_v4 } from "googleapis";
 import { getAttendanceRecords, getWhitelist } from "@/lib/attendance-store";
 import { getGoogleEnv } from "@/lib/env";
 import type { AttendanceRecord } from "@/types";
+import { isSpecialAttendanceService } from "@/types";
 
 const AUDIT_SHEET_TITLE = "Attendance Audit";
 const MAX_SERVICE_COLUMNS = 200;
@@ -67,7 +68,11 @@ function recordIsInRange(record: AttendanceRecord, filters: AuditFilters) {
   if (!date) return false;
   if (filters.from && date < filters.from) return false;
   if (filters.to && date > filters.to) return false;
-  if (filters.service && filters.service !== "All" && record.service !== filters.service) return false;
+  if (filters.service && filters.service !== "All") {
+    if (filters.service === "Other") {
+      if (!isSpecialAttendanceService(record.service)) return false;
+    } else if (record.service !== filters.service) return false;
+  }
   return true;
 }
 
@@ -118,25 +123,33 @@ function sheetClient() {
   return { spreadsheetId: env.sheetId, sheets: google.sheets({ version: "v4", auth }) };
 }
 
-async function ensureAuditSheet(sheets: sheets_v4.Sheets, spreadsheetId: string) {
+async function ensureAuditSheet(sheets: sheets_v4.Sheets, spreadsheetId: string, sheetTitle: string) {
   const metadata = await sheets.spreadsheets.get({ spreadsheetId, fields: "sheets.properties(sheetId,title)" });
-  const existing = metadata.data.sheets?.find((sheet) => sheet.properties?.title === AUDIT_SHEET_TITLE)?.properties?.sheetId;
+  const existing = metadata.data.sheets?.find((sheet) => sheet.properties?.title === sheetTitle)?.properties?.sheetId;
   if (existing !== undefined && existing !== null) return existing;
-  const created = await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [{ addSheet: { properties: { title: AUDIT_SHEET_TITLE, gridProperties: { frozenRowCount: 3, frozenColumnCount: 1 } } } }] } });
+  const created = await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [{ addSheet: { properties: { title: sheetTitle, gridProperties: { frozenRowCount: 3, frozenColumnCount: 1 } } } }] } });
   const sheetId = created.data.replies?.[0]?.addSheet?.properties?.sheetId;
   if (sheetId === undefined || sheetId === null) throw new Error("The audit sheet could not be created.");
   return sheetId;
 }
 
-export async function writeAttendanceAudit(matrix: AttendanceAuditMatrix) {
+function auditSheetTitle(matrix: AttendanceAuditMatrix, filters: AuditFilters) {
+  if (filters.service !== "Other" || matrix.columns.length === 0) return AUDIT_SHEET_TITLE;
+  const dates = [...new Set(matrix.columns.map((column) => column.date))].sort();
+  if (dates.length === 1) return `Special Service - ${formatDate(dates[0]).replace(/,/g, "")}`.slice(0, 100);
+  return `Special Services - ${dates[0]} to ${dates.at(-1)}`.slice(0, 100);
+}
+
+export async function writeAttendanceAudit(matrix: AttendanceAuditMatrix, filters: AuditFilters = {}) {
   const { spreadsheetId, sheets } = sheetClient();
-  const sheetId = await ensureAuditSheet(sheets, spreadsheetId);
+  const sheetTitle = auditSheetTitle(matrix, filters);
+  const sheetId = await ensureAuditSheet(sheets, spreadsheetId, sheetTitle);
   const columnCount = Math.max(1, matrix.columns.length + 1);
   const rowCount = Math.max(4, matrix.rows.length + 3);
-  const title = `'${AUDIT_SHEET_TITLE.replace(/'/g, "''")}'`;
+  const title = `'${sheetTitle.replace(/'/g, "''")}'`;
   const generated = new Intl.DateTimeFormat("en-NG", { timeZone: "Africa/Lagos", dateStyle: "medium", timeStyle: "short" }).format(new Date(matrix.generatedAt));
   const values = [
-    [`Attendance Audit · Generated ${generated}`, ...matrix.columns.map(() => "")],
+    [`${sheetTitle} · Generated ${generated}`, ...matrix.columns.map(() => "")],
     ["Member name", ...matrix.columns.map((column) => column.label)],
     ["Service", ...matrix.columns.map((column) => column.service)],
     ...matrix.rows.map((row) => [row.memberName, ...row.times]),
@@ -158,5 +171,5 @@ export async function writeAttendanceAudit(matrix: AttendanceAuditMatrix) {
     { updateDimensionProperties: { range: { sheetId, dimension: "COLUMNS", startIndex: 1, endIndex: columnCount }, properties: { pixelSize: 125 }, fields: "pixelSize" } },
     { updateDimensionProperties: { range: { sheetId, dimension: "ROWS", startIndex: 0, endIndex: 3 }, properties: { pixelSize: 34 }, fields: "pixelSize" } },
   ] } });
-  return { url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}`, sheetId };
+  return { url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}`, sheetId, title: sheetTitle };
 }

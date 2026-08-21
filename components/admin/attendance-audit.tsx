@@ -64,7 +64,7 @@ export function AttendanceAudit() {
       const url = new URL(String(data.url));
       if (url.protocol !== "https:" || url.hostname !== "docs.google.com") throw new Error("The sheet link returned by the server was invalid.");
       setSheetUrl(url.toString());
-      toast.success(`Attendance Audit updated for ${data.memberCount} members across ${data.serviceCount} services.`);
+      toast.success(`${data.title || "Attendance Audit"} updated for ${data.memberCount} members across ${data.serviceCount} services.`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "The audit sheet could not be generated.");
     } finally {
@@ -98,7 +98,7 @@ export function AttendanceAudit() {
         </CardContent>
       </Card>
 
-      {sheetUrl && <div role="status" className="flex flex-col gap-3 rounded-2xl border border-emerald-300/40 bg-emerald-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="font-medium text-emerald-800 dark:text-emerald-200">The Attendance Audit tab is updated and ready.</span><a href={sheetUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"><ExternalLink className="h-4 w-4" />Open Google Sheet</a></div>}
+      {sheetUrl && <div role="status" className="flex flex-col gap-3 rounded-2xl border border-emerald-300/40 bg-emerald-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="font-medium text-emerald-800 dark:text-emerald-200">The dated attendance report tab is updated and ready.</span><a href={sheetUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"><ExternalLink className="h-4 w-4" />Open Google Sheet</a></div>}
 
       <Card variant="glass" className="overflow-hidden">
         <CardHeader className="border-b border-border/60">

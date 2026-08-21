@@ -35,3 +35,15 @@ export interface AttendanceRequest {
 }
 
 export const ALLOWED_SERVICES = ["Sunday", "Thursday", "Other"] as const;
+export const SPECIAL_SERVICE_PREFIX = "Other — ";
+
+export function isAllowedAttendanceService(service: string) {
+  if (ALLOWED_SERVICES.includes(service as (typeof ALLOWED_SERVICES)[number])) return true;
+  if (!service.startsWith(SPECIAL_SERVICE_PREFIX)) return false;
+  const name = service.slice(SPECIAL_SERVICE_PREFIX.length).trim();
+  return name.length >= 2 && name.length <= 80 && !/[\u0000-\u001f\u007f]/.test(name);
+}
+
+export function isSpecialAttendanceService(service: string) {
+  return service === "Other" || service.startsWith(SPECIAL_SERVICE_PREFIX);
+}
