@@ -35,7 +35,7 @@ type DashboardData = {
   ratings?: Record<string, string | number>;
   postReporters?: PostReporter[];
   timer?: { timerName?: string; reporterEmail?: string; identity?: MemberIdentity; serviceStart?: string; serviceEnd?: string; segments?: TimerSegment[]; generalObservation?: string } | null;
-  observer?: { observerName?: string; reporterEmail?: string; identity?: MemberIdentity; generalObservations?: string; unitReports?: Record<string, string>; recommendations?: string; conclusion?: string; reporterRole?: string; postedLocation?: string; reportingLocation?: string } | null;
+  observer?: { observerName?: string; reporterEmail?: string; identity?: MemberIdentity; generalObservations?: string; unitReports?: Record<string, string>; recommendations?: string; conclusion?: string; reporterRole?: string; postedLocation?: string; reportingLocation?: string; locationsReported?: string[]; locationObservations?: Record<string, string> } | null;
 };
 
 type ServiceResult = { service: ServiceName; data: DashboardData | null; message?: string };
@@ -135,6 +135,8 @@ function normalizeDashboardData(value: unknown): DashboardData | null {
     observer: observer ? {
       observerName: textValue(observer.observerName), reporterEmail: textValue(observer.reporterEmail), identity: identityValue(observer.identity), generalObservations: textValue(observer.generalObservations), recommendations: textValue(observer.recommendations), conclusion: textValue(observer.conclusion), reporterRole: textValue(observer.reporterRole), postedLocation: textValue(observer.postedLocation), reportingLocation: textValue(observer.reportingLocation),
       unitReports: unitReports ? Object.fromEntries(Object.entries(unitReports).map(([key, text]) => [key, textValue(text) || "Not provided"])) : {},
+      locationsReported: Array.isArray(observer.locationsReported) ? observer.locationsReported.flatMap((location) => { const value = textValue(location); return value ? [value] : []; }) : [],
+      locationObservations: recordValue(observer.locationObservations) ? Object.fromEntries(Object.entries(recordValue(observer.locationObservations)!).map(([key, text]) => [key, textValue(text) || "Not provided"])) : {},
     } : null,
   };
 }
@@ -421,7 +423,7 @@ export function ServiceManagerDashboard() {
         </ReportSection>
 
         <ReportSection title={`Observer report${data.observer?.observerName ? ` · ${data.observer.observerName}` : ""}`} icon={Eye}>
-          {data.observer ? <div className="space-y-3"><MemberIdentityCard identity={data.observer.identity} fallbackName={data.observer.observerName || "Unknown observer"} fallbackEmail={data.observer.reporterEmail} />{(data.observer.reporterRole || data.observer.reportingLocation || data.observer.postedLocation) && <Note title="Reporter details" text={[data.observer.reporterRole && `Who: ${data.observer.reporterRole}`, data.observer.postedLocation && `Posted at: ${data.observer.postedLocation}`, data.observer.reportingLocation && `Reporting location: ${data.observer.reportingLocation}`].filter(Boolean).join("\n")} />}{data.observer.generalObservations && <Note title="General observations" text={data.observer.generalObservations} />}{Object.entries(data.observer.unitReports || {}).map(([unit, text]) => <Note key={unit} title={unit} text={text} />)}{data.observer.recommendations && <Note title="Recommendations" text={data.observer.recommendations} />}{data.observer.conclusion && <Note title="Conclusion" text={data.observer.conclusion} />}</div> : <EmptyReport text="No observer report was submitted." />}
+          {data.observer ? <div className="space-y-3"><MemberIdentityCard identity={data.observer.identity} fallbackName={data.observer.observerName || "Unknown observer"} fallbackEmail={data.observer.reporterEmail} />{(data.observer.reporterRole || data.observer.reportingLocation || data.observer.postedLocation) && <Note title="Reporter details" text={[data.observer.reporterRole && `Who: ${data.observer.reporterRole}`, data.observer.postedLocation && `Posted at: ${data.observer.postedLocation}`, data.observer.reportingLocation && `Reporting locations: ${data.observer.reportingLocation}`].filter(Boolean).join("\n")} />}{Object.entries(data.observer.locationObservations || {}).map(([location, text]) => <Note key={`location-${location}`} title={`Location · ${location}`} text={text} />)}{data.observer.generalObservations && <Note title="General observations" text={data.observer.generalObservations} />}{Object.entries(data.observer.unitReports || {}).map(([unit, text]) => <Note key={unit} title={unit} text={text} />)}{data.observer.recommendations && <Note title="Recommendations" text={data.observer.recommendations} />}{data.observer.conclusion && <Note title="Conclusion" text={data.observer.conclusion} />}</div> : <EmptyReport text="No observer report was submitted." />}
         </ReportSection>
       </div>
     );

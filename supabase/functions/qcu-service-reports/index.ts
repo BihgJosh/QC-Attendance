@@ -95,7 +95,7 @@ async function dashboard(date: string, service: string) {
     });
   }
   const timer = timers[0] ? { timerName: timers[0].timer_name, reporterEmail: timers[0].reporter_email, serviceStart: timers[0].service_start, serviceEnd: timers[0].service_end, segments: timers[0].segments, generalObservation: timers[0].general_observation } : null;
-  const observer = observers[0] ? { observerName: observers[0].observer_name, reporterEmail: observers[0].reporter_email, reporterRole: observers[0].reporter_role, postedLocation: observers[0].posted_location, reportingLocation: observers[0].reporting_location, generalObservations: observers[0].general_observations, unitReports: observers[0].unit_reports, recommendations: observers[0].recommendations, conclusion: observers[0].conclusion } : null;
+  const observer = observers[0] ? { observerName: observers[0].observer_name, reporterEmail: observers[0].reporter_email, reporterRole: observers[0].reporter_role, postedLocation: observers[0].posted_location, reportingLocation: observers[0].reporting_location, locationsReported: observers[0].locations_reported || [], locationObservations: observers[0].location_observations || {}, generalObservations: observers[0].general_observations, unitReports: observers[0].unit_reports, recommendations: observers[0].recommendations, conclusion: observers[0].conclusion } : null;
   const postReporters = [...new Map(posts.map((row) => {
     const name = String(row.submitted_by_name || row.reporter_name || "Unknown reporter");
     const email = String(row.submitted_by_email || row.reporter_email || "").toLowerCase();
