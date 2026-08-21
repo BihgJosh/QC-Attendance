@@ -22,7 +22,7 @@ import { MemberIdentityCard } from "@/components/member/member-identity";
 import type { MemberIdentity } from "@/lib/member-store";
 
 const SERVICES = ["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"] as const;
-type ServiceName = (typeof SERVICES)[number];
+type ServiceName = string;
 
 type HeadcountRow = { department?: string; adults?: number; children?: number; total?: number };
 type Emergency = { id?: string; service?: string; location?: string; description?: string; reportedBy?: string; reporterEmail?: string; submittedAt?: string; status?: string; identity?: MemberIdentity };
@@ -50,6 +50,7 @@ type ManagerResult = {
   includedServices?: string[];
   skippedServices?: string[];
   warning?: string;
+  services?: string[];
 };
 
 function abujaToday() {
@@ -89,6 +90,10 @@ function recordValue(value: unknown): Record<string, unknown> | null {
 
 function textValue(value: unknown) {
   return typeof value === "string" || typeof value === "number" ? String(value) : undefined;
+}
+
+function adjustedHeadcount(value: unknown) {
+  return Math.ceil(numberValue(value) * 1.02);
 }
 
 function identityValue(value: unknown): MemberIdentity | undefined {
@@ -140,6 +145,7 @@ export function ServiceManagerDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [results, setResults] = useState<ServiceResult[]>([]);
+  const [serviceNames, setServiceNames] = useState<string[]>([...SERVICES]);
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [emergenciesLoading, setEmergenciesLoading] = useState(false);
   const [emergencyUpdating, setEmergencyUpdating] = useState<{ id: string; status: "Resolved" | "Escalated" } | null>(null);
@@ -185,8 +191,10 @@ export function ServiceManagerDashboard() {
     setEmergencyMessage(null);
     setSelectedService(null);
     try {
+      const discovered = await managerRequest({ action: "getServices", token: accessToken, date: selectedDate });
+      const names = [...SERVICES, ...(discovered.ok ? discovered.services || [] : [])];
       const [responses] = await Promise.all([
-        Promise.all(SERVICES.map(async (service): Promise<ServiceResult> => {
+        Promise.all(names.map(async (service): Promise<ServiceResult> => {
           try {
             const result = await managerRequest({ action: "getDashboard", token: accessToken, date: selectedDate, service });
             return { service, data: result.ok ? result.data || null : null, message: result.message };
@@ -196,7 +204,10 @@ export function ServiceManagerDashboard() {
         })),
         loadEmergencies(accessToken, selectedDate),
       ]);
-      if (requestId === summaryRequest.current) setResults(responses);
+      if (requestId === summaryRequest.current) {
+        setServiceNames(names);
+        setResults(responses);
+      }
     } catch {
       if (requestId === summaryRequest.current) setError("The service summary could not be loaded. Try again.");
     } finally {
@@ -211,7 +222,7 @@ export function ServiceManagerDashboard() {
       (total, result) => {
         const data = result.data;
         if (!data) return total;
-        total.worshippers += numberValue(data.headcount?.grandTotal);
+        total.worshippers += adjustedHeadcount(data.headcount?.grandTotal);
         total.incidents += numberValue(data.incidentCount);
         total.loaded += 1;
         if (data.timer) total.timerLogs += 1;
@@ -387,7 +398,7 @@ export function ServiceManagerDashboard() {
         {generatedLog?.service === selectedService && <div role="status" className={`mt-5 flex flex-col gap-3 rounded-xl p-4 text-sm font-semibold sm:flex-row sm:items-center sm:justify-between ${generatedLog.warning ? "bg-amber-100 text-amber-950" : "bg-emerald-100 text-emerald-900"}`}><span>{generatedLog.warning ? "Document generated; audit logging will retry separately." : `Document generated successfully for ${selectedService}.`}</span><a href={generatedLog.documentUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 font-black underline underline-offset-4"><FileText className="h-4 w-4" /> Open generated document</a></div>}
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          <Metric label="Worshippers" value={numberValue(data.headcount?.grandTotal)} icon={Users} />
+          <Metric label="Worshippers (+2%)" value={adjustedHeadcount(data.headcount?.grandTotal)} icon={Users} />
           <Metric label="Incidents" value={numberValue(data.incidentCount)} icon={AlertTriangle} />
           <Metric label="Today's emergency flags" value={emergencies.length} icon={ShieldCheck} />
         </div>
@@ -436,19 +447,19 @@ export function ServiceManagerDashboard() {
       {headcountDocument?.scope === "All services" && <HeadcountDocumentNotice document={headcountDocument} />}
 
       <div className="mt-7 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Total worshippers" value={summary.worshippers} icon={Users} prominent />
+        <Metric label="Total worshippers (+2%)" value={summary.worshippers} icon={Users} prominent />
         <Metric label="Incidents" value={summary.incidents} icon={AlertTriangle} />
         <Metric label="Emergency flags" value={summary.emergencies} icon={ShieldCheck} />
-        <Metric label="Reports loaded" value={`${summary.loaded}/${SERVICES.length}`} icon={FileText} />
+        <Metric label="Reports loaded" value={`${summary.loaded}/${serviceNames.length}`} icon={FileText} />
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-full bg-cyan-50 px-3 py-1.5 text-cyan-900 ring-1 ring-inset ring-cyan-200">Timer logs {summary.timerLogs}/{SERVICES.length}</span><span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-900 ring-1 ring-inset ring-violet-200">Observer logs {summary.observerLogs}/{SERVICES.length}</span></div>
+      <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-full bg-cyan-50 px-3 py-1.5 text-cyan-900 ring-1 ring-inset ring-cyan-200">Timer logs {summary.timerLogs}/{serviceNames.length}</span><span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-900 ring-1 ring-inset ring-violet-200">Observer logs {summary.observerLogs}/{serviceNames.length}</span><span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 ring-1 ring-inset ring-slate-200">Headcounts include a 2% adjustment</span></div>
 
       <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} />
 
       {loading ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-cyan-700" /><span className="ml-3 text-sm font-semibold text-slate-600">Compiling every service…</span></div> : (
         <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          {SERVICES.map((service) => {
+          {serviceNames.map((service) => {
             const result = results.find((item) => item.service === service);
             const data = result?.data;
             const coverage = [data?.headcount?.byDepartment?.length, data?.timer, data?.observer].filter(Boolean).length;
@@ -456,7 +467,7 @@ export function ServiceManagerDashboard() {
               <div className="flex items-center justify-between gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-800"><ClipboardList className="h-5 w-5" /></span><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${data ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-slate-100 text-slate-700 ring-slate-300"}`}>{data ? "Available" : "No data"}</span></div>
               <h4 className="mt-5 text-lg font-black tracking-tight text-slate-950">{service}</h4>
               <p className="mt-1 text-xs font-semibold text-slate-600">{date}</p>
-              <div className="mt-5 grid grid-cols-2 gap-2"><MiniMetric label="Worshippers" value={numberValue(data?.headcount?.grandTotal)} /><MiniMetric label="Incidents" value={numberValue(data?.incidentCount)} /><MiniMetric label="Emergency" value={data?.emergencies?.length || 0} /><MiniMetric label="Coverage" value={`${coverage}/3`} /></div>
+              <div className="mt-5 grid grid-cols-2 gap-2"><MiniMetric label="Worshippers +2%" value={adjustedHeadcount(data?.headcount?.grandTotal)} /><MiniMetric label="Incidents" value={numberValue(data?.incidentCount)} /><MiniMetric label="Emergency" value={data?.emergencies?.length || 0} /><MiniMetric label="Coverage" value={`${coverage}/3`} /></div>
               <div className="mt-auto grid gap-2 pt-5">
                 <button type="button" disabled={!data || headcountLoading !== null} onClick={() => generateHeadcount(service)} className="flex min-h-10 items-center justify-center gap-2 rounded-xl bg-violet-100 px-3 text-xs font-black text-violet-950 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
                   {headcountLoading === service ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />} Headcount doc

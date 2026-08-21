@@ -60,7 +60,7 @@ function serviceText(input: HeadcountService) {
   const sections = organized.sections.map((section) => `${section.title}\n${section.rows.map((row) => `${row.label}\nAdult = ${row.adults}  |  Children = ${row.children}`).join("\n\n")}`).join("\n\n");
   const warning = organized.grandTotal > 0 && reported > 0 && reported !== organized.grandTotal ? `\nReconciliation notice: submitted area rows total ${organized.grandTotal}, while the service report records ${reported}. Please verify the source entries.` : "";
   const splitNote = organized.grandTotal === 0 && reported > 0 ? "\nAdult/children breakdown was not submitted for this service." : "";
-  return `${input.service.toUpperCase()}\n\n${sections}\n\nSubtotal — Adult: ${organized.totals.adults}  |  Children: ${organized.totals.children}\nGrand Total = ${displayedGrandTotal}${splitNote}${warning}`;
+  return `${input.service.toUpperCase()}\n\n${sections}\n\nSubtotal — Adult: ${organized.totals.adults}  |  Children: ${organized.totals.children}\nGrand Total (+2%) = ${displayedGrandTotal}${splitNote}${warning}`;
 }
 
 function documentText(date: string, services: HeadcountService[]) {
@@ -68,7 +68,7 @@ function documentText(date: string, services: HeadcountService[]) {
     const organized = organizeHeadcount(Array.isArray(service.headcount.byDepartment) ? service.headcount.byDepartment : []);
     return { adults: sum.adults + organized.totals.adults, children: sum.children + organized.totals.children, grand: sum.grand + adjustedTotal(organized.grandTotal || numberValue(service.headcount.grandTotal)) };
   }, { adults: 0, children: 0, grand: 0 });
-  const summary = services.length > 1 ? `ALL SERVICES COMBINED\nAdults: ${combined.adults}  |  Children: ${combined.children}\nGrand Total = ${combined.grand}\n\n` : "";
+  const summary = services.length > 1 ? `ALL SERVICES COMBINED\nAdults: ${combined.adults}  |  Children: ${combined.children}\nGrand Total (+2%) = ${combined.grand}\n\n` : "";
   return `QC SERVICE HEADCOUNT\nService date: ${date}  ·  Updated: ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n${summary}${services.map(serviceText).join("\n\n────────────────────────────────────────\n\n")}\n`;
 }
 

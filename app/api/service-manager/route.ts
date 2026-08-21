@@ -17,7 +17,7 @@ import { attachDashboardIdentities } from "@/lib/report-identities";
 import { isValidServiceReportName, STANDARD_SERVICE_REPORTS } from "@/lib/service-report-services";
 
 const SERVICES = new Set<string>(STANDARD_SERVICE_REPORTS);
-const ACTIONS = new Set(["checkPassword", "getDashboard", "getEmergencies", "updateEmergency", "generateReport", "generateHeadcount", "sendEmail"]);
+const ACTIONS = new Set(["checkPassword", "getDashboard", "getServices", "getEmergencies", "updateEmergency", "generateReport", "generateHeadcount", "sendEmail"]);
 
 function abujaToday() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -60,6 +60,14 @@ function numberValue(value: unknown) {
 
 async function loadDashboard(date: string, service: string) {
   return callServiceReportGateway<SuiteResult>("manager.dashboard", { date, service });
+}
+
+async function otherServicesForDate(date: string) {
+  const daily = await callServiceReportGateway<{ data?: { posts?: Record<string, unknown>[]; timers?: Record<string, unknown>[]; observers?: Record<string, unknown>[] } }>("manager.daily-report", { date });
+  const rows = [...(daily.data?.posts || []), ...(daily.data?.timers || []), ...(daily.data?.observers || [])];
+  return [...new Set(rows.map((row) => String(row.service || "").trim()).filter(isValidServiceReportName))]
+    .filter((name) => !SERVICES.has(name))
+    .sort((left, right) => left.localeCompare(right, "en-NG", { sensitivity: "base" }));
 }
 
 function reportEmailHtml(input: {
@@ -137,6 +145,11 @@ export async function POST(request: Request) {
     if (!elevated && access.role !== "service_manager") return NextResponse.json({ ok: false, message: "Service Manager access is required." }, { status: 403 });
     if (!elevated && activeAssignments.length === 0) return NextResponse.json({ ok: false, message: "Your schedule does not grant access on this date or the access window has expired." }, { status: 403 });
     if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    if (action === "getServices") {
+      if (!isIsoCalendarDate(date)) return NextResponse.json({ ok: false, message: "Choose a valid report date." }, { status: 400 });
+      const services = await otherServicesForDate(date);
+      return NextResponse.json({ ok: true, services }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    }
     const isAllServicesHeadcount = action === "generateHeadcount" && service === "All services";
     const isEmergencyAction = action === "getEmergencies" || action === "updateEmergency";
     if (action !== "checkPassword" && (!isIsoCalendarDate(date) || (!isEmergencyAction && !isValidServiceReportName(service) && !isAllServicesHeadcount))) {
@@ -175,7 +188,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "generateHeadcount") {
-      const requestedServices = isAllServicesHeadcount ? Array.from(SERVICES) : [service];
+      const requestedServices = isAllServicesHeadcount ? [...SERVICES, ...await otherServicesForDate(date)] : [service];
       const dashboards = await Promise.all(requestedServices.map(async (serviceName) => {
         try {
           return { service: serviceName, result: await loadDashboard(date, serviceName) };
