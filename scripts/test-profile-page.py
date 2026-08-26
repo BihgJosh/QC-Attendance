@@ -51,7 +51,7 @@ def upload_test(browser, mode):
     page.route("**/mock-upload/**", upload_route)
     page.goto(f"{BASE_URL}/test-harness/profile-upload", wait_until="domcontentloaded")
     page.get_by_role("heading", name="Mobile Tester").wait_for()
-    join_year = page.get_by_label("When did you join the church?")
+    join_year = page.get_by_label("When did you join Streams of Joy Abuja?")
     assert join_year.is_visible()
     assert join_year.get_attribute("required") is not None
     assert join_year.get_attribute("type") == "number"
