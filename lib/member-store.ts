@@ -152,6 +152,7 @@ export type MemberProfile = {
   phone: string;
   birthMonth: number | null;
   birthDay: number | null;
+  qcJoinDate: string;
   avatarUrl: string | null;
   role: AppRole;
   profileComplete: boolean;
@@ -165,7 +166,7 @@ export async function getMemberProfile(token: string) {
   return data.profile;
 }
 
-export function updateMemberProfile(token: string, input: Pick<MemberProfile, "firstName" | "middleName" | "lastName" | "phone" | "birthMonth" | "birthDay">) {
+export function updateMemberProfile(token: string, input: Pick<MemberProfile, "firstName" | "middleName" | "lastName" | "phone" | "birthMonth" | "birthDay" | "qcJoinDate">) {
   return callMemberGateway<{ success: boolean }>("profile.update", { token, ...input });
 }
 
