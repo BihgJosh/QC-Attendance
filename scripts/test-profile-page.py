@@ -11,7 +11,7 @@ ARTIFACTS.mkdir(parents=True, exist_ok=True)
 BASE_URL = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 TEST_SESSION = "qcu-go-live-playwright-session-20260809"
 PHOTO = base64.b64decode("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABAf/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPxB//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPxB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxB//9k=")
-PROFILE = {"profile": {"email": "mobile.test@example.com", "firstName": "Mobile", "middleName": "", "lastName": "Tester", "phone": "", "birthMonth": None, "birthDay": None, "qcJoinDate": "2024-01-15", "avatarUrl": None, "role": "general_user", "profileComplete": True}}
+PROFILE = {"profile": {"email": "mobile.test@example.com", "firstName": "Mobile", "middleName": "", "lastName": "Tester", "phone": "", "birthMonth": None, "birthDay": None, "churchJoinYear": 2024, "avatarUrl": None, "role": "general_user", "profileComplete": True}}
 
 
 def guard_test(browser, width, height):
@@ -51,10 +51,11 @@ def upload_test(browser, mode):
     page.route("**/mock-upload/**", upload_route)
     page.goto(f"{BASE_URL}/test-harness/profile-upload", wait_until="domcontentloaded")
     page.get_by_role("heading", name="Mobile Tester").wait_for()
-    join_date = page.get_by_label("When did you join Quality Control?")
-    assert join_date.is_visible()
-    assert join_date.get_attribute("required") is not None
-    assert join_date.input_value() == "2024-01-15"
+    join_year = page.get_by_label("When did you join the church?")
+    assert join_year.is_visible()
+    assert join_year.get_attribute("required") is not None
+    assert join_year.get_attribute("type") == "number"
+    assert join_year.input_value() == "2024"
     page.get_by_label("Choose profile picture").set_input_files({"name": "mobile-profile.jpg", "mimeType": "image/jpeg", "buffer": PHOTO})
     page.get_by_role("button", name="Upload", exact=True).click()
 

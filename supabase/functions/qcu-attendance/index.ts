@@ -316,7 +316,7 @@ Deno.serve(async (request) => {
       const [profiles, roles, teamRows] = await Promise.all([
         rest(`member_profiles?select=first_name,middle_name,last_name,phone,birth_month,birth_day,avatar_path,profile_completed_at&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
         rest(`user_roles?select=role,is_active&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
-        rest(`Team%20Data?select=Surname,Other%20Names,QC%20Join%20Date&normalized_email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
+        rest(`Team%20Data?select=Surname,Other%20Names,Church%20Join%20Year&normalized_email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
       ]);
       const profile = profiles[0] || {};
       const team = teamRows[0] || {};
@@ -331,10 +331,10 @@ Deno.serve(async (request) => {
         phone: String(profile.phone || ""),
         birthMonth: profile.birth_month == null ? null : Number(profile.birth_month),
         birthDay: profile.birth_day == null ? null : Number(profile.birth_day),
-        qcJoinDate: String(team["QC Join Date"] || ""),
+        churchJoinYear: team["Church Join Year"] == null ? null : Number(team["Church Join Year"]),
         avatarUrl: await signedAvatarUrl(profile.avatar_path),
         role: roles[0]?.is_active === false ? "general_user" : String(roles[0]?.role || "general_user"),
-        profileComplete: Boolean(profile.profile_completed_at && team["QC Join Date"]),
+        profileComplete: Boolean(profile.profile_completed_at && team["Church Join Year"]),
       } });
     }
     if (operation === "profile.identities") {
@@ -384,19 +384,18 @@ Deno.serve(async (request) => {
       const phone = String(body.phone || "").trim().replace(/\s+/g, " ");
       const birthMonth = body.birthMonth == null || body.birthMonth === "" ? null : Number(body.birthMonth);
       const birthDay = body.birthDay == null || body.birthDay === "" ? null : Number(body.birthDay);
-      const qcJoinDate = String(body.qcJoinDate || "").trim();
+      const churchJoinYear = body.churchJoinYear == null || body.churchJoinYear === "" ? null : Number(body.churchJoinYear);
       if (!firstName || !lastName || firstName.length > 80 || middleName.length > 80 || lastName.length > 80) return json({ error: "Enter your first and last name using 80 characters or fewer." }, 400);
       if (phone && (!/^[+0-9()\-\s]{7,30}$/.test(phone))) return json({ error: "Enter a valid phone number." }, 400);
       if ((birthMonth == null) !== (birthDay == null)) return json({ error: "Choose both a birthday month and day, or leave both empty." }, 400);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(qcJoinDate) || Number.isNaN(Date.parse(`${qcJoinDate}T00:00:00Z`))) return json({ error: "Enter the date you joined Quality Control." }, 400);
-      if (qcJoinDate > new Date().toISOString().slice(0, 10)) return json({ error: "The Quality Control join date cannot be in the future." }, 400);
+      if (!Number.isInteger(churchJoinYear) || churchJoinYear < 1900 || churchJoinYear > new Date().getUTCFullYear()) return json({ error: "Enter the four-digit year you joined the church." }, 400);
       if (birthMonth != null && birthDay != null) {
         const birthday = new Date(Date.UTC(2000, birthMonth - 1, birthDay));
         if (birthday.getUTCMonth() !== birthMonth - 1 || birthday.getUTCDate() !== birthDay) return json({ error: "Choose a valid birthday." }, 400);
       }
       const now = new Date().toISOString();
       await rest("member_profiles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, first_name: firstName, middle_name: middleName, last_name: lastName, phone, birth_month: birthMonth, birth_day: birthDay, profile_completed_at: now, updated_at: now }) });
-      await rest(`Team%20Data?normalized_email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ Surname: lastName, "Other Names": [firstName, middleName].filter(Boolean).join(" "), "QC Join Date": qcJoinDate }) });
+      await rest(`Team%20Data?normalized_email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ Surname: lastName, "Other Names": [firstName, middleName].filter(Boolean).join(" "), "Church Join Year": churchJoinYear }) });
       return json({ success: true });
     }
     if (operation === "profile.email-change-request") {

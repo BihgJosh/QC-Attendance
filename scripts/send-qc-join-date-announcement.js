@@ -26,8 +26,8 @@ function emailHtml(name) {
       </div>
       <div style="padding:28px 26px">
         <p style="margin:0 0 16px;font-size:16px">Hello <strong>${escapeHtml(name)}</strong>,</p>
-        <p style="margin:0 0 22px;font-size:15px;line-height:1.65;color:#334155">Please update your profile immediately with the date you joined the Quality Control Unit. This is a required team record and should be completed without delay.</p>
-        <div style="margin:22px 0;padding:15px 16px;border-left:4px solid #39A9DB;border-radius:8px;background:#EAF9FF;color:#164e63;font-size:14px;line-height:1.6">Sign in, open <strong>My Profile</strong>, answer <strong>“When did you join Quality Control?”</strong>, and save your profile.</div>
+        <p style="margin:0 0 22px;font-size:15px;line-height:1.65;color:#334155">Please update your profile immediately with the year you joined the church. This is a required team record and should be completed without delay.</p>
+        <div style="margin:22px 0;padding:15px 16px;border-left:4px solid #39A9DB;border-radius:8px;background:#EAF9FF;color:#164e63;font-size:14px;line-height:1.6">Sign in, open <strong>My Profile</strong>, answer <strong>“When did you join the church?”</strong> with the year only, and save your profile.</div>
         <p style="margin:0 0 24px"><a href="https://qcunit.vercel.app/member/profile" style="display:inline-block;border-radius:10px;background-color:#8E14A8;background-image:linear-gradient(135deg,#39A9DB 0%,#8E14A8 100%);padding:13px 20px;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none">Update My Profile Now</a></p>
         <p style="margin:0;color:#64748b;font-size:13px;line-height:1.55">Please complete this important update as soon as possible.</p>
       </div>
@@ -71,7 +71,7 @@ async function main() {
           method: "POST",
           signal: AbortSignal.timeout(10_000),
           headers: { "Content-Type": "application/json", "api-key": env.BREVO_API_KEY },
-          body: JSON.stringify({ sender: { name: env.BREVO_SENDER_NAME || "QC Unit", email: env.BREVO_SENDER_EMAIL }, to: [{ email: recipient.email }], ...(env.BREVO_REPLY_TO_EMAIL ? { replyTo: { email: env.BREVO_REPLY_TO_EMAIL } } : {}), subject: "Action Required: Update your QC join date now", htmlContent: emailHtml(recipient.name), headers: { idempotencyKey } }),
+          body: JSON.stringify({ sender: { name: env.BREVO_SENDER_NAME || "QC Unit", email: env.BREVO_SENDER_EMAIL }, to: [{ email: recipient.email }], ...(env.BREVO_REPLY_TO_EMAIL ? { replyTo: { email: env.BREVO_REPLY_TO_EMAIL } } : {}), subject: "Action Required: Update your church join year now", htmlContent: emailHtml(recipient.name), headers: { idempotencyKey } }),
         });
         const data = await response.json().catch(() => ({}));
         if (response.ok || (response.status === 400 && data.code === "duplicate_parameter")) return { delivered: true };
