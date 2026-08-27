@@ -316,7 +316,7 @@ Deno.serve(async (request) => {
       const [profiles, roles, teamRows] = await Promise.all([
         rest(`member_profiles?select=first_name,middle_name,last_name,phone,birth_month,birth_day,avatar_path,profile_completed_at&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
         rest(`user_roles?select=role,is_active&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
-        rest(`Team%20Data?select=Surname,Other%20Names,Church%20Join%20Year&normalized_email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
+        rest(`Team%20Data?select=Surname,Other%20Names,Address,Church%20Join%20Year&normalized_email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
       ]);
       const profile = profiles[0] || {};
       const team = teamRows[0] || {};
@@ -329,12 +329,13 @@ Deno.serve(async (request) => {
         middleName: String(hasSavedProfile ? profile.middle_name || "" : otherNames.join(" ")),
         lastName: String(hasSavedProfile ? profile.last_name || "" : team.Surname || ""),
         phone: String(profile.phone || ""),
+        address: String(team.Address || ""),
         birthMonth: profile.birth_month == null ? null : Number(profile.birth_month),
         birthDay: profile.birth_day == null ? null : Number(profile.birth_day),
         churchJoinYear: team["Church Join Year"] == null ? null : Number(team["Church Join Year"]),
         avatarUrl: await signedAvatarUrl(profile.avatar_path),
         role: roles[0]?.is_active === false ? "general_user" : String(roles[0]?.role || "general_user"),
-        profileComplete: Boolean(profile.profile_completed_at && team["Church Join Year"]),
+        profileComplete: Boolean(profile.profile_completed_at && team.Address && team["Church Join Year"]),
       } });
     }
     if (operation === "profile.identities") {
@@ -382,11 +383,13 @@ Deno.serve(async (request) => {
       const middleName = String(body.middleName || "").trim().replace(/\s+/g, " ");
       const lastName = String(body.lastName || "").trim().replace(/\s+/g, " ");
       const phone = String(body.phone || "").trim().replace(/\s+/g, " ");
+      const address = String(body.address || "").trim().replace(/\s+/g, " ");
       const birthMonth = body.birthMonth == null || body.birthMonth === "" ? null : Number(body.birthMonth);
       const birthDay = body.birthDay == null || body.birthDay === "" ? null : Number(body.birthDay);
       const churchJoinYear = body.churchJoinYear == null || body.churchJoinYear === "" ? null : Number(body.churchJoinYear);
       if (!firstName || !lastName || firstName.length > 80 || middleName.length > 80 || lastName.length > 80) return json({ error: "Enter your first and last name using 80 characters or fewer." }, 400);
       if (phone && (!/^[+0-9()\-\s]{7,30}$/.test(phone))) return json({ error: "Enter a valid phone number." }, 400);
+      if (!address || address.length > 300) return json({ error: "Enter your residential address (up to 300 characters)." }, 400);
       if ((birthMonth == null) !== (birthDay == null)) return json({ error: "Choose both a birthday month and day, or leave both empty." }, 400);
       if (!Number.isInteger(churchJoinYear) || churchJoinYear < 1900 || churchJoinYear > new Date().getUTCFullYear()) return json({ error: "Enter the four-digit year you joined the church." }, 400);
       if (birthMonth != null && birthDay != null) {
@@ -395,7 +398,7 @@ Deno.serve(async (request) => {
       }
       const now = new Date().toISOString();
       await rest("member_profiles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email: session.email, first_name: firstName, middle_name: middleName, last_name: lastName, phone, birth_month: birthMonth, birth_day: birthDay, profile_completed_at: now, updated_at: now }) });
-      await rest(`Team%20Data?normalized_email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ Surname: lastName, "Other Names": [firstName, middleName].filter(Boolean).join(" "), "Church Join Year": churchJoinYear }) });
+      await rest(`Team%20Data?normalized_email=eq.${encodeURIComponent(session.email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ Surname: lastName, "Other Names": [firstName, middleName].filter(Boolean).join(" "), Address: address, "Church Join Year": churchJoinYear }) });
       return json({ success: true });
     }
     if (operation === "profile.email-change-request") {

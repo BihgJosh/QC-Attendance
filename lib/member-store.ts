@@ -150,6 +150,7 @@ export type MemberProfile = {
   middleName: string;
   lastName: string;
   phone: string;
+  address: string;
   birthMonth: number | null;
   birthDay: number | null;
   churchJoinYear: number | null;
@@ -166,7 +167,7 @@ export async function getMemberProfile(token: string) {
   return data.profile;
 }
 
-export function updateMemberProfile(token: string, input: Pick<MemberProfile, "firstName" | "middleName" | "lastName" | "phone" | "birthMonth" | "birthDay" | "churchJoinYear">) {
+export function updateMemberProfile(token: string, input: Pick<MemberProfile, "firstName" | "middleName" | "lastName" | "phone" | "address" | "birthMonth" | "birthDay" | "churchJoinYear">) {
   return callMemberGateway<{ success: boolean }>("profile.update", { token, ...input });
 }
 
