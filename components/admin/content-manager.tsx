@@ -72,6 +72,10 @@ export function ContentManager() {
   const [postingMembersLoading, setPostingMembersLoading] = useState(true);
   const [postingMembersError, setPostingMembersError] = useState("");
   const [confirmResetPostings, setConfirmResetPostings] = useState(false);
+  const [postingDirty, setPostingDirty] = useState<Record<ServiceDay, boolean>>({ Sunday: false, Thursday: false });
+  const [emailingPostings, setEmailingPostings] = useState(false);
+  const [emailingTeam, setEmailingTeam] = useState(false);
+  const [expandedPostingId, setExpandedPostingId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadContent = fetch("/api/content").then(async (response) => {
@@ -101,9 +105,10 @@ export function ContentManager() {
   }, []);
 
   const saveSection = async (section: "announcements" | "postings" | "uniform") => {
+    const targetPostingDay = postingDay;
     if (section === "postings") {
       const unresolved = content.postings
-        .filter((posting) => posting.day === postingDay)
+        .filter((posting) => posting.day === targetPostingDay)
         .flatMap((posting) => posting.rows.flatMap((row) => row.assignments.flat()))
         .filter((member) => !member.email);
       if (unresolved.length) {
@@ -116,7 +121,7 @@ export function ContentManager() {
       const sectionContent = section === "announcements"
         ? { section, announcements: content.announcements }
         : section === "postings"
-          ? { section, day: postingDay, postings: content.postings.filter((posting) => posting.day === postingDay) }
+          ? { section, day: targetPostingDay, postings: content.postings.filter((posting) => posting.day === targetPostingDay) }
           : { section, uniformItems: content.uniformItems, uniformNote: content.uniformNote, uniformImageUrl: content.uniformImageUrl };
       const response = await fetch("/api/content", {
         method: "POST",
@@ -126,6 +131,7 @@ export function ContentManager() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Publishing failed");
       setContent(data.content);
+      if (section === "postings") setPostingDirty((current) => ({ ...current, [targetPostingDay]: false }));
       toast.success(`${section === "uniform" ? "Uniform" : section[0].toUpperCase() + section.slice(1)} saved to the homepage.`);
       return true;
     } catch (error) {
@@ -159,6 +165,48 @@ export function ContentManager() {
       toast.error(error instanceof Error ? error.message : "The team could not be notified.");
     } finally {
       setNotifyingSection(null);
+    }
+  };
+
+  const emailPostedMembers = async () => {
+    if (postingDirty[postingDay]) return toast.error(`Save the ${postingDay} postings before emailing members.`);
+    if (!window.confirm(`Email each member assigned to the saved ${postingDay} postings now?`)) return;
+    setEmailingPostings(true);
+    try {
+      const response = await fetch("/api/admin/posting-emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day: postingDay }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Posting emails could not be sent.");
+      toast.success(`Posting email sent to ${data.delivered} member${data.delivered === 1 ? "" : "s"}.`);
+      if (data.failed > 0) toast.warning(`${data.failed} posting email${data.failed === 1 ? "" : "s"} could not be delivered.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Posting emails could not be sent.");
+    } finally {
+      setEmailingPostings(false);
+    }
+  };
+
+  const emailTeam = async () => {
+    if (postingDirty[postingDay]) return toast.error(`Save the ${postingDay} postings before emailing the team.`);
+    if (!window.confirm(`Email the saved ${postingDay} posting announcement to every team member now?`)) return;
+    setEmailingTeam(true);
+    try {
+      const response = await fetch("/api/admin/posting-emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ day: postingDay, audience: "team" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "The team posting email could not be sent.");
+      toast.success(`Posting announcement emailed to ${data.delivered} team member${data.delivered === 1 ? "" : "s"}.`);
+      if (data.failed > 0) toast.warning(`${data.failed} team email${data.failed === 1 ? "" : "s"} could not be delivered.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The team posting email could not be sent.");
+    } finally {
+      setEmailingTeam(false);
     }
   };
 
@@ -247,7 +295,7 @@ export function ContentManager() {
                   <Label htmlFor="posting-service-day" className="text-[10px] uppercase tracking-[0.16em] text-primary">Service day</Label>
                   <p className="mt-1 text-xs text-muted-foreground">Sunday and Thursday assignments are stored independently.</p>
                 </div>
-                <select id="posting-service-day" value={postingDay} onChange={(event) => { setPostingDay(event.target.value as ServiceDay); setConfirmResetPostings(false); }} className="h-11 min-w-48 rounded-xl border border-input bg-background px-4 text-sm font-semibold outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20">
+                <select id="posting-service-day" value={postingDay} onChange={(event) => { setPostingDay(event.target.value as ServiceDay); setConfirmResetPostings(false); setExpandedPostingId(null); }} className="h-11 min-w-48 rounded-xl border border-input bg-background px-4 text-sm font-semibold outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20">
                   {SERVICE_DAYS.map((day) => <option key={day} value={day}>{day} service</option>)}
                 </select>
               </div>
@@ -262,6 +310,7 @@ export function ContentManager() {
                     <Button type="button" variant="ghost" onClick={() => setConfirmResetPostings(false)}>Cancel</Button>
                     <Button type="button" variant="destructive" onClick={() => {
                       setContent((current) => ({ ...current, postings: [...current.postings.filter((posting) => posting.day !== postingDay), ...createBlankDayPostings(postingDay)] }));
+                      setPostingDirty((current) => ({ ...current, [postingDay]: true }));
                       setConfirmResetPostings(false);
                       toast.success(`${postingDay} draft cleared. Add members, then save to publish it.`);
                     }}><RotateCcw className="mr-2 h-4 w-4" />Clear draft</Button>
@@ -274,11 +323,11 @@ export function ContentManager() {
               {postingMembersError ? <p role="alert" className="rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">{postingMembersError} Name suggestions are unavailable; existing assignments remain safe.</p> : null}
 
               {content.postings.filter((posting) => posting.day === postingDay).map((posting) => (
-                <PostingMatrixEditor key={posting.id} posting={posting} members={postingMembers} membersLoading={postingMembersLoading} onChange={(nextPosting) => setContent({ ...content, postings: content.postings.map((item) => item.id === posting.id ? nextPosting : item) })} onDelete={() => setContent({ ...content, postings: content.postings.filter((item) => item.id !== posting.id) })} />
+                <PostingMatrixEditor key={posting.id} posting={posting} expanded={expandedPostingId === posting.id} onExpandedChange={(expanded) => setExpandedPostingId(expanded ? posting.id : null)} members={postingMembers} membersLoading={postingMembersLoading} onChange={(nextPosting) => { setContent({ ...content, postings: content.postings.map((item) => item.id === posting.id ? nextPosting : item) }); setPostingDirty((current) => ({ ...current, [postingDay]: true })); }} onDelete={() => { setContent({ ...content, postings: content.postings.filter((item) => item.id !== posting.id) }); setExpandedPostingId((current) => current === posting.id ? null : current); setPostingDirty((current) => ({ ...current, [postingDay]: true })); }} />
               ))}
               <div className="flex flex-col-reverse justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
-                <Button type="button" variant="outline" onClick={() => setContent({ ...content, postings: [...content.postings, createNewPosting(postingDay)] })}><Plus className="mr-2 h-4 w-4" /> Add {postingDay} section</Button>
-                <SectionActions section="postings" saveLabel={`Save ${postingDay} postings`} saving={savingSection === "postings"} notifying={notifyingSection === "postings"} disabled={savingSection !== null || notifyingSection !== null} onSave={() => saveSection("postings")} onNotify={() => notifySection("postings")} />
+                <Button type="button" variant="outline" onClick={() => { setContent({ ...content, postings: [...content.postings, createNewPosting(postingDay)] }); setPostingDirty((current) => ({ ...current, [postingDay]: true })); }}><Plus className="mr-2 h-4 w-4" /> Add {postingDay} section</Button>
+                <SectionActions section="postings" saveLabel={`Save ${postingDay} postings`} saving={savingSection === "postings"} notifying={notifyingSection === "postings"} emailing={emailingPostings} emailingTeam={emailingTeam} emailDisabled={postingDirty[postingDay]} disabled={savingSection !== null || notifyingSection !== null || emailingPostings || emailingTeam} onSave={() => saveSection("postings")} onNotify={() => notifySection("postings")} onEmail={emailPostedMembers} onEmailTeam={emailTeam} />
               </div>
             </div>
           )}
@@ -321,8 +370,8 @@ export function ContentManager() {
   );
 }
 
-function PostingMatrixEditor({ posting, members, membersLoading, onChange, onDelete }: { posting: HomepageContent["postings"][number]; members: PostingDirectoryMember[]; membersLoading: boolean; onChange: (posting: HomepageContent["postings"][number]) => void; onDelete: () => void }) {
-  const [expanded, setExpanded] = useState(posting.id.endsWith("main-auditorium"));
+function PostingMatrixEditor({ posting, expanded, onExpandedChange, members, membersLoading, onChange, onDelete }: { posting: HomepageContent["postings"][number]; expanded: boolean; onExpandedChange: (expanded: boolean) => void; members: PostingDirectoryMember[]; membersLoading: boolean; onChange: (posting: HomepageContent["postings"][number]) => void; onDelete: () => void }) {
+  const panelId = `posting-panel-${posting.id}`;
 
   const updateCell = (rowIndex: number, columnIndex: number, value: PostingMember[]) => {
     onChange({
@@ -362,13 +411,13 @@ function PostingMatrixEditor({ posting, members, membersLoading, onChange, onDel
       <div className="grid items-end gap-3 bg-gradient-to-r from-slate-950/[0.03] to-primary/[0.06] p-4 md:grid-cols-[1fr_auto_auto]">
         <Field label="Posting location"><Input value={posting.name} maxLength={100} onChange={(event) => onChange({ ...posting, name: event.target.value })} /></Field>
         <div className="flex items-center justify-end gap-1 md:contents">
-          <Button type="button" variant="ghost" size="icon" aria-label={expanded ? `Collapse ${posting.name}` : `Expand ${posting.name}`} onClick={() => setExpanded((value) => !value)}>{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button>
-          <Button type="button" variant="ghost" size="icon" aria-label={`Delete ${posting.name}`} className="text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="h-11 w-11" aria-label={expanded ? `Collapse ${posting.name}` : `Expand ${posting.name}`} aria-expanded={expanded} aria-controls={panelId} onClick={() => onExpandedChange(!expanded)}>{expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button>
+          <Button type="button" variant="ghost" size="icon" aria-label={`Delete ${posting.name}`} className="h-11 w-11 text-destructive" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>
         </div>
       </div>
       <AnimatePresence initial={false}>
         {expanded && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+          <motion.div id={panelId} initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
             <div className="border-t border-border/60 p-4">
               <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
@@ -546,12 +595,20 @@ function SaveSectionButton({ label, saving, disabled, onClick }: { label: string
   );
 }
 
-function SectionActions({ section, saveLabel, saving, notifying, disabled, onSave, onNotify }: { section: string; saveLabel: string; saving: boolean; notifying: boolean; disabled: boolean; onSave: () => void; onNotify: () => void }) {
-  return <div className="flex flex-col gap-2 sm:flex-row">
+function SectionActions({ section, saveLabel, saving, notifying, emailing = false, emailingTeam = false, emailDisabled = false, disabled, onSave, onNotify, onEmail, onEmailTeam }: { section: string; saveLabel: string; saving: boolean; notifying: boolean; emailing?: boolean; emailingTeam?: boolean; emailDisabled?: boolean; disabled: boolean; onSave: () => void; onNotify: () => void; onEmail?: () => void; onEmailTeam?: () => void }) {
+  return <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
     <SaveSectionButton label={saveLabel} saving={saving} disabled={disabled} onClick={onSave} />
     <Button type="button" variant="outline" className="min-w-36 border-cyan-600/40 text-cyan-800 hover:bg-cyan-50 dark:text-cyan-200 dark:hover:bg-cyan-950/40" disabled={disabled} onClick={onNotify} aria-label={`Notify team about saved ${section}`}>
       {notifying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BellRing className="mr-2 h-4 w-4" />}
       {notifying ? "Notifying…" : "Notify Team"}
     </Button>
+    {onEmail ? <Button type="button" variant="outline" className="min-w-44 border-violet-600/40 text-violet-800 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-950/40" disabled={disabled || emailDisabled} onClick={onEmail} title={emailDisabled ? "Save these postings before sending email" : undefined}>
+      {emailing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+      {emailing ? "Emailing…" : emailDisabled ? "Save before emailing" : "Email posted members"}
+    </Button> : null}
+    {onEmailTeam ? <Button type="button" variant="outline" className="min-w-36 border-violet-600/40 text-violet-800 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-950/40" disabled={disabled || emailDisabled} onClick={onEmailTeam} title={emailDisabled ? "Save these postings before emailing the team" : undefined}>
+      {emailingTeam ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+      {emailingTeam ? "Emailing team…" : "Email Team"}
+    </Button> : null}
   </div>;
 }
