@@ -316,26 +316,27 @@ Deno.serve(async (request) => {
       const [profiles, roles, teamRows] = await Promise.all([
         rest(`member_profiles?select=first_name,middle_name,last_name,phone,birth_month,birth_day,avatar_path,profile_completed_at&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
         rest(`user_roles?select=role,is_active&email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
-        rest(`Team%20Data?select=Surname,Other%20Names,Address,Church%20Join%20Year&normalized_email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
+        rest(`Team%20Data?select=Surname,Other%20Names,Address,Home%20Address,Church%20Join%20Year&normalized_email=eq.${encodeURIComponent(session.email)}&limit=1`) as Promise<Json[]>,
       ]);
       const profile = profiles[0] || {};
       const team = teamRows[0] || {};
       const otherNames = String(team["Other Names"] || "").trim().split(/\s+/).filter(Boolean);
       const fallbackFirstName = otherNames.shift() || "";
       const hasSavedProfile = Boolean(profiles[0]);
+      const address = String(team.Address || team["Home Address"] || "").trim();
       return json({ profile: {
         email: session.email,
         firstName: String(hasSavedProfile ? profile.first_name || "" : fallbackFirstName),
         middleName: String(hasSavedProfile ? profile.middle_name || "" : otherNames.join(" ")),
         lastName: String(hasSavedProfile ? profile.last_name || "" : team.Surname || ""),
         phone: String(profile.phone || ""),
-        address: String(team.Address || ""),
+        address,
         birthMonth: profile.birth_month == null ? null : Number(profile.birth_month),
         birthDay: profile.birth_day == null ? null : Number(profile.birth_day),
         churchJoinYear: team["Church Join Year"] == null ? null : Number(team["Church Join Year"]),
         avatarUrl: await signedAvatarUrl(profile.avatar_path),
         role: roles[0]?.is_active === false ? "general_user" : String(roles[0]?.role || "general_user"),
-        profileComplete: Boolean(profile.profile_completed_at && team.Address && team["Church Join Year"]),
+        profileComplete: Boolean(profile.profile_completed_at && address && team["Church Join Year"]),
       } });
     }
     if (operation === "profile.identities") {
