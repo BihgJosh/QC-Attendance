@@ -57,6 +57,24 @@ Deno.serve(async (request) => {
       const rows = await rest("Team%20Data?select=Surname,Other%20Names,Email&order=Surname.asc") as Json[];
       return json({ members: rows.map(profile).filter(Boolean) });
     }
+    if (operation === "member.incomplete-list") {
+      const [teamRows, profileRows] = await Promise.all([
+        rest("Team%20Data?select=Surname,Other%20Names,Email,Address,Church%20Join%20Year&order=Surname.asc") as Promise<Json[]>,
+        rest("member_profiles?select=email,profile_completed_at") as Promise<Json[]>,
+      ]);
+      const completedProfiles = new Set(profileRows.flatMap((row) => {
+        const email = String(row.email || "").trim().toLowerCase();
+        return email && row.profile_completed_at ? [email] : [];
+      }));
+      const members = teamRows.flatMap((row) => {
+        const member = profile(row);
+        if (!member) return [];
+        const address = String(row.Address || "").trim();
+        const churchJoinYear = row["Church Join Year"];
+        return completedProfiles.has(member.email) && address && churchJoinYear ? [] : [member];
+      });
+      return json({ members });
+    }
     if (operation === "team.import") {
       const members = Array.isArray(body.members) ? body.members.slice(0, 500) : [];
       if (!members.length) return json({ error: "No team rows supplied." }, 400);

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, Mail, MapPin, Phone } from "lucide-react";
-import { IdentityAvatar } from "@/components/member/member-identity";
+import { MemberIdentityCard } from "@/components/member/member-identity";
 import { postingMemberKey, type Posting, type PostingMember, type ServiceDay } from "@/lib/homepage-content";
 import type { MemberIdentity } from "@/lib/member-store";
 
@@ -31,9 +31,8 @@ function MemberPass({ member, identity, loading }: { member: PostingMember; iden
     <li className="relative min-w-0 overflow-hidden rounded-2xl bg-white p-3 text-slate-950 shadow-[0_1px_2px_rgba(15,23,42,.08),0_12px_28px_-22px_rgba(15,23,42,.7)]">
       <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-cyan-500" />
       <div className="flex min-w-0 items-center gap-3 pl-1">
-        <IdentityAvatar identity={identity} name={displayName} size="md" />
         <div className="min-w-0 flex-1">
-          <p className="break-words text-sm font-extrabold tracking-tight">{displayName}</p>
+          <MemberIdentityCard identity={identity} fallbackName={displayName} fallbackEmail={email} compact />
           <div className="mt-1.5 flex min-w-0 flex-col gap-1 text-[11px] text-slate-600 sm:flex-row sm:flex-wrap sm:gap-x-4">
             {email ? <a href={`mailto:${email}`} className="inline-flex min-h-5 min-w-0 items-center gap-1.5 rounded-sm hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600">
               <Mail className="h-3 w-3 shrink-0 text-cyan-700" />
