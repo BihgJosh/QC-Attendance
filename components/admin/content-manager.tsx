@@ -74,7 +74,6 @@ export function ContentManager() {
   const [confirmResetPostings, setConfirmResetPostings] = useState(false);
   const [postingDirty, setPostingDirty] = useState<Record<ServiceDay, boolean>>({ Sunday: false, Thursday: false });
   const [emailingPostings, setEmailingPostings] = useState(false);
-  const [emailingTeam, setEmailingTeam] = useState(false);
   const [expandedPostingId, setExpandedPostingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -186,27 +185,6 @@ export function ContentManager() {
       toast.error(error instanceof Error ? error.message : "Posting emails could not be sent.");
     } finally {
       setEmailingPostings(false);
-    }
-  };
-
-  const emailTeam = async () => {
-    if (postingDirty[postingDay]) return toast.error(`Save the ${postingDay} postings before emailing the team.`);
-    if (!window.confirm(`Email the saved ${postingDay} posting announcement to every team member now?`)) return;
-    setEmailingTeam(true);
-    try {
-      const response = await fetch("/api/admin/posting-emails", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ day: postingDay, audience: "team" }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "The team posting email could not be sent.");
-      toast.success(`Posting announcement emailed to ${data.delivered} team member${data.delivered === 1 ? "" : "s"}.`);
-      if (data.failed > 0) toast.warning(`${data.failed} team email${data.failed === 1 ? "" : "s"} could not be delivered.`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "The team posting email could not be sent.");
-    } finally {
-      setEmailingTeam(false);
     }
   };
 
@@ -327,7 +305,7 @@ export function ContentManager() {
               ))}
               <div className="flex flex-col-reverse justify-between gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center">
                 <Button type="button" variant="outline" onClick={() => { setContent({ ...content, postings: [...content.postings, createNewPosting(postingDay)] }); setPostingDirty((current) => ({ ...current, [postingDay]: true })); }}><Plus className="mr-2 h-4 w-4" /> Add {postingDay} section</Button>
-                <SectionActions section="postings" saveLabel={`Save ${postingDay} postings`} saving={savingSection === "postings"} notifying={notifyingSection === "postings"} emailing={emailingPostings} emailingTeam={emailingTeam} emailDisabled={postingDirty[postingDay]} disabled={savingSection !== null || notifyingSection !== null || emailingPostings || emailingTeam} onSave={() => saveSection("postings")} onNotify={() => notifySection("postings")} onEmail={emailPostedMembers} onEmailTeam={emailTeam} />
+                <SectionActions section="postings" saveLabel={`Save ${postingDay} postings`} saving={savingSection === "postings"} notifying={notifyingSection === "postings"} emailing={emailingPostings} emailDisabled={postingDirty[postingDay]} disabled={savingSection !== null || notifyingSection !== null || emailingPostings} onSave={() => saveSection("postings")} onNotify={() => notifySection("postings")} onEmail={emailPostedMembers} />
               </div>
             </div>
           )}
@@ -595,7 +573,7 @@ function SaveSectionButton({ label, saving, disabled, onClick }: { label: string
   );
 }
 
-function SectionActions({ section, saveLabel, saving, notifying, emailing = false, emailingTeam = false, emailDisabled = false, disabled, onSave, onNotify, onEmail, onEmailTeam }: { section: string; saveLabel: string; saving: boolean; notifying: boolean; emailing?: boolean; emailingTeam?: boolean; emailDisabled?: boolean; disabled: boolean; onSave: () => void; onNotify: () => void; onEmail?: () => void; onEmailTeam?: () => void }) {
+function SectionActions({ section, saveLabel, saving, notifying, emailing = false, emailDisabled = false, disabled, onSave, onNotify, onEmail }: { section: string; saveLabel: string; saving: boolean; notifying: boolean; emailing?: boolean; emailDisabled?: boolean; disabled: boolean; onSave: () => void; onNotify: () => void; onEmail?: () => void }) {
   return <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
     <SaveSectionButton label={saveLabel} saving={saving} disabled={disabled} onClick={onSave} />
     <Button type="button" variant="outline" className="min-w-36 border-cyan-600/40 text-cyan-800 hover:bg-cyan-50 dark:text-cyan-200 dark:hover:bg-cyan-950/40" disabled={disabled} onClick={onNotify} aria-label={`Notify team about saved ${section}`}>
@@ -605,10 +583,6 @@ function SectionActions({ section, saveLabel, saving, notifying, emailing = fals
     {onEmail ? <Button type="button" variant="outline" className="min-w-44 border-violet-600/40 text-violet-800 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-950/40" disabled={disabled || emailDisabled} onClick={onEmail} title={emailDisabled ? "Save these postings before sending email" : undefined}>
       {emailing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
       {emailing ? "Emailing…" : emailDisabled ? "Save before emailing" : "Email posted members"}
-    </Button> : null}
-    {onEmailTeam ? <Button type="button" variant="outline" className="min-w-36 border-violet-600/40 text-violet-800 hover:bg-violet-50 dark:text-violet-200 dark:hover:bg-violet-950/40" disabled={disabled || emailDisabled} onClick={onEmailTeam} title={emailDisabled ? "Save these postings before emailing the team" : undefined}>
-      {emailingTeam ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-      {emailingTeam ? "Emailing team…" : "Email Team"}
     </Button> : null}
   </div>;
 }

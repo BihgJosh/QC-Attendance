@@ -57,25 +57,6 @@ export function postingEmailHtml(input: { recipient: PostingEmailRecipient; day:
   </div>`;
 }
 
-export function teamPostingEmailHtml(input: { recipientName: string; day: ServiceDay; postingsUrl: string }) {
-  return `<div style="margin:0;background:#f7f5fb;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
-    <div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #e2e8f0;border-radius:18px;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,.08)">
-      <div style="background-color:#39A9DB;background-image:linear-gradient(135deg,#39A9DB 0%,#8E14A8 100%);padding:30px 26px;color:#ffffff">
-        <p style="margin:0 0 9px;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#ffffff">Quality Control Unit</p>
-        <h1 style="margin:0;font-size:26px;line-height:1.25;color:#ffffff">${input.day} postings are now available</h1>
-      </div>
-      <div style="padding:28px 26px">
-        <p style="margin:0 0 16px;font-size:16px">Hello <strong>${escapeHtml(input.recipientName)}</strong>,</p>
-        <p style="margin:0 0 22px;font-size:15px;line-height:1.65;color:#334155">The Quality Control Unit postings for the upcoming <strong>${input.day} service</strong> have been published.</p>
-        <div style="margin:22px 0;padding:15px 16px;border-left:4px solid #39A9DB;border-radius:8px;background:#EAF9FF;color:#164e63;font-size:14px;line-height:1.6">Please review the full posting list, confirm whether you have an assignment, and arrive early if you are posted.</div>
-        <p style="margin:0 0 24px"><a href="${escapeHtml(input.postingsUrl)}" style="display:inline-block;border-radius:10px;background-color:#8E14A8;background-image:linear-gradient(135deg,#39A9DB 0%,#8E14A8 100%);padding:13px 20px;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none">View full postings</a></p>
-        <p style="margin:0;color:#64748b;font-size:13px;line-height:1.55">If you have questions about the posting list, please contact your QC team lead.</p>
-      </div>
-      <div style="border-top:1px solid #e2e8f0;background:#f8fafc;padding:16px 26px;text-align:center;color:#64748b;font-size:12px">QC Unit · Excellence in every detail</div>
-    </div>
-  </div>`;
-}
-
 function lagosWeekKey(date = new Date()) {
   const localDate = new Date(date.toLocaleString("en-US", { timeZone: "Africa/Lagos" }));
   const day = localDate.getDay() || 7;
@@ -88,11 +69,6 @@ function lagosWeekKey(date = new Date()) {
 export function postingEmailIdempotencyKey(input: { recipient: PostingEmailRecipient; day: ServiceDay }) {
   const digest = createHash("sha256").update(JSON.stringify({ week: lagosWeekKey(), day: input.day, email: input.recipient.email, assignments: input.recipient.assignments })).digest("hex").slice(0, 32);
   return `posting-${digest}`;
-}
-
-export function teamPostingEmailIdempotencyKey(input: { email: string; day: ServiceDay }) {
-  const digest = createHash("sha256").update(JSON.stringify({ week: lagosWeekKey(), day: input.day, email: input.email, audience: "team" })).digest("hex").slice(0, 27);
-  return `posting-team-${digest}`;
 }
 
 export function postingContentRecipients(content: HomepageContent, day: ServiceDay) {

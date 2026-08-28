@@ -52,7 +52,7 @@ with sync_playwright() as p:
     page.get_by_role("button", name="Cancel").click()
     assert page.get_by_role("button", name="Save Sunday postings").is_visible()
     assert page.get_by_role("button", name="Notify Team").is_visible()
-    assert page.get_by_role("button", name="Email Team").is_visible()
+    assert page.get_by_role("button", name="Email Team").count() == 0
     sunday_assignment.focus()
     page.locator("#homepage-content").screenshot(path=str(OUTPUT / "qc-admin-postings-desktop.png"))
 

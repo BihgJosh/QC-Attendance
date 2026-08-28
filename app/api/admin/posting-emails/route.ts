@@ -4,28 +4,20 @@ import { EmailConfigurationError, sendBrevoEmail } from "@/lib/brevo-email";
 import { getOptionalEnv } from "@/lib/env";
 import { getConfig } from "@/lib/google-sheets";
 import { DEFAULT_HOMEPAGE_CONTENT, normalizeHomepageContent, type ServiceDay } from "@/lib/homepage-content";
-import { listTeamMembers } from "@/lib/team-data-store";
-import { postingContentRecipients, postingEmailHtml, postingEmailIdempotencyKey, teamPostingEmailHtml, teamPostingEmailIdempotencyKey } from "@/lib/posting-email";
+import { postingContentRecipients, postingEmailHtml, postingEmailIdempotencyKey } from "@/lib/posting-email";
 
 const CONTENT_CONFIG_KEY = "homepageContent";
 
 export async function POST(request: Request) {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const body = await request.json().catch(() => null) as { day?: unknown; audience?: unknown } | null;
+    const body = await request.json().catch(() => null) as { day?: unknown } | null;
     if (body?.day !== "Sunday" && body?.day !== "Thursday") return NextResponse.json({ error: "Select Sunday or Thursday postings." }, { status: 400 });
-    if (body.audience !== undefined && body.audience !== "posted" && body.audience !== "team") return NextResponse.json({ error: "Select posted members or the full team." }, { status: 400 });
     const day = body.day as ServiceDay;
-    const audience = body.audience === "team" ? "team" : "posted";
     const config = await getConfig();
     const content = config[CONTENT_CONFIG_KEY] ? normalizeHomepageContent(JSON.parse(config[CONTENT_CONFIG_KEY])) : DEFAULT_HOMEPAGE_CONTENT;
-    const recipients = audience === "team"
-      ? [...new Map((await listTeamMembers()).flatMap((member) => {
-          const email = member.email.trim().toLowerCase();
-          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? [[email, { name: member.name.trim() || email, email, assignments: [] }]] : [];
-        })).values()]
-      : postingContentRecipients(content, day);
-    if (!recipients.length) return NextResponse.json({ error: audience === "team" ? "No valid team email addresses were found." : `No ${day} assignments with linked email addresses were found.` }, { status: 409 });
+    const recipients = postingContentRecipients(content, day);
+    if (!recipients.length) return NextResponse.json({ error: `No ${day} assignments with linked email addresses were found.` }, { status: 409 });
 
     if (!getOptionalEnv("BREVO_API_KEY") || !getOptionalEnv("BREVO_SENDER_EMAIL")) {
       throw new EmailConfigurationError("Email delivery is not configured. Add the Brevo API key and verified sender email.");
@@ -35,12 +27,7 @@ export async function POST(request: Request) {
     for (let offset = 0; offset < recipients.length; offset += 8) {
       completed.push(...await Promise.all(recipients.slice(offset, offset + 8).map(async (recipient) => {
         try {
-          await sendBrevoEmail({
-            to: recipient.email,
-            subject: audience === "team" ? `${day} QC postings are now available` : `Your ${day} QC posting is ready`,
-            html: audience === "team" ? teamPostingEmailHtml({ recipientName: recipient.name, day, postingsUrl }) : postingEmailHtml({ recipient, day, postingsUrl }),
-            idempotencyKey: audience === "team" ? teamPostingEmailIdempotencyKey({ email: recipient.email, day }) : postingEmailIdempotencyKey({ recipient, day }),
-          });
+          await sendBrevoEmail({ to: recipient.email, subject: `Your ${day} QC posting is ready`, html: postingEmailHtml({ recipient, day, postingsUrl }), idempotencyKey: postingEmailIdempotencyKey({ recipient, day }) });
           return { delivered: true, email: recipient.email };
         } catch (error) {
           const reason = error instanceof Error ? error.message : "Unknown error";
