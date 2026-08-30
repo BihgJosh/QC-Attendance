@@ -13,7 +13,7 @@ export class TeamDataError extends Error {
   }
 }
 
-async function callTeamGateway<T>(operation: "member.get" | "member.list", payload: Record<string, unknown> = {}) {
+async function callTeamGateway<T>(operation: "member.get" | "member.list" | "member.birthdays", payload: Record<string, unknown> = {}) {
   const { url, anonKey } = getSupabaseEnv();
   const response = await fetch(`${url.replace(/\/+$/, "")}/functions/v1/qcu-team-data`, {
     method: "POST",
@@ -42,4 +42,8 @@ export async function getTeamMemberByEmail(email: string) {
 export async function listTeamMembers() {
   const data = await callTeamGateway<{ members: TeamMember[] }>("member.list");
   return data.members;
+}
+
+export async function listTeamBirthdayRecords() {
+  return callTeamGateway<{ team: import("@/lib/birthday-records").BirthdayTeamRecord[]; profiles: import("@/lib/birthday-records").BirthdayProfileRecord[] }>("member.birthdays");
 }

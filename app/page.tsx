@@ -79,7 +79,7 @@ export default function HomePage() {
         const response = await fetch("/api/birthdays", { cache: "no-store" });
         if (response.ok) setBirthdays((await response.json()).birthdays || []);
       } catch {
-        // Birthday notices remain hidden when the private sheet is unavailable.
+        // Birthday notices remain hidden when member data is unavailable.
       }
     };
 
@@ -99,9 +99,11 @@ export default function HomePage() {
     fetchBirthdays();
     fetchPostingIdentities();
     const clockInterval = setInterval(updateTime, 1000);
+    const birthdayInterval = setInterval(fetchBirthdays, 60_000);
 
     return () => {
       clearInterval(clockInterval);
+      clearInterval(birthdayInterval);
     };
   }, []);
 

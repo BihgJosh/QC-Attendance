@@ -57,6 +57,22 @@ Deno.serve(async (request) => {
       const rows = await rest("Team%20Data?select=Surname,Other%20Names,Email&order=Surname.asc") as Json[];
       return json({ members: rows.map(profile).filter(Boolean) });
     }
+    if (operation === "member.birthdays") {
+      // Private server-to-server operation; paginate so new members are never cut off.
+      const readAll = async (path: string) => {
+        const rows: Json[] = [];
+        for (let offset = 0; ; offset += 500) {
+          const page = await rest(`${path}&limit=500&offset=${offset}`) as Json[];
+          rows.push(...page);
+          if (page.length < 500) return rows;
+        }
+      };
+      const [team, profiles] = await Promise.all([
+        readAll("Team%20Data?select=normalized_email,Surname,Other%20Names,Birthday&order=normalized_email.asc"),
+        readAll("member_profiles?select=email,first_name,middle_name,last_name,birth_month,birth_day&order=email.asc"),
+      ]);
+      return json({ team, profiles });
+    }
     if (operation === "member.incomplete-list") {
       const [teamRows, profileRows] = await Promise.all([
         rest("Team%20Data?select=Surname,Other%20Names,Email,Address,Church%20Join%20Year&order=Surname.asc") as Promise<Json[]>,
