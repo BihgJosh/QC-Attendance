@@ -6,6 +6,8 @@
     "dev": "next dev",
     "prebuild": "node scripts/verify-sharp-runtime.js",
     "build": "next build",
+    "test:final-report": "node --no-warnings scripts/test-final-report-generator.mjs",
+    "verify:final-report:live": "node --no-warnings scripts/verify-final-report-live.mjs",
     "start": "next start",
     "lint": "next lint"
   },

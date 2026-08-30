@@ -9,4 +9,4 @@ create unique index if not exists service_post_one_active_area
 comment on column public.service_post_reports.assignment_enforced is
   'True for reports submitted after observation-area assignment enforcement was introduced.';
 comment on column public.service_post_reports.assignment_override is
-  'True when an Admin, HOD, Service Manager or Super Admin intentionally overrides an existing area assignment.';;
+  'True when an Admin, Service Manager or Super Admin intentionally overrides an existing area assignment.';

@@ -3,6 +3,7 @@ import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { resolveUserAccess } from "@/lib/member-store";
 import { appendServicePostReport } from "@/lib/service-post-sheet";
+import { callServiceReportGateway } from "@/lib/service-report-store";
 import { isIsoCalendarDate } from "@/lib/validation";
 import { isValidServiceReportName, namedServiceReport } from "@/lib/service-report-services";
 
@@ -32,11 +33,15 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
     if (!body) return NextResponse.json({ ok: false, message: "Invalid report." }, { status: 400 });
 
+    const access = await resolveUserAccess(session.email);
+    const canOverride = ["service_manager", "admin", "super_admin"].includes(access.role);
+    const assignmentOverride = body.assignmentOverride === true;
+    if (assignmentOverride && !canOverride) return NextResponse.json({ ok: false, message: "Only a Service Manager, Admin or Super Admin can override an existing location report." }, { status: 403 });
+
     const reportFor = text(body.reportFor, 20) || "Me";
     const requestedName = text(body.reportForName, 160);
     let reportForName = member.name;
     if (reportFor === "Someone else") {
-      const access = await resolveUserAccess(session.email);
       if (!["service_manager", "hod", "admin", "super_admin"].includes(access.role)) return NextResponse.json({ ok: false, message: "Your role does not allow you to submit a report for someone else." }, { status: 403 });
       if (!requestedName) return NextResponse.json({ ok: false, message: "Enter the name of the person this report is for." }, { status: 400 });
       reportForName = requestedName;
@@ -83,6 +88,16 @@ export async function POST(request: Request) {
     if (body.confirmAccurate !== true) {
       return NextResponse.json({ ok: false, message: "Confirm that the report is accurate." }, { status: 400 });
     }
+    const areaResult = await callServiceReportGateway<{ areas?: string[] }>("report.areas", { date, service });
+    const areaOccupied = areaResult.areas?.some((occupiedArea) => occupiedArea.toLocaleLowerCase() === area.toLocaleLowerCase()) === true;
+    if (areaOccupied && !assignmentOverride) {
+      return NextResponse.json({ ok: false, message: "This location already has a report for the selected date and service. Choose another location or ask a Service Manager or administrator to override it." }, { status: 409 });
+    }
+    if (assignmentOverride) {
+      if (!areaOccupied) {
+        return NextResponse.json({ ok: false, message: "This location no longer needs an override. Refresh the form and submit normally." }, { status: 409 });
+      }
+    }
 
     await appendServicePostReport({
       submissionId, date, service, area, adultsHeadcount, childrenHeadcount,
@@ -94,22 +109,30 @@ export async function POST(request: Request) {
       areasForImprovement, recommendations,
       incidentFlag, incidentDescribe,
       ma: stringRecord(body.ma), teens: stringRecord(body.teens),
-      additionalComments: text(body.additionalComments), confirmAccurate: true,
+      additionalComments: text(body.additionalComments), confirmAccurate: true, assignmentOverride,
     });
     return NextResponse.json({ ok: true, message: "Service Post report saved successfully." });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[service-post] Report save failed", message);
-    const duplicate = /already been submitted|duplicate/i.test(message);
+    const duplicate = /already has a report|already been submitted|duplicate/i.test(message);
     return NextResponse.json({ ok: false, message: duplicate ? message : "The report could not be saved. Please try again." }, { status: duplicate ? 409 : 502 });
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await readMemberSession();
   if (!session) return NextResponse.json({ ok: false, message: "Your member session has expired." }, { status: 401 });
   const member = await getTeamMemberByEmail(session.email);
   if (!member) return NextResponse.json({ ok: false, message: "Your email is not registered in Team Data." }, { status: 403 });
   const access = await resolveUserAccess(session.email);
-  return NextResponse.json({ ok: true, name: member.name, canDelegate: ["service_manager", "hod", "admin", "super_admin"].includes(access.role) }, { headers: { "Cache-Control": "no-store" } });
+  const { searchParams } = new URL(request.url);
+  const date = text(searchParams.get("date"), 10);
+  const service = namedServiceReport(text(searchParams.get("service"), 100), text(searchParams.get("specialServiceName"), 80));
+  let occupiedAreas: string[] = [];
+  if (isIsoCalendarDate(date) && isValidServiceReportName(service)) {
+    const result = await callServiceReportGateway<{ areas?: string[] }>("report.areas", { date, service });
+    occupiedAreas = Array.isArray(result.areas) ? result.areas : [];
+  }
+  return NextResponse.json({ ok: true, name: member.name, canDelegate: ["service_manager", "hod", "admin", "super_admin"].includes(access.role), canOverride: ["service_manager", "admin", "super_admin"].includes(access.role), occupiedAreas }, { headers: { "Cache-Control": "no-store" } });
 }

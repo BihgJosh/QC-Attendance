@@ -1,5 +1,5 @@
 const GATEWAY_SECRET_HASH = "e961e32016c41f358eac3f9e1546b93d78bae0b9b30a446ccceecea47533fa41";
-const allowedOperations = new Set(["migration.import", "report.insert", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "manager.finalize", "admin.report-activity", "document.find", "document.insert", "activity.insert", "email.insert"]);
+const allowedOperations = new Set(["migration.import", "report.insert", "report.areas", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "manager.finalize", "admin.report-activity", "document.find", "document.insert", "activity.insert", "email.insert"]);
 type Json = Record<string, unknown>;
 
 function json(body: unknown, status = 200) {
@@ -156,6 +156,12 @@ Deno.serve(async (request) => {
       return json({ success: true });
     }
     if (operation === "manager.dashboard") return json({ ok: true, data: await dashboard(String(body.date || ""), String(body.service || "")) });
+    if (operation === "report.areas") {
+      const date = encodeURIComponent(String(body.date || ""));
+      const service = encodeURIComponent(String(body.service || ""));
+      const rows = await rest(`service_post_reports?select=area&report_date=eq.${date}&service=eq.${service}&order=created_at.asc`) as Json[];
+      return json({ ok: true, areas: [...new Set(rows.map((row) => String(row.area || "").trim()).filter(Boolean))] });
+    }
     if (operation === "manager.daily-report") return json({ ok: true, data: await dailyReport(String(body.date || "")) });
     if (operation === "admin.report-activity") return json({ ok: true, users: await reportActivity(String(body.from || ""), String(body.to || "")) });
     if (operation === "manager.finalize") {
@@ -190,14 +196,22 @@ Deno.serve(async (request) => {
       const rows = await rest(`service_generated_documents?select=id,document_url,status,generated_at&report_date=eq.${date}&service=eq.${service}&status=eq.Ready&order=generated_at.desc&limit=1`) as Json[];
       return json({ ok: true, row: rows[0] || null });
     }
-    const table = ({ "report.insert": "service_post_reports", "timer.insert": "service_timer_logs", "observer.insert": "service_observer_reports", "emergency.insert": "service_emergency_flags", "document.insert": "service_generated_documents", "activity.insert": "service_activity_log", "email.insert": "service_email_log" } as Record<string, string>)[operation];
+    if (operation === "report.insert") {
+      const row = body.row as Json;
+      const id = encodeURIComponent(String(row.id || ""));
+      const existing = await rest(`service_post_reports?select=id&id=eq.${id}&limit=1`) as Json[];
+      if (existing.length) return json({ success: true, created: false, row: existing[0] });
+      const rows = await rest("service_post_reports", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(row) }) as Json[];
+      return json({ success: true, created: true, row: rows[0] || null });
+    }
+    const table = ({ "timer.insert": "service_timer_logs", "observer.insert": "service_observer_reports", "emergency.insert": "service_emergency_flags", "document.insert": "service_generated_documents", "activity.insert": "service_activity_log", "email.insert": "service_email_log" } as Record<string, string>)[operation];
     const conflictKey = String((body.row as Json)?.source_fingerprint || "") ? "source_fingerprint" : "id";
     const rows = await rest(`${table}?on_conflict=${conflictKey}`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify(body.row) }) as Json[];
     return json({ success: true, created: rows.length > 0, row: rows[0] || null });
   } catch (error) {
     console.error("[qcu-service-reports]", error instanceof Error ? error.message : error);
     const typed = error as Error & { code?: string; status?: number };
-    if (typed.code === "23505") return json({ error: "A report for this service, area and reporter has already been submitted. Ask the Service Manager to review or correct the existing report.", code: "duplicate_submission" }, 409);
+    if (typed.code === "23505") return json({ error: "This location already has a report for the selected date and service. Choose another location or ask a Service Manager or administrator to override it.", code: "duplicate_submission" }, 409);
     return json({ error: typed.message || "Service report request failed." }, typed.status && typed.status < 500 ? typed.status : 500);
   }
 });

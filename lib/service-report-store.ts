@@ -4,6 +4,7 @@ import { getEnv, getSupabaseEnv } from "@/lib/env";
 
 type ServiceReportOperation =
   | "report.insert"
+  | "report.areas"
   | "timer.insert"
   | "observer.insert"
   | "emergency.insert"
@@ -41,7 +42,7 @@ export async function callServiceReportGateway<T>(
           Authorization: `Bearer ${anonKey}`,
           "x-qcu-operation-secret": gatewaySecret,
         },
-        body: JSON.stringify(operation === "manager.dashboard" || operation === "manager.daily-report" || operation === "manager.finalize" || operation === "admin.report-activity" || operation === "document.find" || operation === "emergency.list" || operation === "emergency.update"
+        body: JSON.stringify(operation === "manager.dashboard" || operation === "manager.daily-report" || operation === "manager.finalize" || operation === "admin.report-activity" || operation === "report.areas" || operation === "document.find" || operation === "emergency.list" || operation === "emergency.update"
           ? { operation, ...payload }
           : { operation, row: payload }),
       });

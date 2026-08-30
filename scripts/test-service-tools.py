@@ -19,6 +19,8 @@ with sync_playwright() as p:
 
         assert page.get_by_role("heading", name="One service. One clear record.").is_visible()
         assert page.get_by_role("heading", name="The right tool for every QC role.").is_visible()
+        assert page.get_by_role("heading", name="Select a tool to continue").is_visible()
+        assert page.locator('[aria-pressed="true"]').count() == 0
         for tool in ("Service Post", "Service Timer", "Observer Report", "Emergency Flag", "Service Manager"):
             assert page.get_by_role("heading", name=tool, exact=True).first.is_visible()
 
@@ -27,11 +29,17 @@ with sync_playwright() as p:
         page.get_by_role("button", name="Emergency").click()
         assert page.get_by_text("Immediate submission to the emergency feed", exact=True).is_visible()
 
-        assert page.locator('a[href="/qc-tools/post-report"]').count() >= 1
+        assert page.locator('a[href="/service-tools?tool=post-report#workflow"]').count() >= 1
         assert page.locator('a[href^="https://"]').count() == 0
         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
         page.screenshot(path=str(OUTPUT / f"qc-service-tools-{label}.png"), full_page=True)
         page.close()
+
+    selected = browser.new_page(viewport={"width": 390, "height": 844})
+    selected.goto(f"{BASE_URL}/service-tools?tool=timer#workflow", wait_until="networkidle")
+    assert selected.get_by_role("heading", name="Service Timer", exact=True).is_visible()
+    assert selected.get_by_role("button", name="Timer").get_attribute("aria-pressed") == "true"
+    selected.close()
 
     home = browser.new_page(viewport={"width": 1440, "height": 900})
     home.goto(BASE_URL, wait_until="networkidle")

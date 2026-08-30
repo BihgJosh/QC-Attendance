@@ -28,15 +28,6 @@ function abujaToday() {
   }).format(new Date());
 }
 
-function abujaDate(value: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Lagos",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(value));
-}
-
 type SuiteResult = {
   ok?: boolean;
   url?: unknown;
@@ -139,11 +130,7 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ ok: false, message: "Sign in with your member account first." }, { status: 401 });
     const access = await resolveUserAccess(session.email);
     const elevated = access.role === "admin" || access.role === "super_admin";
-    const activeAssignments = access.assignments.filter((assignment) => !date || (
-      date >= abujaDate(assignment.accessStartsAt) && date <= abujaDate(assignment.accessEndsAt)
-    ));
     if (!elevated && access.role !== "service_manager") return NextResponse.json({ ok: false, message: "Service Manager access is required." }, { status: 403 });
-    if (!elevated && activeAssignments.length === 0) return NextResponse.json({ ok: false, message: "Your schedule does not grant access on this date or the access window has expired." }, { status: 403 });
     if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     if (action === "getServices") {
       if (!isIsoCalendarDate(date)) return NextResponse.json({ ok: false, message: "Choose a valid report date." }, { status: 400 });
@@ -192,10 +179,14 @@ export async function POST(request: Request) {
       const dashboards = await Promise.all(requestedServices.map(async (serviceName) => {
         try {
           return { service: serviceName, result: await loadDashboard(date, serviceName) };
-        } catch {
+        } catch (error) {
+          console.error("[service-manager] Headcount source load failed", serviceName, error instanceof Error ? error.message : "Unknown error");
           return { service: serviceName, result: null };
         }
       }));
+      if (dashboards.some(({ result }) => !result?.ok || !result.data)) {
+        return NextResponse.json({ ok: false, message: "Some service headcounts could not be loaded. The existing document was not changed. Please retry." }, { status: 502 });
+      }
       const available: HeadcountService[] = dashboards.flatMap(({ service: serviceName, result }) => {
         if (!result?.ok || !result.data) return [];
         const rawHeadcount = result.data.headcount;
@@ -210,7 +201,7 @@ export async function POST(request: Request) {
       let document: Awaited<ReturnType<typeof updateHeadcountGoogleDocument>>;
       let headcountLoggingFailed = false;
       try {
-        document = await updateHeadcountGoogleDocument(date, available);
+        document = await updateHeadcountGoogleDocument(date, available, { summaryOnly: isAllServicesHeadcount });
       } catch (error) {
         console.error("[service-manager] Shared headcount document update failed", error instanceof Error ? error.message : "Unknown error");
         return NextResponse.json({ ok: false, message: "The shared headcount Google Doc could not be updated. Confirm that the service account has Editor access and the Google Docs API is enabled." }, { status: 502 });
@@ -222,6 +213,7 @@ export async function POST(request: Request) {
           url: document.url,
           requestId,
           actor: "Service Manager · Shared headcount",
+          documentType: "headcount",
         });
       } catch (error) {
         headcountLoggingFailed = true;
@@ -307,7 +299,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           ok: true,
           url: report.url,
-          message: "Compiled service report refreshed. Its audit log will be retried separately.",
+          message: "Compiled service report refreshed, but its audit log could not be saved. Please retry generation to record it.",
           warning: "logging_failed",
         }, { headers: { "Cache-Control": "no-store, max-age=0" } });
       }

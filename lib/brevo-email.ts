@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { getOptionalEnv } from "@/lib/env";
 
 export class EmailConfigurationError extends Error {
@@ -7,6 +8,12 @@ export class EmailConfigurationError extends Error {
     super(message);
     this.name = "EmailConfigurationError";
   }
+}
+
+function normalizeIdempotencyKey(value: string) {
+  const key = value.trim();
+  if (key.length > 0 && key.length <= 36 && /^[\x20-\x7e]+$/.test(key)) return key;
+  return createHash("sha256").update(key).digest("hex").slice(0, 36);
 }
 
 export async function sendBrevoEmail(input: {
@@ -23,13 +30,14 @@ export async function sendBrevoEmail(input: {
     throw new EmailConfigurationError("Email delivery is not configured. Add the Brevo API key and verified sender email.");
   }
 
+  const idempotencyKey = normalizeIdempotencyKey(input.idempotencyKey);
   const requestBody = JSON.stringify({
     sender: { name: senderName, email: senderEmail },
     to: [{ email: input.to }],
     ...(replyTo ? { replyTo: { email: replyTo } } : {}),
     subject: input.subject,
     htmlContent: input.html,
-    headers: { idempotencyKey: input.idempotencyKey },
+    headers: { idempotencyKey },
   });
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -53,7 +61,7 @@ export async function sendBrevoEmail(input: {
         return { messageId: result.messageId };
       }
       if (response.status === 400 && result.code === "duplicate_parameter") {
-        return { messageId: `idempotent:${input.idempotencyKey}` };
+        return { messageId: `idempotent:${idempotencyKey}` };
       }
       if ((response.status === 429 || response.status >= 500) && attempt === 0) {
         await new Promise((resolve) => setTimeout(resolve, 300));

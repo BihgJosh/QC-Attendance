@@ -56,19 +56,43 @@ export function organizeHeadcount(rows: HeadcountRow[]) {
 function serviceText(input: HeadcountService) {
   const organized = organizeHeadcount(Array.isArray(input.headcount.byDepartment) ? input.headcount.byDepartment : []);
   const reported = numberValue(input.headcount.grandTotal);
-  const displayedGrandTotal = adjustedTotal(organized.grandTotal || reported);
+  const total = organized.grandTotal || reported;
+  const adjusted = adjustedTotal(total);
   const sections = organized.sections.map((section) => `${section.title}\n${section.rows.map((row) => `${row.label}\nAdult = ${row.adults}  |  Children = ${row.children}`).join("\n\n")}`).join("\n\n");
   const warning = organized.grandTotal > 0 && reported > 0 && reported !== organized.grandTotal ? `\nReconciliation notice: submitted area rows total ${organized.grandTotal}, while the service report records ${reported}. Please verify the source entries.` : "";
   const splitNote = organized.grandTotal === 0 && reported > 0 ? "\nAdult/children breakdown was not submitted for this service." : "";
-  return `${input.service.toUpperCase()}\n\n${sections}\n\nSubtotal — Adult: ${organized.totals.adults}  |  Children: ${organized.totals.children}\nGrand Total (+2%) = ${displayedGrandTotal}${splitNote}${warning}`;
+  return `${input.service.toUpperCase()}\n\n${sections}\n\nSubtotal — Adult: ${organized.totals.adults}  |  Children: ${organized.totals.children}\nTotal = ${total}\nTotal (+2%) = ${adjusted}${splitNote}${warning}`;
 }
 
-function documentText(date: string, services: HeadcountService[]) {
+function summaryText(services: HeadcountService[]) {
+  const areas = new Map<string, { adults: number; children: number }>();
+  let total = 0;
+  for (const service of services) {
+    const organized = organizeHeadcount(Array.isArray(service.headcount.byDepartment) ? service.headcount.byDepartment : []);
+    total += organized.grandTotal || numberValue(service.headcount.grandTotal);
+    for (const section of organized.sections) {
+      const label = section.title === "MAIN CHURCH" ? "MAIN AUDITORIUM" : section.title;
+      const current = areas.get(label) || { adults: 0, children: 0 };
+      current.adults += section.rows.reduce((sum, row) => sum + row.adults, 0);
+      current.children += section.rows.reduce((sum, row) => sum + row.children, 0);
+      areas.set(label, current);
+    }
+  }
+  const areaSummary = [...areas.entries()].map(([label, counts]) => `${label}\nAdult = ${counts.adults}  |  Children = ${counts.children}`).join("\n\n");
+  const adults = [...areas.values()].reduce((sum, counts) => sum + counts.adults, 0);
+  const children = [...areas.values()].reduce((sum, counts) => sum + counts.children, 0);
+  return `ALL SERVICES HEADCOUNT SUMMARY\n\n${areaSummary}\n\nSubtotal — Adult: ${adults}  |  Children: ${children}\nTotal = ${total}\nTotal (+2%) = ${adjustedTotal(total)}`;
+}
+
+function documentText(date: string, services: HeadcountService[], summaryOnly: boolean) {
+  if (summaryOnly) {
+    return `QC SERVICE HEADCOUNT\nService date: ${date}  ·  Updated: ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n${summaryText(services)}\n`;
+  }
   const combined = services.reduce((sum, service) => {
     const organized = organizeHeadcount(Array.isArray(service.headcount.byDepartment) ? service.headcount.byDepartment : []);
-    return { adults: sum.adults + organized.totals.adults, children: sum.children + organized.totals.children, grand: sum.grand + adjustedTotal(organized.grandTotal || numberValue(service.headcount.grandTotal)) };
-  }, { adults: 0, children: 0, grand: 0 });
-  const summary = services.length > 1 ? `ALL SERVICES COMBINED\nAdults: ${combined.adults}  |  Children: ${combined.children}\nGrand Total (+2%) = ${combined.grand}\n\n` : "";
+    return { adults: sum.adults + organized.totals.adults, children: sum.children + organized.totals.children, total: sum.total + (organized.grandTotal || numberValue(service.headcount.grandTotal)) };
+  }, { adults: 0, children: 0, total: 0 });
+  const summary = services.length > 1 ? `ALL SERVICES COMBINED\nSubtotal — Adult: ${combined.adults}  |  Children: ${combined.children}\nTotal = ${combined.total}\nTotal (+2%) = ${adjustedTotal(combined.total)}\n\n` : "";
   return `QC SERVICE HEADCOUNT\nService date: ${date}  ·  Updated: ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n${summary}${services.map(serviceText).join("\n\n────────────────────────────────────────\n\n")}\n`;
 }
 
@@ -80,11 +104,11 @@ function docsClient() {
 
 let updateQueue = Promise.resolve();
 
-async function performUpdate(date: string, services: HeadcountService[]) {
+async function performUpdate(date: string, services: HeadcountService[], options: { summaryOnly?: boolean }) {
   if (!services.length) throw new Error("No headcount data is available for this selection.");
   const documentId = process.env.HEADCOUNT_GOOGLE_DOC_ID || DEFAULT_DOCUMENT_ID;
   const docs = docsClient();
-  const content = documentText(date, services);
+  const content = documentText(date, services, options.summaryOnly === true);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const current = await docs.documents.get({ documentId });
     const endIndex = current.data.body?.content?.at(-1)?.endIndex || 1;
@@ -108,8 +132,8 @@ async function performUpdate(date: string, services: HeadcountService[]) {
   return { id: documentId, url: documentId === DEFAULT_DOCUMENT_ID ? DEFAULT_DOCUMENT_URL : `https://docs.google.com/document/d/${documentId}/edit` };
 }
 
-export function updateHeadcountGoogleDocument(date: string, services: HeadcountService[]) {
-  const operation = updateQueue.then(() => performUpdate(date, services));
+export function updateHeadcountGoogleDocument(date: string, services: HeadcountService[], options: { summaryOnly?: boolean } = {}) {
+  const operation = updateQueue.then(() => performUpdate(date, services, options));
   updateQueue = operation.then(() => undefined, () => undefined);
   return operation;
 }

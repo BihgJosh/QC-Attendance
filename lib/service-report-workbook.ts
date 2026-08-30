@@ -82,11 +82,14 @@ export async function appendGeneratedDocumentLog(input: {
   url: string;
   actor?: string;
   requestId?: string;
+  documentType?: "full" | "headcount";
 }) {
   const loggedAt = new Date().toISOString();
-  const fingerprint = `document:full:${input.date}:${input.service}`;
+  const documentType = input.documentType || "full";
+  const eventId = input.requestId || randomUUID();
+  const fingerprint = `document:${documentType}:${input.date}:${input.service}:${eventId}`;
   const result = await callServiceReportGateway<{ row?: { id?: unknown } }>("document.insert", {
-    source_record_id: input.requestId || null,
+    source_record_id: eventId,
     report_date: input.date,
     service: input.service,
     document_url: input.url,
@@ -104,7 +107,7 @@ export async function appendGeneratedDocumentLog(input: {
     category: "Document",
     action: "Generated",
     actor: input.actor || "Service Manager",
-    summary: "Detailed service document generated",
+    summary: documentType === "headcount" ? "Headcount document generated" : "Detailed service document generated",
     source_record_id: recordId,
     status: "Success",
     source_fingerprint: `activity:${fingerprint}`,

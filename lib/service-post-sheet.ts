@@ -47,6 +47,7 @@ export type ServicePostReport = {
   teens: Record<string, string>;
   additionalComments: string;
   confirmAccurate: boolean;
+  assignmentOverride: boolean;
 };
 
 function escapeTitle(title: string) {
@@ -79,6 +80,8 @@ export async function appendServicePostReport(report: ServicePostReport) {
     additional_comments: report.additionalComments,
     submitted_at: submittedAt,
     source_fingerprint: `live:${recordId}`,
+    assignment_enforced: true,
+    assignment_override: report.assignmentOverride,
   });
   if (inserted.created === false) return;
   try {
