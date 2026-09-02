@@ -460,16 +460,16 @@ export function ServiceManagerDashboard() {
       <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} />
 
       {loading ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-cyan-700" /><span className="ml-3 text-sm font-semibold text-slate-600">Compiling every service…</span></div> : (
-        <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {serviceNames.map((service) => {
             const result = results.find((item) => item.service === service);
             const data = result?.data;
             const coverage = [data?.headcount?.byDepartment?.length, data?.timer, data?.observer].filter(Boolean).length;
-            return <article key={service} className="flex min-h-72 flex-col rounded-2xl bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.12)]">
+            return <article key={service} className="flex min-h-80 min-w-0 flex-col rounded-2xl bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.12)]">
               <div className="flex items-center justify-between gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-800"><ClipboardList className="h-5 w-5" /></span><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${data ? "bg-emerald-100 text-emerald-800 ring-emerald-300" : "bg-slate-100 text-slate-700 ring-slate-300"}`}>{data ? "Available" : "No data"}</span></div>
               <h4 className="mt-5 text-lg font-black tracking-tight text-slate-950">{service}</h4>
               <p className="mt-1 text-xs font-semibold text-slate-600">{date}</p>
-              <div className="mt-5 grid grid-cols-2 gap-2"><MiniMetric label="Worshippers +2%" value={adjustedHeadcount(data?.headcount?.grandTotal)} /><MiniMetric label="Incidents" value={numberValue(data?.incidentCount)} /><MiniMetric label="Emergency" value={data?.emergencies?.length || 0} /><MiniMetric label="Coverage" value={`${coverage}/3`} /></div>
+              <div className="mt-5 grid grid-cols-2 gap-3"><MiniMetric label="Worshippers +2%" value={adjustedHeadcount(data?.headcount?.grandTotal)} /><MiniMetric label="Incidents" value={numberValue(data?.incidentCount)} /><MiniMetric label="Emergency" value={data?.emergencies?.length || 0} /><MiniMetric label="Coverage" value={`${coverage}/3`} /></div>
               <div className="mt-auto grid gap-2 pt-5">
                 <button type="button" disabled={!data || headcountLoading !== null} onClick={() => generateHeadcount(service)} className="flex min-h-10 items-center justify-center gap-2 rounded-xl bg-violet-100 px-3 text-xs font-black text-violet-950 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
                   {headcountLoading === service ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />} Headcount doc
@@ -511,8 +511,8 @@ function Metric({ label, value, icon: Icon, prominent = false }: { label: string
 }
 
 function MiniMetric({ label, value }: { label: string; value: number | string }) {
-  const tone = label === "Worshippers" ? "bg-cyan-100 text-cyan-950" : label === "Incidents" ? "bg-amber-100 text-amber-950" : label === "Emergency" ? "bg-rose-100 text-rose-950" : "bg-violet-100 text-violet-950";
-  return <div className={`rounded-xl p-3 ${tone}`}><p className="text-lg font-black">{value}</p><p className="mt-0.5 text-[9px] font-black uppercase tracking-wider opacity-80">{label}</p></div>;
+  const tone = label.startsWith("Worshippers") ? "bg-cyan-100 text-cyan-950" : label === "Incidents" ? "bg-amber-100 text-amber-950" : label === "Emergency" ? "bg-rose-100 text-rose-950" : "bg-violet-100 text-violet-950";
+  return <div className={`min-w-0 rounded-xl p-4 ${tone}`}><p className="text-xl font-black">{value}</p><p className="mt-1 break-words text-[10px] font-black uppercase leading-4 tracking-wide opacity-80">{label}</p></div>;
 }
 
 function ReportSection({ title, icon: Icon, danger = false, children }: { title: string; icon: typeof Users; danger?: boolean; children: React.ReactNode }) {

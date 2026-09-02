@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     const teamMember = await getTeamMemberByEmail(session.email);
     if (!teamMember) return NextResponse.json({ error: "Your email is not registered in Team Data." }, { status: 403 });
     const name = teamMember.name;
-    if (!(await getAttendanceStatus())) {
+    if (!(await getAttendanceStatus()).isOpen) {
       return NextResponse.json({ error: "Attendance is currently closed." }, { status: 403 });
     }
 

@@ -3,6 +3,7 @@ import { getEnv, getSupabaseEnv } from "@/lib/env";
 
 type AttendanceSettings = {
   isOpen: boolean;
+  closesAt: string | null;
   churchLat: string;
   churchLng: string;
   allowedRadius: string;
@@ -79,12 +80,11 @@ async function callGateway<T>(
 }
 
 export async function getAttendanceStatus() {
-  const data = await callGateway<{ isOpen: boolean }>("status.get");
-  return data.isOpen;
+  return callGateway<{ isOpen: boolean; closesAt: string | null }>("status.get");
 }
 
-export async function updateAttendanceStatus(isOpen: boolean) {
-  return callGateway<{ success: boolean; isOpen: boolean }>("status.update", { isOpen });
+export async function updateAttendanceStatus(isOpen: boolean, closesAt: string | null = null) {
+  return callGateway<{ success: boolean; isOpen: boolean; closesAt: string | null }>("status.update", { isOpen, closesAt });
 }
 
 export async function getAttendanceSettings() {

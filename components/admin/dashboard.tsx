@@ -63,9 +63,28 @@ function attendanceDateKey(value: string) {
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
+function toLocalDateTime(value: string) {
+  const date = new Date(value);
+  return new Date(date.getTime() + 60 * 60_000).toISOString().slice(0, 16);
+}
+
+function watInputToIso(value: string) {
+  return new Date(`${value}:00+01:00`).toISOString();
+}
+
+function formatCloseTime(value: string) {
+  return new Intl.DateTimeFormat("en-NG", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Africa/Lagos",
+  }).format(new Date(value));
+}
+
 export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [closesAt, setClosesAt] = useState<string | null>(null);
+  const [scheduledClose, setScheduledClose] = useState("");
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [searchApproved, setSearchApproved] = useState("");
@@ -97,7 +116,12 @@ export function Dashboard() {
         fetch("/api/admin/settings"),
       ]);
 
-      if (statusRes.ok) setIsOpen((await statusRes.json()).isOpen);
+      if (statusRes.ok) {
+        const status = await statusRes.json();
+        setIsOpen(status.isOpen);
+        setClosesAt(status.closesAt || null);
+        setScheduledClose(status.closesAt ? toLocalDateTime(status.closesAt) : "");
+      }
       if (recordsRes.ok) setRecords(await recordsRes.json());
       if (settingsRes.ok) setSettings(await settingsRes.json());
     } catch {
@@ -180,13 +204,19 @@ export function Dashboard() {
       const res = await fetch("/api/admin/status", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isOpen: !isOpen }),
+        body: JSON.stringify({
+          isOpen: !isOpen,
+          closesAt: !isOpen && scheduledClose ? watInputToIso(scheduledClose) : null,
+        }),
       });
-      if (!res.ok) throw new Error("Failed to update status");
-      setIsOpen(!isOpen);
-      toast.success(`Attendance is now ${!isOpen ? "OPEN" : "CLOSED"}`);
-    } catch {
-      toast.error("Failed to update status.");
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || "Failed to update status");
+      setIsOpen(result.isOpen);
+      setClosesAt(result.closesAt || null);
+      if (!result.isOpen) setScheduledClose("");
+      toast.success(result.isOpen ? (result.closesAt ? `Attendance is open until ${formatCloseTime(result.closesAt)}` : "Attendance is now OPEN") : "Attendance is now CLOSED");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update status.");
     } finally {
       setTogglingStatus(false);
       setConfirmToggle(false);
@@ -427,6 +457,19 @@ export function Dashboard() {
               <CardDescription>Open or close attendance checking globally.</CardDescription>
             </CardHeader>
             <CardContent>
+              {!isOpen && !confirmToggle && (
+                <div className="mb-4 space-y-2">
+                  <Label htmlFor="attendance-closes-at">Close automatically — WAT (optional)</Label>
+                  <Input
+                    id="attendance-closes-at"
+                    type="datetime-local"
+                    value={scheduledClose}
+                    min={toLocalDateTime(new Date(Date.now() + 60_000).toISOString())}
+                    onChange={(event) => setScheduledClose(event.target.value)}
+                  />
+                  <p className="text-xs leading-5 text-muted-foreground">Leave blank to keep attendance open until an admin closes it.</p>
+                </div>
+              )}
               <AnimatePresence mode="wait">
                 {confirmToggle ? (
                   <motion.div
@@ -438,6 +481,7 @@ export function Dashboard() {
                     <p className="text-sm text-muted-foreground text-center">
                       Are you sure you want to {isOpen ? "close" : "open"} attendance?
                     </p>
+                    {!isOpen && scheduledClose && <p className="text-xs font-medium text-center text-foreground">It will close automatically at {formatCloseTime(watInputToIso(scheduledClose))}.</p>}
                     <div className="flex gap-2">
                       <Button
                         variant={isOpen ? "destructive" : "gradient"}
@@ -484,7 +528,7 @@ export function Dashboard() {
                   )}
                 </div>
                 <span className="ml-2 text-xs text-muted-foreground">
-                  {isOpen ? "Live — accepting check-ins" : "Inactive — no check-ins accepted"}
+                  {isOpen ? (closesAt ? `Live — closes automatically ${formatCloseTime(closesAt)}` : "Live — accepting check-ins") : "Inactive — no check-ins accepted"}
                 </span>
               </div>
             </CardContent>

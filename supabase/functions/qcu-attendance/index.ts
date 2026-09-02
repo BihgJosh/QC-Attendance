@@ -204,13 +204,21 @@ Deno.serve(async (request) => {
     if (!expectedHash || !safeEqual(suppliedHash, expectedHash)) return json({ error: "Unauthorized." }, 401);
 
     if (operation === "status.get") {
-      const rows = await rest("attendance_settings?select=is_open&id=eq.1&limit=1") as Json[];
-      return json({ isOpen: Boolean(rows[0]?.is_open) });
+      const rows = await rest("attendance_settings?select=is_open,closes_at&id=eq.1&limit=1") as Json[];
+      const row = rows[0] || {};
+      const closesAt = row.closes_at ? String(row.closes_at) : null;
+      const expired = Boolean(row.is_open) && Boolean(closesAt) && Date.parse(closesAt!) <= Date.now();
+      if (expired) {
+        await rest("attendance_settings?id=eq.1", { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_open: false, closes_at: null, updated_at: new Date().toISOString() }) });
+      }
+      return json({ isOpen: Boolean(row.is_open) && !expired, closesAt: expired ? null : closesAt });
     }
     if (operation === "status.update") {
       const isOpen = body.isOpen === true;
-      await rest("attendance_settings?id=eq.1", { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_open: isOpen, updated_at: new Date().toISOString() }) });
-      return json({ success: true, isOpen });
+      const closesAt = isOpen && typeof body.closesAt === "string" ? body.closesAt : null;
+      if (closesAt && (!Number.isFinite(Date.parse(closesAt)) || Date.parse(closesAt) <= Date.now())) return json({ error: "Closing time must be in the future." }, 400);
+      await rest("attendance_settings?id=eq.1", { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_open: isOpen, closes_at: closesAt, updated_at: new Date().toISOString() }) });
+      return json({ success: true, isOpen, closesAt });
     }
     if (operation === "settings.get") {
       const rows = await rest("attendance_settings?select=is_open,church_latitude,church_longitude,allowed_radius_meters,location_name,timezone_label&id=eq.1&limit=1") as Json[];
@@ -232,6 +240,15 @@ Deno.serve(async (request) => {
       return json({ memberName: rows[0] ? String(rows[0].member_name) : null });
     }
     if (operation === "attendance.insert") {
+      if (body.adminOverride !== true) {
+        const settings = await rest("attendance_settings?select=is_open,closes_at&id=eq.1&limit=1") as Json[];
+        const attendance = settings[0] || {};
+        const closesAt = attendance.closes_at ? String(attendance.closes_at) : null;
+        if (!attendance.is_open || (closesAt && Date.parse(closesAt) <= Date.now())) {
+          if (attendance.is_open) await rest("attendance_settings?id=eq.1", { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_open: false, closes_at: null, updated_at: new Date().toISOString() }) });
+          return json({ error: "Attendance is closed.", code: "ATTENDANCE_CLOSED" }, 409);
+        }
+      }
       const record = body.record as Json;
       const dateParts = String(record.date || "").split("/");
       const dateKey = dateParts.length === 3
