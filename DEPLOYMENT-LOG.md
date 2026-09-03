@@ -2,6 +2,36 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-03 — qcsoja.com domain migration
+
+- Source commit: `573ffae` (`Configure qcsoja.com as production domain`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_8J7tt5xSfY4DZ6hXDdjyZ2ZZ4Zdi`.
+- Vercel status: **READY**, `qcsoja.com` production alias confirmed.
+- Live verification completed: **2026-09-03 15:22:43 WAT**.
+- Database/API migrations: none required.
+
+### Changes
+
+- Attached `qcsoja.com`, `www.qcsoja.com`, and the legacy `qcunit.vercel.app` address to the QCU Vercel project.
+- Configured Namecheap authoritative DNS with Vercel's recommended apex A records `216.198.79.1` and `64.29.17.1` and retained the existing Vercel `www` CNAME.
+- Removed the conflicting parking A record and Namecheap URL redirect; disabled Namecheap's HTTPS proxy on Vercel DNS records.
+- Preserved Namecheap email forwarding and SPF configuration.
+- Set `www.qcsoja.com` and `qcunit.vercel.app` to permanent HTTP 308 redirects to `qcsoja.com`, preserving request paths.
+- Added `NEXT_PUBLIC_SITE_URL=https://qcsoja.com` to Vercel Production and Preview environments.
+- Centralized active site URL usage and moved posting/profile email links, canonical metadata, and Open Graph metadata to `qcsoja.com`.
+
+### Verification
+
+- Namecheap authoritative DNS returned both recommended Vercel apex A records and the Vercel `www` CNAME.
+- Vercel domain verification returned `configured-correctly`, with no issues or conflicts.
+- Local and Vercel production builds passed; all 58 static pages generated.
+- `https://qcsoja.com/` and `/api/status` returned HTTP 200 over HTTPS.
+- `www.qcsoja.com/member/profile` and `qcunit.vercel.app/member/profile` returned HTTP 308 to the equivalent `qcsoja.com` path.
+- Production HTML contains the `https://qcsoja.com` canonical metadata.
+- Historical deployment URLs and the separate `qc-soja-suite.vercel.app` integration were not rewritten.
+- Unrelated local changes and artifacts were excluded from the release archive.
+
 ## 2026-09-03 — Branded 404 and request loading states
 
 - Source commit: `b650eeb` (`Add branded 404 and request loading states`).
