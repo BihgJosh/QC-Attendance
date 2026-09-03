@@ -2,6 +2,32 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-03 — Branded 404 and request loading states
+
+- Source commit: `b650eeb` (`Add branded 404 and request loading states`).
+- Production: https://qcunit.vercel.app
+- Deployment: `dpl_HMWrFVHSa1fpettgDVXhSfme4Egi`.
+- Vercel status: **READY**, production alias confirmed.
+- Live verification completed: **2026-09-03 12:52:47 WAT**.
+- Database/API migrations: none required.
+
+### Changes
+
+- Added a responsive custom 404 page using the QC logo, black/navy canvas, cyan-to-purple 404 treatment, flight path and clear recovery actions.
+- Added a shared logo-based loading animation for route transitions and browser requests.
+- Delayed the request overlay by 220 ms to avoid flashing on fast requests and kept it visible briefly enough to be perceived when shown.
+- Added reduced-motion behavior and accessible live status/dialog labels.
+
+### Verification
+
+- TypeScript check passed.
+- Local and Vercel production builds passed; all 58 static pages generated.
+- Mobile (390 × 844) and desktop (1440 × 1000) 404 renders confirmed the approved layout and actions.
+- Production `/api/status` returned HTTP 200.
+- Production unknown-route check returned HTTP 404 and contained the branded heading, logo and Return home action.
+- Impeccable reported only intentional design advisories for the approved gradient display treatment and route-specific dark palette; no blocking structural or accessibility finding.
+- Unrelated local changes and artifacts were excluded from the release archive.
+
 ## 2026-09-03 — Attendance auto-close scheduler and wider service cards
 
 - Source commit: `bccf192` (`Add scheduled attendance closing and widen report cards`).
