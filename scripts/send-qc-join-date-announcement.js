@@ -17,7 +17,7 @@ function escapeHtml(value) {
   return value.replace(/[&<>\"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[character]);
 }
 
-function emailHtml(name) {
+function emailHtml(name, siteUrl) {
   return `<div style="margin:0;background:#f7f5fb;padding:32px 12px;font-family:Arial,Helvetica,sans-serif;color:#0f172a">
     <div style="max-width:620px;margin:0 auto;overflow:hidden;border:1px solid #e2e8f0;border-radius:18px;background:#ffffff;box-shadow:0 12px 30px rgba(15,23,42,.08)">
       <div style="background-color:#39A9DB;background-image:linear-gradient(135deg,#39A9DB 0%,#8E14A8 100%);padding:30px 26px;color:#ffffff">
@@ -28,7 +28,7 @@ function emailHtml(name) {
         <p style="margin:0 0 16px;font-size:16px">Hello <strong>${escapeHtml(name)}</strong>,</p>
         <p style="margin:0 0 22px;font-size:15px;line-height:1.65;color:#334155">This is the final reminder to complete your QC member profile. Please provide the required information now so our team records remain accurate and complete.</p>
         <div style="margin:22px 0;padding:15px 16px;border-left:4px solid #39A9DB;border-radius:8px;background:#EAF9FF;color:#164e63;font-size:14px;line-height:1.6">Sign in, open <strong>My Profile</strong>, complete every required field—including your residential address and the year you joined Streams of Joy Abuja—and save your profile.</div>
-        <p style="margin:0 0 24px"><a href="https://qcunit.vercel.app/member/profile" style="display:inline-block;border-radius:10px;background-color:#8E14A8;background-image:linear-gradient(135deg,#39A9DB 0%,#8E14A8 100%);padding:13px 20px;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none">Update My Profile Now</a></p>
+        <p style="margin:0 0 24px"><a href="${siteUrl}/member/profile" style="display:inline-block;border-radius:10px;background-color:#8E14A8;background-image:linear-gradient(135deg,#39A9DB 0%,#8E14A8 100%);padding:13px 20px;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none">Update My Profile Now</a></p>
         <p style="margin:0;color:#64748b;font-size:13px;line-height:1.55">Please act on this final reminder today.</p>
       </div>
       <div style="border-top:1px solid #e2e8f0;background:#f8fafc;padding:16px 26px;text-align:center;color:#64748b;font-size:12px">QC Unit · Excellence in every detail</div>
@@ -39,6 +39,7 @@ function emailHtml(name) {
 async function main() {
   const send = process.argv.includes("--send");
   const env = { ...loadEnv(".env"), ...loadEnv(".env.local") };
+  const siteUrl = String(env.NEXT_PUBLIC_SITE_URL || "https://qcsoja.com").replace(/\/+$/, "");
   const required = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_GATEWAY_SECRET", "BREVO_API_KEY", "BREVO_SENDER_EMAIL"];
   const missing = required.filter((name) => !env[name]);
   if (missing.length) throw new Error(`Missing configuration: ${missing.join(", ")}`);
@@ -71,7 +72,7 @@ async function main() {
           method: "POST",
           signal: AbortSignal.timeout(10_000),
           headers: { "Content-Type": "application/json", "api-key": env.BREVO_API_KEY },
-          body: JSON.stringify({ sender: { name: env.BREVO_SENDER_NAME || "QC Unit", email: env.BREVO_SENDER_EMAIL }, to: [{ email: recipient.email }], ...(env.BREVO_REPLY_TO_EMAIL ? { replyTo: { email: env.BREVO_REPLY_TO_EMAIL } } : {}), subject: "Final Reminder: Complete your QC profile today", htmlContent: emailHtml(recipient.name), headers: { idempotencyKey } }),
+          body: JSON.stringify({ sender: { name: env.BREVO_SENDER_NAME || "QC Unit", email: env.BREVO_SENDER_EMAIL }, to: [{ email: recipient.email }], ...(env.BREVO_REPLY_TO_EMAIL ? { replyTo: { email: env.BREVO_REPLY_TO_EMAIL } } : {}), subject: "Final Reminder: Complete your QC profile today", htmlContent: emailHtml(recipient.name, siteUrl), headers: { idempotencyKey } }),
         });
         const data = await response.json().catch(() => ({}));
         if (response.ok || (response.status === 400 && data.code === "duplicate_parameter")) return { delivered: true };

@@ -5,6 +5,7 @@ import { getOptionalEnv } from "@/lib/env";
 import { getConfig } from "@/lib/google-sheets";
 import { DEFAULT_HOMEPAGE_CONTENT, normalizeHomepageContent, type ServiceDay } from "@/lib/homepage-content";
 import { postingContentRecipients, postingEmailHtml, postingEmailIdempotencyKey } from "@/lib/posting-email";
+import { getSiteUrl } from "@/lib/site-url";
 
 const CONTENT_CONFIG_KEY = "homepageContent";
 
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     if (!getOptionalEnv("BREVO_API_KEY") || !getOptionalEnv("BREVO_SENDER_EMAIL")) {
       throw new EmailConfigurationError("Email delivery is not configured. Add the Brevo API key and verified sender email.");
     }
-    const postingsUrl = "https://qcunit.vercel.app/#postings";
+    const postingsUrl = `${getSiteUrl()}/#postings`;
     const completed: Array<{ delivered: boolean; email: string; reason?: string }> = [];
     for (let offset = 0; offset < recipients.length; offset += 8) {
       completed.push(...await Promise.all(recipients.slice(offset, offset + 8).map(async (recipient) => {

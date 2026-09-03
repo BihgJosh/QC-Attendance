@@ -7,11 +7,21 @@ import { Toaster } from "@/components/ui/sonner";
 import { PWARegister } from "@/components/pwa-register";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { GlobalRequestLoader } from "@/components/global-request-loader";
+import { getSiteUrl } from "@/lib/site-url";
+
+const siteUrl = getSiteUrl();
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Quality Control Unit | Streams of Joy International",
   description: "The home of the Streams of Joy Quality Control Unit — announcements, postings, uniform guidance and attendance.",
   manifest: "/manifest.webmanifest",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: siteUrl,
+    siteName: "QC Streams of Joy Abuja",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
