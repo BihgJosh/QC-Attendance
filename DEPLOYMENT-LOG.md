@@ -2,6 +2,35 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-04 — Admin login protection and emergency replay prevention
+
+- Source commit: `555f647` (`Harden admin login and emergency alerts`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_HcoXX9xpXpEfLGdBnz316uuhYKdX`.
+- Vercel status: **READY**, `qcsoja.com` production alias confirmed.
+- Live verification completed: **2026-09-04 10:08:44 WAT**.
+- Supabase migration: `admin_login_protection`, applied successfully.
+- Supabase Edge Function: `qcu-attendance` version 39, **ACTIVE**.
+
+### Changes
+
+- Added durable per-client administrator login throttling: five failed attempts trigger a 15-minute lockout.
+- Added a wider shared-credential guard that locks after 25 failures in 15 minutes to limit distributed guessing.
+- Replaced the password-derived administrator cookie with a signed, expiring session that uses an independent production secret; changing the password still invalidates existing sessions.
+- Applied the same protected verifier to the administrator login aliases and attendance override path.
+- Prevented duplicate emergency submissions from broadcasting repeat notifications; the database insert result is authoritative and the notification topic is stable per submission ID.
+- MFA was intentionally postponed at the user's direction.
+
+### Verification
+
+- TypeScript, diff checks, local production build and Vercel production build passed; all 58 static pages generated.
+- Database lockout reached the expected locked state after five controlled failures; the temporary test row was removed and confirmed absent.
+- Anonymous and authenticated roles cannot execute the lockout functions; `service_role` can.
+- Production administrator login returned HTTP 200, issued an administrator cookie, and accessed `/api/admin/settings` successfully.
+- Production `/api/status` returned HTTP 200.
+- No emergency notification was sent during verification.
+- Unrelated local changes and artifacts were excluded from the deployment snapshot.
+
 ## 2026-09-03 — qcsoja.com domain migration
 
 - Source commit: `573ffae` (`Configure qcsoja.com as production domain`).
