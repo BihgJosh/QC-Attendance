@@ -6,7 +6,6 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { PWARegister } from "@/components/pwa-register";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
-import { GlobalRequestLoader } from "@/components/global-request-loader";
 import { getSiteUrl } from "@/lib/site-url";
 
 const siteUrl = getSiteUrl();
@@ -59,7 +58,6 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <div className="noise-texture" />
           </div>
           {children}
-          <GlobalRequestLoader />
           <Toaster richColors position="top-right" />
           <PWARegister />
           <PWAInstallPrompt />

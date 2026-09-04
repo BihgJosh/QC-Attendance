@@ -94,7 +94,7 @@
   }
 }
 
-/* Branded request and route loading */
+/* Branded route loading */
 .qc-route-loading {
   min-height: 100svh;
   display: grid;
@@ -102,33 +102,6 @@
   padding: 1.5rem;
   background: #050d1b;
   color: white;
-}
-
-.qc-request-loader {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  padding: 1.5rem;
-}
-
-.qc-request-loader__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgb(3 10 23 / 0.72);
-  backdrop-filter: blur(7px);
-}
-
-.qc-request-loader__card {
-  position: relative;
-  width: min(100%, 20rem);
-  padding: 2rem;
-  border: 1px solid rgb(255 255 255 / 0.14);
-  border-radius: 1.5rem;
-  background: linear-gradient(145deg, rgb(10 27 49 / 0.98), rgb(8 18 36 / 0.98));
-  color: white;
-  box-shadow: 0 32px 90px rgb(0 0 0 / 0.42);
 }
 
 .qc-loader__mark {
