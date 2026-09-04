@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isValidAdminPassword, setAdminSession } from "@/lib/auth";
+import { setAdminSession } from "@/lib/auth";
+import { verifySharedAdminAccess } from "@/lib/admin-login-security";
 
 export async function POST(req: Request) {
   try {
@@ -9,7 +10,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Password is required" }, { status: 400 });
     }
 
-    if (isValidAdminPassword(password)) {
+    const verification = await verifySharedAdminAccess(req, String(password));
+    if (verification.ok) {
       const sessionSet = await setAdminSession();
 
       if (!sessionSet) {
@@ -19,7 +21,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true });
     }
 
-    return NextResponse.json({ error: "Invalid admin password" }, { status: 401 });
+    return NextResponse.json({ error: verification.error }, { status: verification.status });
   } catch (error) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

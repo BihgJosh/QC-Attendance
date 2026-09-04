@@ -25,7 +25,7 @@ function escapeTitle(title: string) {
   return `'${title.replace(/'/g, "''")}'`;
 }
 
-export async function appendEmergencyFlag(flag: EmergencyFlag) {
+export async function appendEmergencyFlag(flag: EmergencyFlag): Promise<{ created: boolean }> {
   const now = new Date();
   const date = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Africa/Lagos",
@@ -47,7 +47,7 @@ export async function appendEmergencyFlag(flag: EmergencyFlag) {
     submitted_at_ms: now.getTime(),
     source_fingerprint: `live:${recordId}`,
   });
-  if (inserted.created === false) return;
+  if (inserted.created === false) return { created: false };
   try {
     const env = getGoogleEnv();
     const auth = new google.auth.JWT({
@@ -81,6 +81,7 @@ export async function appendEmergencyFlag(flag: EmergencyFlag) {
     console.error("[emergency-flag] Legacy workbook write failed", error instanceof Error ? error.message : error);
   }
   await syncFinalReportForDate(date).catch((error) => console.error("[emergency-flag] Final daily report refresh failed", error instanceof Error ? error.message : error));
+  return { created: true };
 }
 
 export async function updateEmergencyFlagStatus(input: { id: string; date: string; status: "Resolved" | "Escalated" }) {

@@ -326,7 +326,7 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
                 </div>
                 <h3 className="text-base font-semibold mb-1">Service Already Recorded</h3>
                 <p className="text-xs text-muted-foreground max-w-xs">
-                  This device has already signed attendance for this service today. An administrator can override this with their admin password.
+                   This device has already signed attendance for this service today. An administrator can override this with their admin password.
                 </p>
               </div>
 

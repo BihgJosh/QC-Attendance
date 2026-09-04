@@ -27,8 +27,8 @@ with sync_playwright() as p:
     console_errors = []
     page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
 
-    session = hashlib.sha256(f"qcu-attendance-admin-session:{admin_password()}".encode()).hexdigest()
-    page.context.add_cookies([{"name": "admin_session", "value": session, "url": BASE_URL, "sameSite": "Strict"}])
+    response = page.request.post(f"{BASE_URL}/api/admin/login", data={"password": admin_password()})
+    assert response.ok, response.text()
     page.route("**/api/member/profile", lambda route: route.fulfill(status=200, content_type="application/json", body='{"profile":{"profileComplete":true}}'))
     page.goto(f"{BASE_URL}/admin/dashboard", wait_until="domcontentloaded", timeout=60_000)
 

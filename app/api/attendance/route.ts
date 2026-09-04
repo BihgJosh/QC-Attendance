@@ -3,7 +3,7 @@ import { appendAttendance, AttendanceStoreError, getAttendanceSettings, getAtten
 import { calculateDistance } from "@/lib/geofencing";
 import { getAttendanceEnvConfig } from "@/lib/env";
 import { formatAbujaTime, formatAbujaDate } from "@/lib/timezone";
-import { isValidAdminPassword } from "@/lib/auth";
+import { verifySharedAdminAccess } from "@/lib/admin-login-security";
 import { isAllowedAttendanceService, type AttendanceRecord } from "@/types";
 import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
@@ -51,8 +51,9 @@ export async function POST(request: Request) {
     }
 
     const adminOverrideUsed = typeof adminPassword === "string" && adminPassword.length > 0;
-    if (adminOverrideUsed && !isValidAdminPassword(adminPassword)) {
-      return NextResponse.json({ error: "Invalid admin override." }, { status: 401 });
+    if (adminOverrideUsed) {
+      const verification = await verifySharedAdminAccess(request, adminPassword);
+      if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
     }
 
     const settings = await getAttendanceSettings();

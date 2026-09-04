@@ -57,14 +57,17 @@ export async function POST(request: Request) {
     }
     const flag = { submissionId, location, description, reportedBy: member.name, reporterEmail: session.email };
 
-    await appendEmergencyFlag(flag);
+    const stored = await appendEmergencyFlag(flag);
+    if (!stored.created) {
+      return NextResponse.json({ ok: true, duplicate: true, message: "This emergency alert was already received." });
+    }
     const warnings: string[] = [];
     try {
       const notificationResult = await notifyTeam({
         title: `Emergency — ${location}`,
         body: `${description} — reported by ${member.name}`,
         url: "/qc-tools/emergency",
-        tag: `qc-emergency-${Date.now()}`,
+        tag: `qc-emergency-${submissionId}`,
         urgency: "high",
         ttlSeconds: 60 * 60 * 24,
         requireInteraction: true,

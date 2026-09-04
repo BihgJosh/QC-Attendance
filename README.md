@@ -15,7 +15,8 @@ A geofenced attendance platform built for church departments to prevent fraudule
 Create `.env.local` in the project root for local development:
 
 ```env
-ADMIN_PASSWORD=QCADMIN2026
+ADMIN_PASSWORD=replace-with-a-long-random-password
+ADMIN_SESSION_SECRET=replace-with-an-independent-32-byte-random-secret
 SHARED_PASSWORD=QCSOJA
 CHURCH_LATITUDE=0.000
 CHURCH_LONGITUDE=0.000
@@ -95,6 +96,7 @@ Generating a headcount updates this shared document in place. The latest individ
 
 ```env
 ADMIN_PASSWORD=
+ADMIN_SESSION_SECRET=
 SHARED_PASSWORD=
 CHURCH_LATITUDE=
 CHURCH_LONGITUDE=

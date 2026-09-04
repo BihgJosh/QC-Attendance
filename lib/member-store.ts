@@ -29,7 +29,9 @@ type MemberOperation =
   | "roles.upsert"
   | "roles.remove"
   | "assignments.upsert"
-  | "assignments.remove";
+  | "assignments.remove"
+  | "admin.login-check"
+  | "admin.login-record";
 
 export type MemberStatus = {
   email: string;
@@ -77,7 +79,8 @@ function retryDelay(attempt: number) {
 async function callMemberGateway<T>(operation: MemberOperation, payload: Record<string, unknown> = {}) {
   const { endpoint, anonKey, gatewaySecret } = gatewayConfiguration();
 
-  for (let attempt = 0; attempt < GATEWAY_ATTEMPTS; attempt += 1) {
+  const maximumAttempts = operation === "admin.login-record" ? 1 : GATEWAY_ATTEMPTS;
+  for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
     try {
       const response = await fetch(endpoint, {
         method: "POST",
@@ -94,7 +97,7 @@ async function callMemberGateway<T>(operation: MemberOperation, payload: Record<
       const data = await response.json().catch(() => ({})) as { error?: unknown };
       if (response.ok) return data as T;
 
-      if (!RETRYABLE_STATUS_CODES.has(response.status) || attempt === GATEWAY_ATTEMPTS - 1) {
+      if (!RETRYABLE_STATUS_CODES.has(response.status) || attempt === maximumAttempts - 1) {
         throw new MemberStoreError(
           typeof data.error === "string" ? data.error : "Member authentication is temporarily unavailable.",
           response.status >= 500 ? 503 : response.status,
@@ -102,8 +105,8 @@ async function callMemberGateway<T>(operation: MemberOperation, payload: Record<
       }
     } catch (error) {
       if (error instanceof MemberStoreError) throw error;
-      if (attempt === GATEWAY_ATTEMPTS - 1) {
-        console.error(`[member-store] ${operation} gateway request failed after ${GATEWAY_ATTEMPTS} attempts`, error);
+      if (attempt === maximumAttempts - 1) {
+        console.error(`[member-store] ${operation} gateway request failed after ${maximumAttempts} attempts`, error);
         throw new MemberStoreError("Member authentication is temporarily unavailable. Please try again.", 503);
       }
     }
@@ -258,4 +261,14 @@ export function upsertServiceAssignment(input: { id?: string; serviceDate: strin
 
 export function removeServiceAssignment(id: string) {
   return callMemberGateway<{ success: boolean }>("assignments.remove", { id });
+}
+
+export type AdminLoginAttempt = { allowed: boolean; lockedUntil: string | null; attemptsRemaining?: number };
+
+export function checkAdminLoginAttempt(clientKey: string) {
+  return callMemberGateway<AdminLoginAttempt>("admin.login-check", { clientKey });
+}
+
+export function recordAdminLoginAttempt(clientKey: string, succeeded: boolean, maximumFailures: number) {
+  return callMemberGateway<AdminLoginAttempt>("admin.login-record", { clientKey, succeeded, maximumFailures });
 }
