@@ -2,6 +2,28 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-04 — Page-only loading screen
+
+- Source commit: `4b0a0e7` (`Limit loader to page transitions`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_5cw1AoV9fwrwbodUMPVXaYQSkG2z`.
+- Vercel status: **READY**, `qcsoja.com` production alias confirmed.
+- Live verification completed: **2026-09-04 20:35:36 WAT**.
+- Database/API migrations: none required.
+
+### Changes
+
+- Removed the global browser-request interceptor and its full-screen overlay.
+- Retained the branded Next.js route loader only for genuine new-page loading.
+- Background requests, form submissions, refresh buttons, and same-page updates no longer trigger the loading screen.
+
+### Verification
+
+- TypeScript, diff checks, local production build and Vercel production build passed; all 58 static pages generated.
+- Source scan confirmed the global request loader and overlay styles are absent while `app/loading.tsx` remains.
+- Production `/api/status` returned HTTP 200.
+- Unrelated local changes and artifacts were excluded from the deployment snapshot.
+
 ## 2026-09-04 — Admin login protection and emergency replay prevention
 
 - Source commit: `555f647` (`Harden admin login and emergency alerts`).
