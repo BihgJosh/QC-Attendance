@@ -5,9 +5,6 @@ import { CalendarDays, Clock3, ExternalLink, FileSpreadsheet, Loader2, RefreshCw
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CustomSelect } from "@/components/ui/custom-select";
 
 type AuditMatrix = {
   generatedAt: string;
@@ -17,15 +14,7 @@ type AuditMatrix = {
   approvedCount: number;
 };
 
-function today() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-}
-
 export function AttendanceAudit() {
-  const currentDate = today();
-  const [from, setFrom] = useState(`${currentDate.slice(0, 4)}-01-01`);
-  const [to, setTo] = useState(currentDate);
-  const [service, setService] = useState("All");
   const [matrix, setMatrix] = useState<AuditMatrix | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -35,8 +24,7 @@ export function AttendanceAudit() {
     setLoading(true);
     setSheetUrl("");
     try {
-      const query = new URLSearchParams({ from, to, service });
-      const response = await fetch(`/api/admin/attendance-audit?${query}`, { cache: "no-store" });
+      const response = await fetch("/api/admin/attendance-audit", { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "The audit preview could not be loaded.");
       setMatrix(data);
@@ -46,7 +34,7 @@ export function AttendanceAudit() {
     } finally {
       setLoading(false);
     }
-  }, [from, service, to]);
+  }, []);
 
   useEffect(() => { void loadPreview(); }, [loadPreview]);
 
@@ -57,7 +45,6 @@ export function AttendanceAudit() {
       const response = await fetch("/api/admin/attendance-audit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, service }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof data.error === "string" ? data.error : "The audit sheet could not be generated.");
@@ -77,7 +64,7 @@ export function AttendanceAudit() {
       <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 id="attendance-audit-title" className="text-2xl font-bold tracking-tight sm:text-3xl">Attendance audit</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Every registered member appears vertically. Each known service is a dated column, and an approved check-in shows the earliest recorded attendance time.</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">Every registered member appears vertically. Each Sunday since launch is a dated column, and an approved check-in shows the earliest recorded attendance time.</p>
         </div>
         <Button type="button" variant="gradient" className="min-h-11 shrink-0" onClick={generateSheet} disabled={generating || loading || !matrix}>
           {generating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSpreadsheet className="mr-2 h-4 w-4" />}
@@ -87,15 +74,14 @@ export function AttendanceAudit() {
 
       <Card variant="glass">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base"><CalendarDays className="h-5 w-5 text-primary" />Report range</CardTitle>
-          <CardDescription>The current year is selected by default. Narrow the range when you need a shorter leadership report.</CardDescription>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base"><CalendarDays className="h-5 w-5 text-primary" />Sunday attendance only</CardTitle>
+              <CardDescription className="mt-1">From the first live Sunday on 19 July 2026. Thursday, special-service and incorrectly dated Sunday records are excluded.</CardDescription>
+            </div>
+            <Button type="button" variant="outline" className="min-h-11" onClick={loadPreview} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh preview</Button>
+          </div>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-4">
-          <div className="space-y-2"><Label htmlFor="audit-from">From</Label><Input id="audit-from" type="date" value={from} max={to} onChange={(event) => setFrom(event.target.value)} className="w-44" /></div>
-          <div className="space-y-2"><Label htmlFor="audit-to">To</Label><Input id="audit-to" type="date" value={to} min={from} max={currentDate} onChange={(event) => setTo(event.target.value)} className="w-44" /></div>
-          <div className="min-w-44 space-y-2"><Label>Service</Label><CustomSelect id="audit-service" ariaLabel="Filter audit by service" value={service} onChange={setService} options={[{ value: "All", label: "All services" }, { value: "Sunday", label: "Sunday" }, { value: "Thursday", label: "Thursday" }, { value: "Other", label: "Other" }]} /></div>
-          <Button type="button" variant="outline" className="min-h-10" onClick={loadPreview} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh preview</Button>
-        </CardContent>
       </Card>
 
       {sheetUrl && <div role="status" className="flex flex-col gap-3 rounded-2xl border border-emerald-300/40 bg-emerald-500/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between"><span className="font-medium text-emerald-800 dark:text-emerald-200">The dated attendance report tab is updated and ready.</span><a href={sheetUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 font-bold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"><ExternalLink className="h-4 w-4" />Open Google Sheet</a></div>}

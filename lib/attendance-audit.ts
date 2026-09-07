@@ -4,15 +4,13 @@ import { google, sheets_v4 } from "googleapis";
 import { getAttendanceRecords, getWhitelist } from "@/lib/attendance-store";
 import { getGoogleEnv } from "@/lib/env";
 import type { AttendanceRecord } from "@/types";
-import { isSpecialAttendanceService } from "@/types";
 
 const AUDIT_SHEET_TITLE = "Attendance Audit";
 const MAX_SERVICE_COLUMNS = 200;
+export const ATTENDANCE_PLATFORM_LIVE_DATE = "2026-07-19";
 
 export type AuditFilters = {
-  from?: string;
   to?: string;
-  service?: string;
 };
 
 export type AuditServiceColumn = {
@@ -66,20 +64,15 @@ function formatDate(date: string) {
 function recordIsInRange(record: AttendanceRecord, filters: AuditFilters) {
   const date = normalizeDate(record.date);
   if (!date) return false;
-  if (filters.from && date < filters.from) return false;
+  if (date < ATTENDANCE_PLATFORM_LIVE_DATE) return false;
   if (filters.to && date > filters.to) return false;
-  if (filters.service && filters.service !== "All") {
-    if (filters.service === "Other") {
-      if (!isSpecialAttendanceService(record.service)) return false;
-    } else if (record.service !== filters.service) return false;
-  }
-  return true;
+  if (normalize(record.service) !== "sunday") return false;
+  return new Date(`${date}T12:00:00Z`).getUTCDay() === 0;
 }
 
 export function validateAuditFilters(filters: AuditFilters) {
-  if (!validDate(filters.from) || !validDate(filters.to)) throw new Error("Use valid start and end dates.");
-  if (filters.from && filters.to && filters.from > filters.to) throw new Error("The start date must be before the end date.");
-  if (filters.service && !["All", "Sunday", "Thursday", "Other"].includes(filters.service)) throw new Error("Select a valid service.");
+  if (!validDate(filters.to)) throw new Error("Use a valid end date.");
+  if (filters.to && filters.to < ATTENDANCE_PLATFORM_LIVE_DATE) throw new Error("The end date cannot be before the platform launch date.");
 }
 
 export async function buildAttendanceAudit(filters: AuditFilters): Promise<AttendanceAuditMatrix> {
@@ -133,16 +126,13 @@ async function ensureAuditSheet(sheets: sheets_v4.Sheets, spreadsheetId: string,
   return sheetId;
 }
 
-function auditSheetTitle(matrix: AttendanceAuditMatrix, filters: AuditFilters) {
-  if (filters.service !== "Other" || matrix.columns.length === 0) return AUDIT_SHEET_TITLE;
-  const dates = [...new Set(matrix.columns.map((column) => column.date))].sort();
-  if (dates.length === 1) return `Special Service - ${formatDate(dates[0]).replace(/,/g, "")}`.slice(0, 100);
-  return `Special Services - ${dates[0]} to ${dates.at(-1)}`.slice(0, 100);
+function auditSheetTitle() {
+  return AUDIT_SHEET_TITLE;
 }
 
-export async function writeAttendanceAudit(matrix: AttendanceAuditMatrix, filters: AuditFilters = {}) {
+export async function writeAttendanceAudit(matrix: AttendanceAuditMatrix) {
   const { spreadsheetId, sheets } = sheetClient();
-  const sheetTitle = auditSheetTitle(matrix, filters);
+  const sheetTitle = auditSheetTitle();
   const sheetId = await ensureAuditSheet(sheets, spreadsheetId, sheetTitle);
   const columnCount = Math.max(1, matrix.columns.length + 1);
   const rowCount = Math.max(4, matrix.rows.length + 3);

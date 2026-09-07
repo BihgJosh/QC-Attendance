@@ -5,19 +5,10 @@ import { buildAttendanceAudit, validateAuditFilters, writeAttendanceAudit, type 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-function filtersFromUrl(request: Request): AuditFilters {
-  const url = new URL(request.url);
-  return {
-    from: url.searchParams.get("from") || undefined,
-    to: url.searchParams.get("to") || undefined,
-    service: url.searchParams.get("service") || "All",
-  };
-}
-
-export async function GET(request: Request) {
+export async function GET() {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
-    const filters = filtersFromUrl(request);
+    const filters: AuditFilters = {};
     validateAuditFilters(filters);
     return NextResponse.json(await buildAttendanceAudit(filters));
   } catch (error) {
@@ -25,18 +16,13 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST() {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
-    const body = await request.json().catch(() => ({}));
-    const filters: AuditFilters = {
-      from: typeof body.from === "string" ? body.from : undefined,
-      to: typeof body.to === "string" ? body.to : undefined,
-      service: typeof body.service === "string" ? body.service : "All",
-    };
+    const filters: AuditFilters = {};
     validateAuditFilters(filters);
     const matrix = await buildAttendanceAudit(filters);
-    const sheet = await writeAttendanceAudit(matrix, filters);
+    const sheet = await writeAttendanceAudit(matrix);
     return NextResponse.json({ ...sheet, memberCount: matrix.members.length, serviceCount: matrix.columns.length, approvedCount: matrix.approvedCount });
   } catch (error) {
     console.error("[attendance-audit] generation failed", error);
