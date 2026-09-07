@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     const email = String(body.email || "").trim().toLowerCase();
     const action = String(body.action || "login");
     const rememberMe = body.isPwa === true;
+    if (body.privacyAccepted !== true) return NextResponse.json({ error: "Accept the Privacy Policy before signing in." }, { status: 400 });
     if (!email) return NextResponse.json({ error: "Enter your team email." }, { status: 400 });
     if (!(await isAdminEmail(email))) {
       if (!(await getTeamMemberByEmail(email))) return NextResponse.json({ error: "This email is not registered with the QC team." }, { status: 401 });

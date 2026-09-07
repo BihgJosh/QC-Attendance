@@ -361,7 +361,7 @@ export default function HomePage() {
             <Image src="/soja-logo.jpeg" alt="Streams of Joy International" width={36} height={36} className="h-9 w-9 rounded-xl object-cover" />
             <div><p className="text-sm font-bold">Quality Control Unit</p><p className="text-xs text-muted-foreground">Streams of Joy International</p></div>
           </Link>
-          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Excellence, accountability and service.</p>
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground"><Link href="/privacy" className="font-semibold hover:text-foreground">Privacy Policy</Link><p>© {new Date().getFullYear()} Excellence, accountability and service.</p></div>
         </div>
       </footer>
     </main>

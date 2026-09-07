@@ -6,6 +6,7 @@ import { ArrowLeft, Eye, EyeOff, Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Link from "next/link";
 
 type Step = "login" | "setup";
 
@@ -19,6 +20,7 @@ export function MemberLoginForm() {
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const passwordReady = password.length >= 10 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password);
 
   function finish() {
@@ -36,7 +38,8 @@ export function MemberLoginForm() {
       if (step === "setup" && !passwordReady) throw new Error("Use at least 10 characters with uppercase, lowercase and a number.");
       const standaloneNavigator = navigator as Navigator & { standalone?: boolean };
       const isPwa = window.matchMedia("(display-mode: standalone)").matches || standaloneNavigator.standalone === true;
-      const response = await fetch("/api/member/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: step, email, password, isPwa }) });
+      if (!privacyAccepted) throw new Error("Accept the Privacy Policy before signing in.");
+      const response = await fetch("/api/member/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: step, email, password, isPwa, privacyAccepted }) });
       const data = await response.json().catch(() => ({ error: "The sign-in service returned an invalid response." }));
       if (!response.ok) throw new Error(data.error || "Sign-in failed.");
       if (data.nextStep === "setup") {
@@ -59,7 +62,8 @@ export function MemberLoginForm() {
       <p className="text-xs leading-5 text-white/80">Use at least 10 characters with uppercase, lowercase and a number.</p>
     </>}
     {error && <div role="alert" className="rounded-xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">{error}</div>}
-    <Button type="submit" variant="gradient" className="h-12 w-full" disabled={loading}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}{step === "setup" ? "Create password and sign in" : "Sign in"}</Button>
+    <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-white/[0.07] p-4 text-sm leading-5 text-white/85"><input type="checkbox" checked={privacyAccepted} onChange={(event) => setPrivacyAccepted(event.target.checked)} required className="mt-0.5 h-4 w-4 shrink-0 accent-cyan-400" /><span>I have read and accept the <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-cyan-200 underline underline-offset-2 hover:text-white">Privacy Policy</Link>. I will not share my credentials or give another person access to the platform.</span></label>
+    <Button type="submit" variant="gradient" className="h-12 w-full" disabled={loading || !privacyAccepted}>{loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}{step === "setup" ? "Create password and sign in" : "Sign in"}</Button>
     {step === "login" && <p className="text-center text-xs font-medium leading-5 text-white/80">First time here? Enter the password you want to use. You’ll confirm it before your account is created.</p>}
   </form>;
 }

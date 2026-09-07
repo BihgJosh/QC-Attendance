@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { PWARegister } from "@/components/pwa-register";
 import { PWAInstallPrompt } from "@/components/pwa-install-prompt";
 import { getSiteUrl } from "@/lib/site-url";
+import { CookieConsent } from "@/components/cookie-consent";
 
 const siteUrl = getSiteUrl();
 
@@ -61,6 +62,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           <Toaster richColors position="top-right" />
           <PWARegister />
           <PWAInstallPrompt />
+          <CookieConsent />
         </ThemeProvider>
       </body>
     </html>
