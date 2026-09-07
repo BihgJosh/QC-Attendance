@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Mail, MapPin, Phone, UserRound } from "lucide-react";
+import { ChevronDown, Mail, MapPin, Phone } from "lucide-react";
 import { IdentityAvatar, MemberIdentityCard } from "@/components/member/member-identity";
 import { postingMemberKey, type Posting, type PostingMember, type ServiceDay } from "@/lib/homepage-content";
 import type { MemberIdentity } from "@/lib/member-store";
@@ -21,6 +21,10 @@ function appliesToService(rowLabel: string, token: string) {
   return token === "thursday" ? normalized.includes("thursday") : normalized.includes(token);
 }
 
+function postingIdentityKey(member: PostingMember, canViewDetails: boolean) {
+  return canViewDetails ? postingMemberKey(member) : postingMemberKey({ ...member, email: "" });
+}
+
 function MemberPass({ member, identity, loading, canViewDetails }: { member: PostingMember; identity?: MemberIdentity; loading: boolean; canViewDetails: boolean }) {
   const displayName = identity?.name || member.name;
   const email = identity?.email || member.email;
@@ -28,11 +32,12 @@ function MemberPass({ member, identity, loading, canViewDetails }: { member: Pos
   const phoneHref = phone ? `tel:${phone.replace(/[^+\d]/g, "")}` : "";
 
   return (
-    <li className="relative min-w-0 overflow-hidden rounded-2xl bg-white p-3 text-slate-950 shadow-[0_1px_2px_rgba(15,23,42,.08),0_12px_28px_-22px_rgba(15,23,42,.7)]">
+    <li className={`relative min-w-0 overflow-hidden rounded-2xl p-3 text-slate-950 shadow-[0_1px_2px_rgba(15,23,42,.08),0_12px_28px_-22px_rgba(15,23,42,.7)] ${canViewDetails ? "bg-white" : "bg-gradient-to-r from-cyan-50 via-white to-violet-50 ring-1 ring-inset ring-cyan-100"}`}>
       <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1 bg-cyan-500" />
       {!canViewDetails ? (
-        <div className="flex min-h-14 items-center justify-center" aria-label="Member profile picture">
-          {identity?.avatarUrl ? <IdentityAvatar identity={identity} name="Member" size="lg" /> : <span className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400"><UserRound className="h-6 w-6" aria-hidden="true" /></span>}
+        <div className="flex min-h-14 min-w-0 items-center gap-3 pl-1" aria-label={`${displayName}, assigned member`}>
+          <IdentityAvatar identity={identity} name={displayName} />
+          <span className="min-w-0 break-words text-sm font-black leading-5 text-slate-950">{displayName}</span>
         </div>
       ) : (
       <div className="flex min-w-0 items-center gap-3 pl-1">
@@ -109,7 +114,7 @@ export function PostingBoard({ postings, day, identities, identitiesLoading, can
                                     <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-200">{column}</p>
                                     <ul className="grid gap-2">
                                       {members.map((member, memberIndex) => (
-                                        <MemberPass key={`${postingMemberKey(member)}-${memberIndex}`} member={member} identity={identities[postingMemberKey(member)]} loading={identitiesLoading} canViewDetails={canViewMemberDetails} />
+                                        <MemberPass key={`${postingMemberKey(member)}-${memberIndex}`} member={member} identity={identities[postingIdentityKey(member, canViewMemberDetails)]} loading={identitiesLoading} canViewDetails={canViewMemberDetails} />
                                       ))}
                                     </ul>
                                   </div>
