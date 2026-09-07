@@ -113,10 +113,6 @@ export async function hasDeviceSignedToday(deviceId: string, date: string) {
   return data.memberName;
 }
 
-export async function appendAttendance(record: AttendanceRecord, options: { override?: boolean; overrideActor?: string } = {}) {
-  return callGateway<{ success: boolean; overridden?: boolean; replacedMemberName?: string }>("attendance.insert", {
-    record,
-    adminOverride: options.override === true,
-    overrideActor: options.overrideActor,
-  });
+export async function appendAttendance(record: AttendanceRecord) {
+  return callGateway<{ success: boolean }>("attendance.insert", { record });
 }

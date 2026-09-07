@@ -7,7 +7,7 @@ import { isAllowedAttendanceService, type AttendanceRecord } from "@/types";
 import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { resolveUserAccess } from "@/lib/member-store";
-import { canOverrideAttendance, canSignAttendanceForOthers } from "@/lib/member-permissions";
+import { canSignAttendanceForOthers } from "@/lib/member-permissions";
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
-    const { name: submittedName, latitude, longitude, browser, device, service, deviceId, override } = body as Record<string, unknown>;
+    const { name: submittedName, latitude, longitude, browser, device, service, deviceId } = body as Record<string, unknown>;
     const boundedString = (value: unknown, min: number, max: number): value is string =>
       typeof value === "string" && value.trim().length >= min && value.length <= max;
 
@@ -37,20 +37,12 @@ export async function POST(request: Request) {
     if (device !== undefined && !boundedString(device, 1, 80)) {
       return NextResponse.json({ error: "Invalid device information." }, { status: 400 });
     }
-    if (override !== undefined && typeof override !== "boolean") {
-      return NextResponse.json({ error: "Invalid admin override." }, { status: 400 });
-    }
-
     const envConfig = getAttendanceEnvConfig();
     const session = await readMemberSession();
     if (!session) return NextResponse.json({ error: "Your member session has expired." }, { status: 401 });
     const teamMember = await getTeamMemberByEmail(session.email);
     if (!teamMember) return NextResponse.json({ error: "Your email is not registered in Team Data." }, { status: 403 });
     const access = await resolveUserAccess(session.email);
-    const overrideRequested = override === true;
-    if (overrideRequested && !canOverrideAttendance(access.role)) {
-      return NextResponse.json({ error: "Your role cannot override attendance records." }, { status: 403 });
-    }
     let name = teamMember.name;
     if (canSignAttendanceForOthers(access.role)) {
       if (!boundedString(submittedName, 1, 160)) return NextResponse.json({ error: "Select a valid member." }, { status: 400 });
@@ -91,20 +83,13 @@ export async function POST(request: Request) {
       deviceId,
     };
 
-    if (overrideRequested && !isInside) {
-      return NextResponse.json({ error: "Attendance override rejected: this device is outside the church geofence." }, { status: 403 });
-    }
-    const result = await appendAttendance(record, {
-      override: overrideRequested,
-      overrideActor: `${teamMember.name} (${access.role})`,
-    });
+    await appendAttendance(record);
     if (!isInside) {
       return NextResponse.json({ error: "Attendance rejected: You are outside the church geofence." }, { status: 403 });
     }
     return NextResponse.json({
       success: true,
-      overridden: result.overridden === true,
-      message: result.overridden ? "Previous attendance replaced and the override was documented." : "Attendance signed successfully!",
+      message: "Attendance signed successfully!",
     });
   } catch (error) {
     if (error instanceof AttendanceStoreError && error.code === "device_already_signed") {

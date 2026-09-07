@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 export default function AttendancePage() {
   const [isOpen, setIsOpen] = useState<boolean | null>(null);
   const [memberName, setMemberName] = useState("");
-  const [permissions, setPermissions] = useState({ canSignAttendanceForOthers: false, canOverrideAttendance: false, canViewEmergencyAlerts: false });
+  const [permissions, setPermissions] = useState({ canSignAttendanceForOthers: false, canViewEmergencyAlerts: false });
 
   useEffect(() => {
     let active = true;
@@ -31,7 +31,6 @@ export default function AttendancePage() {
         setMemberName(data.name || "");
         setPermissions({
           canSignAttendanceForOthers: data.canSignAttendanceForOthers === true,
-          canOverrideAttendance: data.canOverrideAttendance === true,
           canViewEmergencyAlerts: data.canViewEmergencyAlerts === true,
         });
       }
@@ -73,7 +72,7 @@ export default function AttendancePage() {
             </div>
           </div>
           <div className="flex justify-center xl:justify-end">
-            <AttendanceCard isOpen={isOpen} memberName={memberName} canSignForOthers={permissions.canSignAttendanceForOthers} canOverrideAttendance={permissions.canOverrideAttendance} />
+            <AttendanceCard isOpen={isOpen} memberName={memberName} canSignForOthers={permissions.canSignAttendanceForOthers} />
           </div>
         </section>
       </div>

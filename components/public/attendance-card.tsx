@@ -13,7 +13,7 @@ import { getDeviceId } from "@/lib/device-id";
 import { SPECIAL_SERVICE_PREFIX } from "@/types";
 import {
   Loader2, MapPin, User, CheckCircle2, Sparkles,
-  Satellite, Navigation, AlertCircle, Check, Church, Shield,
+  Satellite, Navigation, AlertCircle, Check, Church,
 } from "lucide-react";
 
 const SERVICES = ["Sunday", "Thursday", "Other"] as const;
@@ -23,7 +23,6 @@ interface AttendanceCardProps {
   isOpen: boolean | null;
   memberName: string;
   canSignForOthers: boolean;
-  canOverrideAttendance: boolean;
 }
 
 interface GpsPhase {
@@ -36,7 +35,7 @@ const GPS_PHASES: GpsPhase[] = [
   { label: "Verifying location...", icon: Navigation },
 ];
 
-export function AttendanceCard({ isOpen, memberName, canSignForOthers, canOverrideAttendance }: AttendanceCardProps) {
+export function AttendanceCard({ isOpen, memberName, canSignForOthers }: AttendanceCardProps) {
   const [name, setName] = useState(memberName);
   const [service, setService] = useState<ServiceType>("Sunday");
   const [specialServiceName, setSpecialServiceName] = useState("");
@@ -45,9 +44,6 @@ export function AttendanceCard({ isOpen, memberName, canSignForOthers, canOverri
   const [successData, setSuccessData] = useState<{ name: string; time: string } | null>(null);
   const [gpsPhase, setGpsPhase] = useState(0);
   const [deviceId] = useState(getDeviceId);
-
-  const [showAdminOverride, setShowAdminOverride] = useState(false);
-  const [existingMemberName, setExistingMemberName] = useState("");
 
   /* ---------- Autocomplete state ---------- */
   const [whitelist, setWhitelist] = useState<string[]>([]);
@@ -168,9 +164,7 @@ export function AttendanceCard({ isOpen, memberName, canSignForOthers, canOverri
     return { browser, device };
   };
 
-  const submitAttendance = async (override = false) => {
-    setShowAdminOverride(false);
-
+  const submitAttendance = async () => {
     setLoading(true);
     setGpsPhase(0);
 
@@ -195,8 +189,6 @@ export function AttendanceCard({ isOpen, memberName, canSignForOthers, canOverri
             service: service === "Other" ? `${SPECIAL_SERVICE_PREFIX}${specialServiceName.trim().replace(/\s+/g, " ")}` : service,
             latitude, longitude, browser, device, deviceId,
           };
-          if (override) body.override = true;
-
           const res = await fetch("/api/attendance", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -206,12 +198,7 @@ export function AttendanceCard({ isOpen, memberName, canSignForOthers, canOverri
           const data = await res.json();
 
           if (!res.ok) {
-            // ── Device already signed — show admin override ──
-            if (data.error === "device_already_signed") {
-              setExistingMemberName(typeof data.existingMemberName === "string" ? data.existingMemberName : "the previous member");
-              if (canOverrideAttendance) setShowAdminOverride(true);
-              throw new Error(data.message || "This device has already signed in for this service today.");
-            }
+            if (data.error === "device_already_signed") throw new Error(data.message || "This device has already signed in for this service today.");
             throw new Error(data.error || "Failed to sign attendance");
           }
 
@@ -224,9 +211,7 @@ export function AttendanceCard({ isOpen, memberName, canSignForOthers, canOverri
           toast.success(data.message || "Attendance signed successfully!");
           setNameTouched(false);
         } catch (error: any) {
-          toast.error(error.message || "An error occurred.", {
-            description: canOverrideAttendance ? "Review the replacement details below or cancel." : "Ask a service manager or administrator to replace the previous record.",
-          });
+          toast.error(error.message || "An error occurred.");
         } finally {
           setLoading(false);
         }
@@ -270,11 +255,6 @@ export function AttendanceCard({ isOpen, memberName, canSignForOthers, canOverri
     await submitAttendance();
   };
 
-  const handleAdminOverride = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await submitAttendance(true);
-  };
-
   const CurrentGpsIcon = GPS_PHASES[gpsPhase].icon;
 
   return (
@@ -314,53 +294,6 @@ export function AttendanceCard({ isOpen, memberName, canSignForOthers, canOverri
               {canSignForOthers && <Button variant="outline" size="sm" onClick={() => { setSuccess(false); setSuccessData(null); setName(""); }}>
                 Sign in another member
               </Button>}
-            </motion.div>
-          ) : showAdminOverride ? (
-            /* ── Admin Override Form ── */
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div className="flex flex-col items-center text-center mb-6">
-                <div className="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center mb-3">
-                  <Shield className="w-7 h-7 text-warning" strokeWidth={1.5} />
-                </div>
-                <h3 className="text-base font-semibold mb-1">Replace Previous Attendance?</h3>
-                <p className="text-xs text-muted-foreground max-w-xs">
-                  This will remove {existingMemberName}&apos;s approved record and replace it with {name}. The override and your account will remain documented.
-                </p>
-              </div>
-
-              <form onSubmit={handleAdminOverride} className="space-y-4">
-                <Button
-                  type="submit"
-                  variant="gradient"
-                  className="w-full h-12 text-base font-semibold"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Replacing record...
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="mr-2 h-4 w-4" />
-                      Replace and Document Override
-                    </>
-                  )}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-xs text-muted-foreground"
-                  onClick={() => setShowAdminOverride(false)}
-                >
-                  Cancel
-                </Button>
-              </form>
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">

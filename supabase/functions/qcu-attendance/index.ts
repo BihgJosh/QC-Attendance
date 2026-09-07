@@ -271,26 +271,11 @@ Deno.serve(async (request) => {
         : String(record.date || "");
       const existing = await rest(`attendance_records?select=id,member_name&attendance_date_key=eq.${encodeURIComponent(dateKey)}&service=eq.${encodeURIComponent(String(record.service || ""))}&device_id=eq.${encodeURIComponent(String(record.deviceId || ""))}&status=eq.Approved&order=id.asc&limit=1`) as Json[];
       const previous = existing[0];
-      if (previous && body.adminOverride !== true) {
+      if (previous) {
         return json({ error: "This device has already signed attendance for this service today.", code: "device_already_signed", existingMemberName: String(previous.member_name || "") }, 409);
       }
-      if (!previous && body.adminOverride === true) {
-        return json({ error: "There is no previous approved attendance to replace.", code: "override_target_missing" }, 409);
-      }
-      const overrideActor = String(body.overrideActor || "Authorized user").trim().slice(0, 180);
-      const reason = previous
-        ? `${String(record.reason || "Inside geofence")}; overridden by ${overrideActor}; replaced ${String(previous.member_name || "unknown member")}`
-        : String(record.reason || "");
-      const inserted = await rest("attendance_records", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ attendance_date: record.date, attendance_date_key: dateKey, service: record.service, member_name: record.memberName, attendance_time: record.time, latitude: record.latitude, longitude: record.longitude, distance_meters: record.distance, status: record.status, reason, browser: record.browser, device: record.device, device_id: record.deviceId, admin_override: Boolean(previous) }) }) as Json[];
-      if (previous) {
-        try {
-          await rest(`attendance_records?id=eq.${encodeURIComponent(String(previous.id))}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
-        } catch (error) {
-          if (inserted[0]?.id) await rest(`attendance_records?id=eq.${encodeURIComponent(String(inserted[0].id))}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }).catch(() => undefined);
-          throw error;
-        }
-      }
-      return json({ success: true, overridden: Boolean(previous), replacedMemberName: previous ? String(previous.member_name || "") : undefined });
+      await rest("attendance_records", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attendance_date: record.date, attendance_date_key: dateKey, service: record.service, member_name: record.memberName, attendance_time: record.time, latitude: record.latitude, longitude: record.longitude, distance_meters: record.distance, status: record.status, reason: record.reason, browser: record.browser, device: record.device, device_id: record.deviceId, admin_override: false }) });
+      return json({ success: true });
     }
     if (operation === "attendance.list") return json({ records: (await allRecords()).map(mapRecord) });
     if (operation === "migration.import") {
