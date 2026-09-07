@@ -20,11 +20,13 @@ import {
 } from "lucide-react";
 import { MemberIdentityCard } from "@/components/member/member-identity";
 import type { MemberIdentity } from "@/lib/member-store";
+import { normalizeServicePostLocation, SERVICE_POST_LOCATIONS } from "@/lib/service-post-locations";
 
 const SERVICES = ["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"] as const;
 type ServiceName = string;
 
 type HeadcountRow = { department?: string; adults?: number; children?: number; total?: number };
+type StandardHeadcountRow = HeadcountRow & { department: string; reported: boolean };
 type Emergency = { id?: string; service?: string; location?: string; description?: string; reportedBy?: string; reporterEmail?: string; submittedAt?: string; status?: string; identity?: MemberIdentity };
 type TimerSegment = { label?: string; status?: string; min?: number; sec?: number };
 type PostReporter = { name?: string; email?: string; identity?: MemberIdentity };
@@ -94,6 +96,22 @@ function textValue(value: unknown) {
 
 function adjustedHeadcount(value: unknown) {
   return Math.ceil(numberValue(value) * 1.02);
+}
+
+function standardizeHeadcountRows(rows: HeadcountRow[]): StandardHeadcountRow[] {
+  const reportedByLocation = new Map<string, HeadcountRow>();
+  for (const row of rows) {
+    if (row.department) reportedByLocation.set(normalizeServicePostLocation(row.department), row);
+  }
+  const standardKeys = new Set(SERVICE_POST_LOCATIONS.map(normalizeServicePostLocation));
+  const standardRows = SERVICE_POST_LOCATIONS.map((department) => {
+    const reported = reportedByLocation.get(normalizeServicePostLocation(department));
+    return reported ? { ...reported, department, reported: true } : { department, reported: false };
+  });
+  const otherReportedRows = rows.flatMap((row) => row.department && !standardKeys.has(normalizeServicePostLocation(row.department))
+    ? [{ ...row, department: row.department, reported: true }]
+    : []);
+  return [...standardRows, ...otherReportedRows];
 }
 
 function identityValue(value: unknown): MemberIdentity | undefined {
@@ -360,6 +378,9 @@ export function ServiceManagerDashboard() {
 
   if (selectedService && selected?.data) {
     const data = selected.data;
+    const headcountRows = standardizeHeadcountRows(data.headcount?.byDepartment || []);
+    const reportedLocationCount = SERVICE_POST_LOCATIONS.filter((location) => headcountRows.some((row) => row.reported && normalizeServicePostLocation(row.department) === normalizeServicePostLocation(location))).length;
+    const pendingLocationCount = SERVICE_POST_LOCATIONS.length - reportedLocationCount;
     return (
       <div className="p-4 sm:p-7 lg:p-9">
         <div className="flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-between">
@@ -408,8 +429,11 @@ export function ServiceManagerDashboard() {
         <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} />
 
         <ReportSection title="Worshipper headcount" icon={Users}>
-          <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-slate-200"><table className="w-full min-w-[34rem] text-left text-sm"><thead className="bg-slate-100 text-[10px] uppercase tracking-wider text-slate-700"><tr><th className="px-4 py-3">Department</th><th className="px-4 py-3">Adults</th><th className="px-4 py-3">Children</th><th className="px-4 py-3">Total</th></tr></thead><tbody>{(data.headcount?.byDepartment || []).map((row, index) => <tr key={`${row.department}-${index}`} className="border-t border-slate-200 text-slate-800"><td className="px-4 py-3 font-semibold text-slate-950">{row.department || "Unspecified"}</td><td className="px-4 py-3">{numberValue(row.adults)}</td><td className="px-4 py-3">{numberValue(row.children)}</td><td className="px-4 py-3 font-black text-blue-800">{numberValue(row.total)}</td></tr>)}</tbody></table></div>
-          {!data.headcount?.byDepartment?.length && <EmptyReport text="No department headcount was submitted." />}
+          <div className="mb-4 flex flex-col gap-3 rounded-xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-200 sm:flex-row sm:items-center sm:justify-between">
+            <div><p className="text-sm font-black text-slate-950">{reportedLocationCount} of {SERVICE_POST_LOCATIONS.length} locations reported</p><p className="mt-1 text-xs leading-5 text-slate-600">A submitted report counts even when its headcount is zero.</p></div>
+            <span className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-black ring-1 ring-inset ${pendingLocationCount === 0 ? "bg-emerald-100 text-emerald-900 ring-emerald-300" : "bg-amber-100 text-amber-950 ring-amber-300"}`}>{pendingLocationCount === 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}{pendingLocationCount === 0 ? "All locations complete" : `${pendingLocationCount} awaiting report${pendingLocationCount === 1 ? "" : "s"}`}</span>
+          </div>
+          <div className="overflow-x-auto rounded-xl ring-1 ring-inset ring-slate-200"><table className="w-full min-w-[44rem] text-left text-sm"><thead className="bg-slate-100 text-[10px] uppercase tracking-wider text-slate-700"><tr><th className="px-4 py-3">Location</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Adults</th><th className="px-4 py-3">Children</th><th className="px-4 py-3">Total</th></tr></thead><tbody>{headcountRows.map((row, index) => <tr key={`${row.department}-${index}`} className="border-t border-slate-200 text-slate-800"><td className="max-w-72 px-4 py-3 font-semibold text-slate-950">{row.department}</td><td className="px-4 py-3"><span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${row.reported ? "bg-emerald-100 text-emerald-900 ring-emerald-300" : "bg-amber-100 text-amber-950 ring-amber-300"}`}>{row.reported ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}{row.reported ? "Reported" : "Not reported"}</span></td><td className="px-4 py-3 tabular-nums">{row.reported ? numberValue(row.adults) : "—"}</td><td className="px-4 py-3 tabular-nums">{row.reported ? numberValue(row.children) : "—"}</td><td className={`px-4 py-3 font-black tabular-nums ${row.reported ? "text-blue-800" : "text-slate-400"}`}>{row.reported ? numberValue(row.total) : "—"}</td></tr>)}</tbody></table></div>
         </ReportSection>
 
         <ReportSection title="Post ratings" icon={ClipboardList}>

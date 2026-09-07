@@ -42,7 +42,7 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
         else:
             service_number = ["1st Service", "2nd Service", "3rd Service", "4th Service", "Thursday Service"].index(body["service"]) + 1
             payload = {"ok": True, "data": {
-                "headcount": {"grandTotal": service_number * 100, "byDepartment": [{"department": "Main auditorium", "adults": service_number * 80, "children": service_number * 20, "total": service_number * 100}]},
+                "headcount": {"grandTotal": service_number * 100, "byDepartment": [{"department": "Main Church – FrontRow 1", "adults": service_number * 80, "children": service_number * 20, "total": service_number * 100}]},
                 "incidentCount": service_number - 1,
                 "emergencies": [],
                 "ratings": {"Preparedness": "Excellent", "Orderliness": "Good"},
@@ -77,7 +77,12 @@ def inspect(browser, label: str, width: int, height: int) -> list[str]:
     assert page.get_by_text("Resolved", exact=True).count() == 1
     page.get_by_role("button", name="View report").first.click()
     assert page.get_by_text("Full detailed report", exact=False).is_visible()
-    assert page.get_by_text("Main auditorium", exact=True).is_visible()
+    assert page.get_by_text("1 of 17 locations reported", exact=True).is_visible()
+    assert page.get_by_text("16 awaiting reports", exact=True).is_visible()
+    assert page.get_by_text("Reported", exact=True).count() == 1
+    assert page.get_by_text("Not reported", exact=True).count() == 16
+    assert page.get_by_text("Main Church – FrontRow 1", exact=True).is_visible()
+    assert page.get_by_text("Mighty Arrows - Exit", exact=True).is_visible()
     assert page.get_by_text("Preparedness", exact=True).is_visible()
     page.get_by_role("button", name="Generate document").click()
     page.get_by_text("Document generated successfully for 1st Service.").wait_for()

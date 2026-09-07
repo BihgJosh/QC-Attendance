@@ -6,28 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { namedServiceReport, SPECIAL_SERVICE_REPORT_OPTION, STANDARD_SERVICE_REPORTS } from "@/lib/service-report-services";
+import { SERVICE_POST_LOCATIONS } from "@/lib/service-post-locations";
 
 const SERVICES = [...STANDARD_SERVICE_REPORTS, SPECIAL_SERVICE_REPORT_OPTION];
 const RATINGS = ["Excellent", "Good", "Needs Improvement", "Poor"];
-const AREAS = [
-  "Main Church – FrontRow 1",
-  "Main Church – FrontRow 2",
-  "Main Church – FrontRow 3",
-  "Main Church – FrontRow 4",
-  "Main Church – BackRow 1",
-  "Main Church – BackRow 2 & Front Media",
-  "Main Church – BackRow 3",
-  "Main Church – BackRow 4 & Back Media",
-  "Overflow – Row 1",
-  "Overflow – Row 2",
-  "Overflow – Row 3",
-  "Overflow – Row 4",
-  "Outside – Vendors Gate",
-  "Outside – Main Gate",
-  "Outside – Emporium & Toilet",
-  "Mighty Arrows - Entrance",
-  "Mighty Arrows - Exit",
-];
+const AREAS = SERVICE_POST_LOCATIONS;
 const OBSERVATIONS = [["preparedness", "Preparedness"], ["neatness", "Neatness & appearance"], ["orderliness", "Orderliness"], ["conduct", "Workers' conduct"], ["compliance", "Compliance"], ["coordination", "Coordination"]] as const;
 const SEGMENTS = [["openingPrayer", "Opening Prayer"], ["praiseWorship", "Praise & Worship"], ["speakingIntoWeek", "Speaking into the Week"], ["soloMinistration", "Solo Ministration"], ["declaration", "Declaration"], ["testimonyIntroduction", "Testimony Introduction"], ["firstTestimony", "First Testimony"], ["secondTestimony", "Second Testimony"], ["thirdTestimony", "Third Testimony"], ["fourthTestimony", "Fourth Testimony"], ["fifthTestimony", "Fifth Testimony"], ["choirMinistration", "Choir Ministration"], ["pastorMinistration", "Pastor's Ministration"], ["offeringAnnouncement", "Offering & Announcement"]] as const;
 const UNITS = ["Teens Ministries", "Mighty Arrows", "Chabod Ministrels", "Ushering", "Protocol", "Traffic Unit (Watch Tower)", "Security", "Media", "Meeters and Greeters", "Temple Keepers", "Medical Care", "Streams Emporium", "Streams Enquiry Unit", "Instrumental Unit", "Transport Unit", "Other"];

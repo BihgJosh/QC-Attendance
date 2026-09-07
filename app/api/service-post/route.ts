@@ -6,6 +6,7 @@ import { appendServicePostReport } from "@/lib/service-post-sheet";
 import { callServiceReportGateway } from "@/lib/service-report-store";
 import { isIsoCalendarDate } from "@/lib/validation";
 import { isValidServiceReportName, namedServiceReport } from "@/lib/service-report-services";
+import { isServicePostLocation } from "@/lib/service-post-locations";
 
 const RATINGS = new Set(["Excellent", "Good", "Needs Improvement", "Poor"]);
 const RATING_SCORES: Record<string, number> = { Excellent: 4, Good: 3, "Needs Improvement": 2, Poor: 1 };
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     const adultsHeadcount = count(body.adultsHeadcount);
     const childrenHeadcount = count(body.childrenHeadcount);
     const observationFields = ["preparedness", "neatness", "orderliness", "conduct", "compliance", "coordination"] as const;
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId) || !isIsoCalendarDate(date) || !isValidServiceReportName(service) || !area || adultsHeadcount === null || childrenHeadcount === null) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(submissionId) || !isIsoCalendarDate(date) || !isValidServiceReportName(service) || !isServicePostLocation(area) || adultsHeadcount === null || childrenHeadcount === null) {
       return NextResponse.json({ ok: false, message: "Complete the date, service, area and headcounts correctly." }, { status: 400 });
     }
     const selectedRatings = observationFields.map((field) => text(body[field], 30)).filter(Boolean);
