@@ -2,6 +2,36 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-07 — Single-account sessions and visible posting identities
+
+- Source commit: `e1e29a7` (`Enforce single member sessions and restore posting identities`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_Ayyh4rQuxpnb4EktV6skpwwU4G5M`.
+- Vercel status: **READY**; all production aliases confirmed.
+- Platform-confirmed deployment time: **2026-09-07 18:20:07 WAT**.
+- Live verification completed: **2026-09-07 18:22:24 WAT**.
+- Supabase migration: `enforce_single_member_session`, applied and recorded.
+- Supabase Edge Function: `qcu-attendance` version 42, **ACTIVE**, JWT verification enabled.
+
+### Changes
+
+- Enforced one server-side member session per email address with a unique database constraint, preventing simultaneous sign-in on another device.
+- A valid second sign-in now returns HTTP 409 with instructions to sign out on the existing device or ask an administrator to reset access.
+- Expired sessions are cleared before a replacement session is created; explicit logout and administrator password reset continue to revoke access.
+- General-user posting cards now show each assigned member's profile picture and name on a branded cyan-to-violet surface.
+- Fixed the privacy-safe name-key lookup that previously left general-user posting cards blank; email and phone remain hidden.
+
+### Verification
+
+- Local and Vercel production builds passed; all 60 routes generated or compiled.
+- Live database verification returned 112 sessions, 0 duplicate email rows, 0 expired rows, and the unique-email index present.
+- Migration cleanup preserved each account's newest session and revoked 877 older duplicate session rows; affected older device sessions must sign in again.
+- Supabase confirmed `qcu-attendance` version 42 **ACTIVE**.
+- Production homepage protection returned HTTP 307 to member login and `/api/posting-identities` returned HTTP 401 without a session.
+- The UI detector found no blocking issue; only pre-existing off-ramp typography advisories remain in the posting component.
+- A general-user authenticated production visual check was not performed because no general-user credential was used; the browser's older session was correctly invalidated during migration cleanup.
+- Unrelated local changes, artifacts, and the older address migration were excluded.
+
 ## 2026-09-07 — Standard service-location reporting status
 
 - Source commit: `163ef7c` (`Standardize service location reporting status`).
