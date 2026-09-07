@@ -4,6 +4,7 @@ import { EmergencyAlertLoader } from "@/components/emergency-alert-loader";
 import { readMemberSession } from "@/lib/member-auth";
 import { redirect } from "next/navigation";
 import { getMemberProfile, resolveUserAccess } from "@/lib/member-store";
+import { canViewEmergencyAlerts } from "@/lib/member-permissions";
 
 export const metadata: Metadata = {
   title: "Service Tools | Quality Control Unit",
@@ -25,7 +26,7 @@ export default async function ServiceToolsPage() {
   const canViewReportActivity = ["admin", "super_admin"].includes(access.role);
   return (
     <>
-      <EmergencyAlertLoader />
+      {canViewEmergencyAlerts(access.role) && <EmergencyAlertLoader />}
       <ServiceToolsHub canViewServiceManager={canViewServiceManager} canViewReportActivity={canViewReportActivity} memberIdentity={memberIdentity} />
     </>
   );

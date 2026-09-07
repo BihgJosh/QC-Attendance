@@ -4,6 +4,8 @@ import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { appendEmergencyFlag } from "@/lib/emergency-flag-sheet";
 import { notifyTeam } from "@/lib/web-push";
 import { callServiceReportGateway } from "@/lib/service-report-store";
+import { resolveUserAccess } from "@/lib/member-store";
+import { canViewEmergencyAlerts } from "@/lib/member-permissions";
 
 function text(value: unknown, max: number) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -18,6 +20,8 @@ export async function GET(request: Request) {
     const session = await readMemberSession();
     if (!session) return NextResponse.json({ ok: false, message: "Your member session has expired." }, { status: 401 });
     if (!(await getTeamMemberByEmail(session.email))) return NextResponse.json({ ok: false, message: "Your email is not registered in Team Data." }, { status: 403 });
+    const access = await resolveUserAccess(session.email);
+    if (!canViewEmergencyAlerts(access.role)) return NextResponse.json({ ok: false, message: "Your role cannot view emergency alerts." }, { status: 403 });
     const sinceValue = Number(new URL(request.url).searchParams.get("since") || 0);
     const since = Number.isFinite(sinceValue) && sinceValue >= 0 ? sinceValue : 0;
     const result = await callServiceReportGateway<{ rows?: Record<string, unknown>[] }>("emergency.list", { date: abujaToday() });
@@ -71,7 +75,7 @@ export async function POST(request: Request) {
         urgency: "high",
         ttlSeconds: 60 * 60 * 24,
         requireInteraction: true,
-      });
+      }, { elevatedOnly: true });
       if (notificationResult.total === 0) warnings.push("no_subscribed_devices");
       else if (notificationResult.failed > 0) warnings.push("partial_notification_delivery");
     } catch (error) {

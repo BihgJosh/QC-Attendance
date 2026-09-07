@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 export default function AttendancePage() {
   const [isOpen, setIsOpen] = useState<boolean | null>(null);
   const [memberName, setMemberName] = useState("");
+  const [permissions, setPermissions] = useState({ canSignAttendanceForOthers: false, canOverrideAttendance: false, canViewEmergencyAlerts: false });
 
   useEffect(() => {
     let active = true;
@@ -25,7 +26,15 @@ export default function AttendancePage() {
 
     const fetchMember = async () => {
       const response = await fetch("/api/member/session", { cache: "no-store" });
-      if (response.ok && active) setMemberName((await response.json()).name || "");
+      if (response.ok && active) {
+        const data = await response.json();
+        setMemberName(data.name || "");
+        setPermissions({
+          canSignAttendanceForOthers: data.canSignAttendanceForOthers === true,
+          canOverrideAttendance: data.canOverrideAttendance === true,
+          canViewEmergencyAlerts: data.canViewEmergencyAlerts === true,
+        });
+      }
     };
 
     void fetchStatus();
@@ -42,7 +51,7 @@ export default function AttendancePage() {
 
   return (
     <main className="relative z-10 min-h-screen overflow-x-hidden px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-      <EmergencyAlertLoader />
+      {permissions.canViewEmergencyAlerts && <EmergencyAlertLoader />}
       <div className="mx-auto max-w-7xl">
         <Button asChild variant="ghost" className="mb-8 rounded-full">
           <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to homepage</Link>
@@ -64,7 +73,7 @@ export default function AttendancePage() {
             </div>
           </div>
           <div className="flex justify-center xl:justify-end">
-            <AttendanceCard isOpen={isOpen} memberName={memberName} />
+            <AttendanceCard isOpen={isOpen} memberName={memberName} canSignForOthers={permissions.canSignAttendanceForOthers} canOverrideAttendance={permissions.canOverrideAttendance} />
           </div>
         </section>
       </div>

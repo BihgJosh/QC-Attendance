@@ -22,6 +22,8 @@ type ServiceType = typeof SERVICES[number];
 interface AttendanceCardProps {
   isOpen: boolean | null;
   memberName: string;
+  canSignForOthers: boolean;
+  canOverrideAttendance: boolean;
 }
 
 interface GpsPhase {
@@ -34,7 +36,7 @@ const GPS_PHASES: GpsPhase[] = [
   { label: "Verifying location...", icon: Navigation },
 ];
 
-export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
+export function AttendanceCard({ isOpen, memberName, canSignForOthers, canOverrideAttendance }: AttendanceCardProps) {
   const [name, setName] = useState(memberName);
   const [service, setService] = useState<ServiceType>("Sunday");
   const [specialServiceName, setSpecialServiceName] = useState("");
@@ -44,9 +46,8 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
   const [gpsPhase, setGpsPhase] = useState(0);
   const [deviceId] = useState(getDeviceId);
 
-  /* ---------- Admin override state ---------- */
   const [showAdminOverride, setShowAdminOverride] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
+  const [existingMemberName, setExistingMemberName] = useState("");
 
   /* ---------- Autocomplete state ---------- */
   const [whitelist, setWhitelist] = useState<string[]>([]);
@@ -60,17 +61,20 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
   useEffect(() => setName(memberName), [memberName]);
 
   /* ---------- Inline validation ---------- */
-  const nameError = nameTouched && !isNameValid(name) ? "Your member name could not be loaded from Team Data." : null;
+  const nameError = nameTouched && !isNameValid(name) ? (canSignForOthers ? "Select a member from Team Data." : "Your member name could not be loaded from Team Data.") : null;
 
   function isNameValid(value: string): boolean {
-    return value.trim() === memberName.trim() && memberName.trim().length > 0;
+    return canSignForOthers
+      ? whitelist.some((candidate) => candidate.trim().toLowerCase() === value.trim().toLowerCase())
+      : value.trim() === memberName.trim() && memberName.trim().length > 0;
   }
 
   /* ---------- Fetch whitelist ---------- */
   useEffect(() => {
     const fetchWhitelist = async () => {
       try {
-        const res = await fetch("/api/whitelist");
+        if (!canSignForOthers) return;
+        const res = await fetch("/api/attendance/members", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           setWhitelist(data.names);
@@ -80,7 +84,7 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
       }
     };
     fetchWhitelist();
-  }, []);
+  }, [canSignForOthers]);
 
   /* ---------- Autocomplete filtering ---------- */
   const updateSuggestions = useCallback((value: string) => {
@@ -164,9 +168,8 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
     return { browser, device };
   };
 
-  const submitAttendance = async (adminPw?: string) => {
+  const submitAttendance = async (override = false) => {
     setShowAdminOverride(false);
-    setAdminPassword("");
 
     setLoading(true);
     setGpsPhase(0);
@@ -192,7 +195,7 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
             service: service === "Other" ? `${SPECIAL_SERVICE_PREFIX}${specialServiceName.trim().replace(/\s+/g, " ")}` : service,
             latitude, longitude, browser, device, deviceId,
           };
-          if (adminPw) body.adminPassword = adminPw;
+          if (override) body.override = true;
 
           const res = await fetch("/api/attendance", {
             method: "POST",
@@ -205,7 +208,8 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
           if (!res.ok) {
             // ── Device already signed — show admin override ──
             if (data.error === "device_already_signed") {
-              setShowAdminOverride(true);
+              setExistingMemberName(typeof data.existingMemberName === "string" ? data.existingMemberName : "the previous member");
+              if (canOverrideAttendance) setShowAdminOverride(true);
               throw new Error(data.message || "This device has already signed in for this service today.");
             }
             throw new Error(data.error || "Failed to sign attendance");
@@ -217,14 +221,12 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
             time: formatAbujaTime(now),
           });
           setSuccess(true);
-          toast.success("Attendance signed successfully!");
+          toast.success(data.message || "Attendance signed successfully!");
           setNameTouched(false);
         } catch (error: any) {
-          if (!showAdminOverride) {
-            toast.error(error.message || "An error occurred.", {
-              description: "Please try again or contact an administrator.",
-            });
-          }
+          toast.error(error.message || "An error occurred.", {
+            description: canOverrideAttendance ? "Review the replacement details below or cancel." : "Ask a service manager or administrator to replace the previous record.",
+          });
         } finally {
           setLoading(false);
         }
@@ -250,7 +252,7 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
       return;
     }
 
-    if (nameError) {
+    if (!isNameValid(name)) {
       toast.error("Name not found in the whitelist.", {
         description: "Check your spelling or try a different combination of your names.",
       });
@@ -270,7 +272,7 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
 
   const handleAdminOverride = async (e: React.FormEvent) => {
     e.preventDefault();
-    await submitAttendance(adminPassword);
+    await submitAttendance(true);
   };
 
   const CurrentGpsIcon = GPS_PHASES[gpsPhase].icon;
@@ -309,9 +311,9 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
               <h3 className="text-lg font-semibold mb-1">Attendance Confirmed</h3>
               <p className="text-sm text-muted-foreground mb-1">{successData.name}</p>
               <p className="text-xs text-muted-foreground mb-6">Recorded at {successData.time}</p>
-              <Button variant="outline" size="sm" onClick={() => { setSuccess(false); setSuccessData(null); }}>
-                Sign in for another member
-              </Button>
+              {canSignForOthers && <Button variant="outline" size="sm" onClick={() => { setSuccess(false); setSuccessData(null); setName(""); }}>
+                Sign in another member
+              </Button>}
             </motion.div>
           ) : showAdminOverride ? (
             /* ── Admin Override Form ── */
@@ -324,31 +326,13 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
                 <div className="w-14 h-14 rounded-2xl bg-warning/10 flex items-center justify-center mb-3">
                   <Shield className="w-7 h-7 text-warning" strokeWidth={1.5} />
                 </div>
-                <h3 className="text-base font-semibold mb-1">Service Already Recorded</h3>
+                <h3 className="text-base font-semibold mb-1">Replace Previous Attendance?</h3>
                 <p className="text-xs text-muted-foreground max-w-xs">
-                   This device has already signed attendance for this service today. An administrator can override this with their admin password.
+                  This will remove {existingMemberName}&apos;s approved record and replace it with {name}. The override and your account will remain documented.
                 </p>
               </div>
 
               <form onSubmit={handleAdminOverride} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="adminPassword" className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Admin Password
-                  </Label>
-                  <div className="relative">
-                    <Shield className="absolute left-4 top-4 h-4 w-4 text-muted-foreground/50" />
-                    <Input
-                      id="adminPassword"
-                      type="password"
-                      placeholder="Enter admin password to override"
-                      className="pl-11"
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      required
-                      autoFocus
-                    />
-                  </div>
-                </div>
                 <Button
                   type="submit"
                   variant="gradient"
@@ -358,12 +342,12 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying...
+                      Replacing record...
                     </>
                   ) : (
                     <>
                       <Shield className="mr-2 h-4 w-4" />
-                      Admin Override — Sign In
+                      Replace and Document Override
                     </>
                   )}
                 </Button>
@@ -372,7 +356,7 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
                   variant="ghost"
                   size="sm"
                   className="w-full text-xs text-muted-foreground"
-                  onClick={() => { setShowAdminOverride(false); setAdminPassword(""); }}
+                  onClick={() => setShowAdminOverride(false)}
                 >
                   Cancel
                 </Button>
@@ -432,13 +416,17 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
                   <Input
                     ref={inputRef}
                     id="name"
-                    placeholder="Loading your member name…"
+                    placeholder={canSignForOthers ? "Search member name" : "Loading your member name…"}
                     className={`pl-11 ${nameError ? "border-destructive/50 focus-visible:ring-destructive/40 focus-visible:border-destructive/40" : ""}`}
                     value={name}
-                    readOnly
+                    readOnly={!canSignForOthers}
                     required
                     disabled={loading || !isOpen}
-                    aria-readonly="true"
+                    aria-readonly={!canSignForOthers}
+                    autoComplete="off"
+                    onChange={(event) => { setName(event.target.value); if (canSignForOthers) setShowDropdown(true); }}
+                    onFocus={() => { if (canSignForOthers) setShowDropdown(true); }}
+                    onKeyDown={handleKeyDown}
                   />
                   {nameTouched && name.trim().length > 0 && !loading && (
                     <div className="absolute right-4 top-4 z-10">
@@ -468,7 +456,7 @@ export function AttendanceCard({ isOpen, memberName }: AttendanceCardProps) {
 
                 {/* Autocomplete dropdown */}
                 <AnimatePresence>
-                  {false && showDropdown && suggestions.length > 0 && (
+                  {canSignForOthers && showDropdown && suggestions.length > 0 && (
                     <motion.div
                       ref={dropdownRef}
                       initial={{ opacity: 0, y: -6, scale: 0.97 }}

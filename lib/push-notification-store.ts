@@ -37,8 +37,8 @@ export function deletePushSubscription(endpoint: string, memberEmail: string) {
   return callPushGateway<{ success: boolean }>("push.unsubscribe", { endpoint, memberEmail });
 }
 
-export async function listPushSubscriptions() {
-  const data = await callPushGateway<{ subscriptions: StoredPushSubscription[] }>("push.list");
+export async function listPushSubscriptions(options: { elevatedOnly?: boolean } = {}) {
+  const data = await callPushGateway<{ subscriptions: StoredPushSubscription[] }>("push.list", { elevatedOnly: options.elevatedOnly === true });
   if (!Array.isArray(data.subscriptions)) throw new Error("Notification storage returned an invalid subscription list.");
   return data.subscriptions.filter((item): item is StoredPushSubscription => Boolean(item && typeof item.endpoint === "string" && item.endpoint.startsWith("https://") && typeof item.p256dh === "string" && typeof item.auth === "string"));
 }

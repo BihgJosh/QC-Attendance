@@ -57,6 +57,7 @@ export default function HomePage() {
   const [birthdays, setBirthdays] = useState<BirthdayNoticeEntry[]>([]);
   const [postingIdentities, setPostingIdentities] = useState<Record<string, MemberIdentity>>({});
   const [postingIdentitiesLoading, setPostingIdentitiesLoading] = useState(true);
+  const [permissions, setPermissions] = useState({ canViewMemberDetails: false, canViewEmergencyAlerts: false });
 
   useEffect(() => {
     const updateTime = () => {
@@ -94,10 +95,23 @@ export default function HomePage() {
       }
     };
 
+    const fetchPermissions = async () => {
+      try {
+        const response = await fetch("/api/member/session", { cache: "no-store" });
+        if (response.ok) {
+          const data = await response.json();
+          setPermissions({ canViewMemberDetails: data.canViewMemberDetails === true, canViewEmergencyAlerts: data.canViewEmergencyAlerts === true });
+        }
+      } catch {
+        // Sensitive details and emergency alerts remain hidden when access cannot be confirmed.
+      }
+    };
+
     updateTime();
     fetchContent();
     fetchBirthdays();
     fetchPostingIdentities();
+    fetchPermissions();
     const clockInterval = setInterval(updateTime, 1000);
     const birthdayInterval = setInterval(fetchBirthdays, 60_000);
 
@@ -109,7 +123,7 @@ export default function HomePage() {
 
   return (
     <main className="relative z-10 min-h-screen overflow-x-hidden">
-      <EmergencyAlertLoader />
+      {permissions.canViewEmergencyAlerts && <EmergencyAlertLoader />}
       <header className="safe-top-nav fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-5">
         <nav className="mx-auto flex max-w-7xl items-center justify-between gap-2 rounded-2xl border border-cyan-200/10 bg-[linear-gradient(110deg,rgba(2,12,32,0.96),rgba(26,20,69,0.95)_58%,rgba(74,20,96,0.94))] px-3 py-2.5 text-white shadow-2xl shadow-slate-950/20 backdrop-blur-xl sm:px-5" aria-label="Main navigation">
           <Link href="/" aria-label="Go to homepage" className="flex min-w-0 items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 sm:gap-3">
@@ -299,7 +313,7 @@ export default function HomePage() {
                 </select>
               </div>
             </div>
-            <PostingBoard postings={content.postings.filter((posting) => posting.day === postingDay)} day={postingDay} identities={postingIdentities} identitiesLoading={postingIdentitiesLoading} />
+            <PostingBoard postings={content.postings.filter((posting) => posting.day === postingDay)} day={postingDay} identities={postingIdentities} identitiesLoading={postingIdentitiesLoading} canViewMemberDetails={permissions.canViewMemberDetails} />
             <p className="relative mt-6 text-xs leading-5 text-white/50">Posting assignments are confirmed by team leads during the pre-service briefing.</p>
           </div>
 

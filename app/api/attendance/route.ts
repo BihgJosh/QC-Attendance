@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { appendAttendance, AttendanceStoreError, getAttendanceSettings, getAttendanceStatus } from "@/lib/attendance-store";
+import { appendAttendance, AttendanceStoreError, getAttendanceSettings, getAttendanceStatus, getWhitelist } from "@/lib/attendance-store";
 import { calculateDistance } from "@/lib/geofencing";
 import { getAttendanceEnvConfig } from "@/lib/env";
 import { formatAbujaTime, formatAbujaDate } from "@/lib/timezone";
-import { verifySharedAdminAccess } from "@/lib/admin-login-security";
 import { isAllowedAttendanceService, type AttendanceRecord } from "@/types";
 import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
+import { resolveUserAccess } from "@/lib/member-store";
+import { canOverrideAttendance, canSignAttendanceForOthers } from "@/lib/member-permissions";
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
-    const { latitude, longitude, browser, device, service, deviceId, adminPassword } = body as Record<string, unknown>;
+    const { name: submittedName, latitude, longitude, browser, device, service, deviceId, override } = body as Record<string, unknown>;
     const boundedString = (value: unknown, min: number, max: number): value is string =>
       typeof value === "string" && value.trim().length >= min && value.length <= max;
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     if (device !== undefined && !boundedString(device, 1, 80)) {
       return NextResponse.json({ error: "Invalid device information." }, { status: 400 });
     }
-    if (adminPassword !== undefined && !boundedString(adminPassword, 1, 256)) {
+    if (override !== undefined && typeof override !== "boolean") {
       return NextResponse.json({ error: "Invalid admin override." }, { status: 400 });
     }
 
@@ -45,15 +46,23 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ error: "Your member session has expired." }, { status: 401 });
     const teamMember = await getTeamMemberByEmail(session.email);
     if (!teamMember) return NextResponse.json({ error: "Your email is not registered in Team Data." }, { status: 403 });
-    const name = teamMember.name;
+    const access = await resolveUserAccess(session.email);
+    const overrideRequested = override === true;
+    if (overrideRequested && !canOverrideAttendance(access.role)) {
+      return NextResponse.json({ error: "Your role cannot override attendance records." }, { status: 403 });
+    }
+    let name = teamMember.name;
+    if (canSignAttendanceForOthers(access.role)) {
+      if (!boundedString(submittedName, 1, 160)) return NextResponse.json({ error: "Select a valid member." }, { status: 400 });
+      const requested = submittedName.trim().replace(/\s+/g, " ").toLowerCase();
+      const matched = (await getWhitelist()).find((candidate) => candidate.trim().replace(/\s+/g, " ").toLowerCase() === requested);
+      if (!matched) return NextResponse.json({ error: "Select a member from Team Data." }, { status: 400 });
+      name = matched;
+    } else if (typeof submittedName === "string" && submittedName.trim() !== teamMember.name.trim()) {
+      return NextResponse.json({ error: "Your role can only sign your own attendance." }, { status: 403 });
+    }
     if (!(await getAttendanceStatus()).isOpen) {
       return NextResponse.json({ error: "Attendance is currently closed." }, { status: 403 });
-    }
-
-    const adminOverrideUsed = typeof adminPassword === "string" && adminPassword.length > 0;
-    if (adminOverrideUsed) {
-      const verification = await verifySharedAdminAccess(request, adminPassword);
-      if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
     }
 
     const settings = await getAttendanceSettings();
@@ -82,17 +91,31 @@ export async function POST(request: Request) {
       deviceId,
     };
 
-    await appendAttendance(record, adminOverrideUsed);
+    if (overrideRequested && !isInside) {
+      return NextResponse.json({ error: "Attendance override rejected: this device is outside the church geofence." }, { status: 403 });
+    }
+    const result = await appendAttendance(record, {
+      override: overrideRequested,
+      overrideActor: `${teamMember.name} (${access.role})`,
+    });
     if (!isInside) {
       return NextResponse.json({ error: "Attendance rejected: You are outside the church geofence." }, { status: 403 });
     }
-    return NextResponse.json({ success: true, message: "Attendance signed successfully!" });
+    return NextResponse.json({
+      success: true,
+      overridden: result.overridden === true,
+      message: result.overridden ? "Previous attendance replaced and the override was documented." : "Attendance signed successfully!",
+    });
   } catch (error) {
     if (error instanceof AttendanceStoreError && error.code === "device_already_signed") {
       return NextResponse.json({
         error: "device_already_signed",
         message: "This device has already signed attendance for this service today.",
+        existingMemberName: error.existingMemberName,
       }, { status: 409 });
+    }
+    if (error instanceof AttendanceStoreError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
     console.error("Attendance Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

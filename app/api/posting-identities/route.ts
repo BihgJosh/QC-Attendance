@@ -5,6 +5,8 @@ import { readMemberSession } from "@/lib/member-auth";
 import { identityKey, identityMap } from "@/lib/report-identities";
 import { isPrivilegedAdminEmail } from "@/lib/roles";
 import { getTeamMemberByEmail, listTeamMembers, type TeamMember } from "@/lib/team-data-store";
+import { resolveUserAccess } from "@/lib/member-store";
+import { canViewMemberDetails } from "@/lib/member-permissions";
 
 const CONTENT_CONFIG_KEY = "homepageContent";
 
@@ -38,10 +40,11 @@ export async function GET() {
   if (!session) return NextResponse.json({ identities: {} }, { status: 401, headers: { "Cache-Control": "private, no-store" } });
 
   try {
-    const [teamMember, teamMembers, config] = await Promise.all([
+    const [teamMember, teamMembers, config, access] = await Promise.all([
       getTeamMemberByEmail(session.email),
       listTeamMembers(),
       getConfig(),
+      resolveUserAccess(session.email),
     ]);
     if (!teamMember && !isPrivilegedAdminEmail(session.email)) {
       return NextResponse.json({ identities: {} }, { status: 403, headers: { "Cache-Control": "private, no-store" } });
@@ -52,7 +55,7 @@ export async function GET() {
       : DEFAULT_HOMEPAGE_CONTENT;
     const members = new Map<string, { name: string; email: string }>();
     for (const member of content.postings.flatMap((posting) => posting.rows.flatMap((row) => row.assignments.flat()))) {
-      const key = postingMemberKey(member);
+      const key = canViewMemberDetails(access.role) ? postingMemberKey(member) : postingMemberKey({ ...member, email: "" });
       if (key) members.set(key, member);
     }
 

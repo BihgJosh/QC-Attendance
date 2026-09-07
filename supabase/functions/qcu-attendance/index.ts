@@ -105,6 +105,13 @@ function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
 }
 
+async function activeRole(emailValue: unknown) {
+  const email = normalizeEmail(emailValue);
+  if (PROTECTED_BOOTSTRAP_EMAILS.has(email)) return "super_admin";
+  const rows = await rest(`user_roles?select=role&email=eq.${encodeURIComponent(email)}&is_active=eq.true&limit=1`) as Json[];
+  return String(rows[0]?.role || "general_user");
+}
+
 function bytesToBase64Url(bytes: Uint8Array) {
   let binary = "";
   bytes.forEach((byte) => binary += String.fromCharCode(byte));
@@ -243,26 +250,46 @@ Deno.serve(async (request) => {
     if (operation === "attendance.device-check") {
       const date = encodeURIComponent(String(body.date || ""));
       const deviceId = encodeURIComponent(String(body.deviceId || ""));
-      const rows = await rest(`attendance_records?select=member_name&attendance_date=eq.${date}&device_id=eq.${deviceId}&status=eq.Approved&order=id.asc&limit=1`) as Json[];
+      const service = encodeURIComponent(String(body.service || ""));
+      const serviceFilter = service ? `&service=eq.${service}` : "";
+      const rows = await rest(`attendance_records?select=member_name&attendance_date=eq.${date}&device_id=eq.${deviceId}${serviceFilter}&status=eq.Approved&order=id.asc&limit=1`) as Json[];
       return json({ memberName: rows[0] ? String(rows[0].member_name) : null });
     }
     if (operation === "attendance.insert") {
-      if (body.adminOverride !== true) {
-        const settings = await rest("attendance_settings?select=is_open,closes_at&id=eq.1&limit=1") as Json[];
-        const attendance = settings[0] || {};
-        const closesAt = attendance.closes_at ? String(attendance.closes_at) : null;
-        if (!attendance.is_open || (closesAt && Date.parse(closesAt) <= Date.now())) {
-          if (attendance.is_open) await rest("attendance_settings?id=eq.1", { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_open: false, closes_at: null, updated_at: new Date().toISOString() }) });
-          return json({ error: "Attendance is closed.", code: "ATTENDANCE_CLOSED" }, 409);
-        }
+      const settings = await rest("attendance_settings?select=is_open,closes_at&id=eq.1&limit=1") as Json[];
+      const attendance = settings[0] || {};
+      const closesAt = attendance.closes_at ? String(attendance.closes_at) : null;
+      if (!attendance.is_open || (closesAt && Date.parse(closesAt) <= Date.now())) {
+        if (attendance.is_open) await rest("attendance_settings?id=eq.1", { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ is_open: false, closes_at: null, updated_at: new Date().toISOString() }) });
+        return json({ error: "Attendance is closed.", code: "ATTENDANCE_CLOSED" }, 409);
       }
       const record = body.record as Json;
       const dateParts = String(record.date || "").split("/");
       const dateKey = dateParts.length === 3
         ? `${dateParts[2]}-${dateParts[1].padStart(2, "0")}-${dateParts[0].padStart(2, "0")}`
         : String(record.date || "");
-      await rest("attendance_records", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attendance_date: record.date, attendance_date_key: dateKey, service: record.service, member_name: record.memberName, attendance_time: record.time, latitude: record.latitude, longitude: record.longitude, distance_meters: record.distance, status: record.status, reason: record.reason, browser: record.browser, device: record.device, device_id: record.deviceId, admin_override: body.adminOverride === true }) });
-      return json({ success: true });
+      const existing = await rest(`attendance_records?select=id,member_name&attendance_date_key=eq.${encodeURIComponent(dateKey)}&service=eq.${encodeURIComponent(String(record.service || ""))}&device_id=eq.${encodeURIComponent(String(record.deviceId || ""))}&status=eq.Approved&order=id.asc&limit=1`) as Json[];
+      const previous = existing[0];
+      if (previous && body.adminOverride !== true) {
+        return json({ error: "This device has already signed attendance for this service today.", code: "device_already_signed", existingMemberName: String(previous.member_name || "") }, 409);
+      }
+      if (!previous && body.adminOverride === true) {
+        return json({ error: "There is no previous approved attendance to replace.", code: "override_target_missing" }, 409);
+      }
+      const overrideActor = String(body.overrideActor || "Authorized user").trim().slice(0, 180);
+      const reason = previous
+        ? `${String(record.reason || "Inside geofence")}; overridden by ${overrideActor}; replaced ${String(previous.member_name || "unknown member")}`
+        : String(record.reason || "");
+      const inserted = await rest("attendance_records", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ attendance_date: record.date, attendance_date_key: dateKey, service: record.service, member_name: record.memberName, attendance_time: record.time, latitude: record.latitude, longitude: record.longitude, distance_meters: record.distance, status: record.status, reason, browser: record.browser, device: record.device, device_id: record.deviceId, admin_override: Boolean(previous) }) }) as Json[];
+      if (previous) {
+        try {
+          await rest(`attendance_records?id=eq.${encodeURIComponent(String(previous.id))}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+        } catch (error) {
+          if (inserted[0]?.id) await rest(`attendance_records?id=eq.${encodeURIComponent(String(inserted[0].id))}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }).catch(() => undefined);
+          throw error;
+        }
+      }
+      return json({ success: true, overridden: Boolean(previous), replacedMemberName: previous ? String(previous.member_name || "") : undefined });
     }
     if (operation === "attendance.list") return json({ records: (await allRecords()).map(mapRecord) });
     if (operation === "migration.import") {
@@ -381,6 +408,7 @@ Deno.serve(async (request) => {
     if (operation === "profile.identities") {
       const session = await resolveMemberSession(body.token);
       if (!session) return json({ error: "Your session has expired." }, 401);
+      const revealContactDetails = new Set(["service_manager", "hod", "admin", "super_admin"]).has(await activeRole(session.email));
       const references = (Array.isArray(body.references) ? body.references : []).slice(0, 100).flatMap((value) => {
         if (!value || typeof value !== "object" || Array.isArray(value)) return [];
         const reference = value as Json;
@@ -412,7 +440,7 @@ Deno.serve(async (request) => {
         const profile = email ? profileByEmail.get(email) : undefined;
         const profileName = profile ? [profile.first_name, profile.middle_name, profile.last_name].map((part) => String(part || "").trim()).filter(Boolean).join(" ") : "";
         const teamName = team ? `${String(team["Other Names"] || "").trim()} ${String(team.Surname || "").trim()}`.trim().replace(/\s+/g, " ") : "";
-        identities[key] = { name: profileName || teamName || reference.name || email || "Unknown member", email, phone: String(profile?.phone || "").trim(), avatarUrl: await signedAvatarUrl(profile?.avatar_path) };
+        identities[key] = { name: profileName || teamName || reference.name || email || "Unknown member", email: revealContactDetails ? email : "", phone: revealContactDetails ? String(profile?.phone || "").trim() : "", avatarUrl: await signedAvatarUrl(profile?.avatar_path) };
       }));
       return json({ identities });
     }
@@ -686,11 +714,17 @@ Deno.serve(async (request) => {
     if (operation === "push.list") {
       const rows: Json[] = [];
       for (let offset = 0; ; offset += 1000) {
-        const page = await rest(`push_subscriptions?select=endpoint,p256dh,auth&is_active=eq.true&order=id.asc&offset=${offset}&limit=1000`) as Json[];
+        const page = await rest(`push_subscriptions?select=endpoint,p256dh,auth,member_email&is_active=eq.true&order=id.asc&offset=${offset}&limit=1000`) as Json[];
         rows.push(...page);
         if (page.length < 1000) break;
       }
-      return json({ subscriptions: rows.map((row) => ({ endpoint: String(row.endpoint), p256dh: String(row.p256dh), auth: String(row.auth) })) });
+      let visibleRows = rows;
+      if (body.elevatedOnly === true) {
+        const roleRows = await rest("user_roles?select=email,role&is_active=eq.true&role=in.(service_manager,hod,admin,super_admin)") as Json[];
+        const allowed = new Set([...PROTECTED_BOOTSTRAP_EMAILS, ...roleRows.map((row) => normalizeEmail(row.email))]);
+        visibleRows = rows.filter((row) => allowed.has(normalizeEmail(row.member_email)));
+      }
+      return json({ subscriptions: visibleRows.map((row) => ({ endpoint: String(row.endpoint), p256dh: String(row.p256dh), auth: String(row.auth) })) });
     }
     if (operation === "push.deactivate") {
       const endpoints = Array.isArray(body.endpoints) ? body.endpoints.map((value) => String(value || "").trim()).filter((value) => value.startsWith("https://") && value.length <= 4096).slice(0, 1000) : [];

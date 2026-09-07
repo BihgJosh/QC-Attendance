@@ -25,12 +25,14 @@ type GatewayOperation =
 export class AttendanceStoreError extends Error {
   status: number;
   code?: string;
+  existingMemberName?: string;
 
-  constructor(message: string, status = 500, code?: string) {
+  constructor(message: string, status = 500, code?: string, existingMemberName?: string) {
     super(message);
     this.name = "AttendanceStoreError";
     this.status = status;
     this.code = code;
+    this.existingMemberName = existingMemberName;
   }
 }
 
@@ -73,6 +75,7 @@ async function callGateway<T>(
       typeof data.error === "string" ? data.error : "Attendance storage request failed.",
       response.status,
       typeof data.code === "string" ? data.code : undefined,
+      typeof data.existingMemberName === "string" ? data.existingMemberName : undefined,
     );
   }
 
@@ -110,6 +113,10 @@ export async function hasDeviceSignedToday(deviceId: string, date: string) {
   return data.memberName;
 }
 
-export async function appendAttendance(record: AttendanceRecord, adminOverride = false) {
-  return callGateway<{ success: boolean }>("attendance.insert", { record, adminOverride });
+export async function appendAttendance(record: AttendanceRecord, options: { override?: boolean; overrideActor?: string } = {}) {
+  return callGateway<{ success: boolean; overridden?: boolean; replacedMemberName?: string }>("attendance.insert", {
+    record,
+    adminOverride: options.override === true,
+    overrideActor: options.overrideActor,
+  });
 }

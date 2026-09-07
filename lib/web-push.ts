@@ -14,9 +14,9 @@ export type TeamNotification = {
   requireInteraction?: boolean;
 };
 
-export async function notifyTeam(notification: TeamNotification) {
+export async function notifyTeam(notification: TeamNotification, options: { elevatedOnly?: boolean } = {}) {
   webPush.setVapidDetails(getEnv("VAPID_SUBJECT"), getEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY"), getEnv("VAPID_PRIVATE_KEY"));
-  const subscriptions = await listPushSubscriptions();
+  const subscriptions = await listPushSubscriptions(options);
   const payload = JSON.stringify({ ...notification, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png" });
   const completed: { delivered: boolean; expired: boolean; endpoint: string }[] = [];
   const batchSize = 20;

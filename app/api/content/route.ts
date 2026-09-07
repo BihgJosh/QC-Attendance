@@ -2,18 +2,25 @@ import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/auth";
 import { getConfig, updateConfig } from "@/lib/google-sheets";
 import { DEFAULT_HOMEPAGE_CONTENT, normalizeHomepageContent } from "@/lib/homepage-content";
+import { readMemberSession } from "@/lib/member-auth";
+import { resolveUserAccess } from "@/lib/member-store";
+import { canViewMemberDetails } from "@/lib/member-permissions";
 
 const CONTENT_CONFIG_KEY = "homepageContent";
 
 export async function GET() {
   try {
     const config = await getConfig();
-    if (!config[CONTENT_CONFIG_KEY]) {
-      return NextResponse.json(DEFAULT_HOMEPAGE_CONTENT);
-    }
-    return NextResponse.json(normalizeHomepageContent(JSON.parse(config[CONTENT_CONFIG_KEY])));
+    const content = config[CONTENT_CONFIG_KEY] ? normalizeHomepageContent(JSON.parse(config[CONTENT_CONFIG_KEY])) : DEFAULT_HOMEPAGE_CONTENT;
+    if (await isAdminAuthenticated()) return NextResponse.json(content, { headers: { "Cache-Control": "private, no-store" } });
+    const session = await readMemberSession();
+    if (!session) return NextResponse.json({ error: "Unauthenticated." }, { status: 401 });
+    const access = await resolveUserAccess(session.email);
+    if (canViewMemberDetails(access.role)) return NextResponse.json(content, { headers: { "Cache-Control": "private, no-store" } });
+    const redacted = { ...content, postings: content.postings.map((posting) => ({ ...posting, rows: posting.rows.map((row) => ({ ...row, assignments: row.assignments.map((members) => members.map((member) => ({ ...member, email: "" }))) })) })) };
+    return NextResponse.json(redacted, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
-    return NextResponse.json(DEFAULT_HOMEPAGE_CONTENT);
+    return NextResponse.json({ error: "Homepage content is unavailable." }, { status: 503, headers: { "Cache-Control": "private, no-store" } });
   }
 }
 
