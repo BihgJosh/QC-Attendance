@@ -2,6 +2,34 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-07 — Attendance override removal
+
+- Source commit: `a28bcab` (`Remove attendance override flow`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_Eh6tQi6jzwU8MiXYDkY1KRWc4m44`.
+- Vercel status: **READY**, `qcsoja.com` alias confirmed.
+- Live verification completed: **2026-09-07 22:58:03 WAT**.
+- Supabase Edge Function: `qcu-attendance` version 45, **ACTIVE**, JWT verification enabled.
+- Database migrations: none required.
+
+### Changes
+
+- Removed the attendance replacement confirmation screen and override action from the attendance form.
+- Removed attendance-override permission data from member sessions and the client.
+- Removed the override input, authorization branch, actor audit wording and replacement response from the attendance API.
+- Removed record replacement and deletion behavior from the Supabase attendance gateway.
+- Duplicate device attendance remains blocked with HTTP 409; an existing approved attendance record is never replaced through the attendance form.
+- Service Post report overrides are unchanged because this release only removes actual member-attendance overrides.
+
+### Verification
+
+- Local and Vercel production builds passed; all 58 static pages generated.
+- Impeccable found no blocking issue in the changed attendance interface.
+- Vercel confirmed the deployment **READY** and the `qcsoja.com` production alias.
+- Supabase confirmed `qcu-attendance` version 45 **ACTIVE**.
+- No attendance record was created, replaced or deleted during verification.
+- Unrelated local changes and artifacts were excluded from the release archive.
+
 ## 2026-09-07 — Role-only administrator access
 
 - Source commit: `9f221e4` (`Replace shared admin password with role access`).
