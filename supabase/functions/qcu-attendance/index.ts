@@ -100,7 +100,6 @@ const PROTECTED_BOOTSTRAP_EMAILS = new Set(["joshuaagusa001@gmail.com"]);
 const PASSWORD_ITERATIONS = 210_000;
 const WEB_SESSION_DAYS = 1;
 const PWA_SESSION_DAYS = 30;
-const ACTIVE_SESSION_ERROR = "This account is already signed in on another device. Sign out there first or ask an administrator to reset your access.";
 
 function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
@@ -147,23 +146,16 @@ async function verifyPassword(password: string, stored: string) {
 }
 
 async function createMemberSession(email: string, rememberMe = false) {
-  await rest(`member_sessions?email=eq.${encodeURIComponent(email)}&expires_at=lte.${encodeURIComponent(new Date().toISOString())}`, {
-    method: "DELETE", headers: { Prefer: "return=minimal" },
-  });
   const token = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash = await sha256(token);
   const sessionDays = rememberMe ? PWA_SESSION_DAYS : WEB_SESSION_DAYS;
-  const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000).toISOString();
-  await rest("member_sessions", {
-    method: "POST", headers: { Prefer: "return=minimal" },
-    body: JSON.stringify({ email, token_hash: tokenHash, expires_at: expiresAt, remember_me: rememberMe }),
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + sessionDays * 24 * 60 * 60 * 1000).toISOString();
+  await rest("member_sessions?on_conflict=email", {
+    method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ email, token_hash: tokenHash, expires_at: expiresAt, remember_me: rememberMe, created_at: now.toISOString(), last_seen_at: now.toISOString() }),
   });
   return token;
-}
-
-async function hasActiveMemberSession(email: string) {
-  const active = await rest(`member_sessions?select=id&email=eq.${encodeURIComponent(email)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&limit=1`) as Json[];
-  return Boolean(active[0]);
 }
 
 async function resolveMemberSession(tokenValue: unknown) {
@@ -348,15 +340,9 @@ Deno.serve(async (request) => {
         await rest(`member_credentials?email=eq.${encodeURIComponent(email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ failed_attempts: lock ? 0 : failures, locked_until: lock, updated_at: new Date().toISOString() }) });
         return json({ error: lock ? "Too many attempts. Try again in 15 minutes." : "Invalid email or password." }, lock ? 429 : 401);
       }
-      if (await hasActiveMemberSession(email)) return json({ error: ACTIVE_SESSION_ERROR, code: "SESSION_ALREADY_ACTIVE" }, 409);
       await rest(`member_credentials?email=eq.${encodeURIComponent(email)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ failed_attempts: 0, locked_until: null, last_login_at: new Date().toISOString(), updated_at: new Date().toISOString() }) });
       const rememberMe = body.rememberMe === true;
-      try {
-        return json({ token: await createMemberSession(email, rememberMe), rememberMe, mustChangePassword: false });
-      } catch (error) {
-        if ((error as Error & { code?: string }).code === "23505") return json({ error: ACTIVE_SESSION_ERROR, code: "SESSION_ALREADY_ACTIVE" }, 409);
-        throw error;
-      }
+      return json({ token: await createMemberSession(email, rememberMe), rememberMe, mustChangePassword: false });
     }
     if (operation === "member.session") {
       const session = await resolveMemberSession(body.token);
