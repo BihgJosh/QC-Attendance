@@ -2,6 +2,35 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-07 — Standard service-location reporting status
+
+- Source commit: `163ef7c` (`Standardize service location reporting status`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_ETgiwdBGrtxiySp3rRbtUfYTR26d`.
+- Vercel status: **READY**; `qcsoja.com`, `www.qcsoja.com`, `qcunit.vercel.app`, and `qcu-bigh-devs.vercel.app` aliases confirmed.
+- Platform-confirmed deployment time: **2026-09-07 18:07:27 WAT**.
+- Live route verification completed: **2026-09-07 18:09:11 WAT**.
+- Database/API migrations: none required.
+
+### Changes
+
+- Established one shared, fixed list of 17 Service Post reporting locations for the form, server validation, and Service Manager dashboard.
+- The Worshipper Headcount table now keeps every expected location visible in operational order and labels each one **Reported** or **Not reported**.
+- Added a completion summary showing reported locations and the number still awaiting reports.
+- Missing locations display blank counts, while a submitted report with zero adults and zero children correctly counts as reported.
+- Historical non-standard reported locations remain visible after the standard list so previously saved data is not hidden.
+
+### Verification
+
+- Local and Vercel production builds passed; all 60 routes generated or compiled.
+- TypeScript passed and Git whitespace checks found no errors.
+- The UI detector found no blocking issue; its remaining warnings include pre-existing dashboard color and typography patterns.
+- Vercel confirmed the deployment **READY** and all production aliases.
+- Production `/service-tools` returned the expected HTTP 307 redirect to member login for an unauthenticated request.
+- The authenticated browser fixture could not be completed because its old test session is no longer accepted by the current signed-session guard; no live Service Manager credential was used.
+- No service report, headcount, attendance record, or notification was created during verification.
+- Unrelated local changes and artifacts were excluded from the deployment snapshot.
+
 ## 2026-09-07 — Privacy policy and cookie consent
 
 - Source commit: `5562cd0` (`Add privacy policy and cookie consent`).
