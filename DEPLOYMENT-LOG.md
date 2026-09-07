@@ -2,6 +2,31 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-07 — Sunday-only attendance audit
+
+- Source commit: `773e639` (`Limit attendance audit to live Sundays`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_5p8sToFThhYJtLnPE9Jcx3PAas6k`.
+- Vercel status: **READY**, `qcsoja.com` production alias confirmed.
+- Live verification completed: **2026-09-07 16:56:46 WAT**.
+- Database/API migrations: none required.
+
+### Changes
+
+- Attendance Audit now includes only records whose service is Sunday and whose calendar date is Sunday.
+- The audit begins with the first live Sunday, 19 July 2026.
+- Removed date-range and service filters so preview counts and generated Google Sheets always use the same fixed Sunday-only scope.
+- Mislabeled Sunday records saved on other weekdays are excluded.
+
+### Verification
+
+- Local and Vercel production builds passed; all 59 routes generated or compiled.
+- Authenticated production audit returned HTTP 200 with 8 Sunday columns and 470 approved check-ins, from 19 July through 6 September 2026.
+- All 8 returned columns passed service, calendar-day, and launch-boundary checks; invalid columns: 0.
+- Impeccable reported one pre-existing 11px typography advisory and no blocking UI finding.
+- No attendance records or Google Sheets were modified during verification.
+- Unrelated local changes and artifacts were excluded from the release snapshot.
+
 ## 2026-09-07 — Role privacy and replace-in-place attendance override
 
 - Source commit: `2a9815e` (`Enforce member privacy and attendance overrides`).
