@@ -2,6 +2,34 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-07 — Combined member login and session-duration policy
+
+- Source commit: `41824a6` (`Streamline member login and session duration`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_B5rD3VLU2KFuY8wozuW8tXtGtf4E`.
+- Vercel status: **READY**, `qcsoja.com` production alias confirmed.
+- Live verification completed: **2026-09-07 15:36:06 WAT**.
+- Supabase Edge Function: `qcu-attendance` version 40, **ACTIVE**.
+- Database migrations: none required.
+
+### Changes
+
+- Combined email and password on the initial member login screen; returning members now sign in with one submission.
+- Kept first-time private-password confirmation on the same screen and only reveal it when the account needs setup.
+- Removed the inaccurate 180-day login-duration message.
+- Set normal browser sessions to 24 hours and installed PWA sessions to 30 days, with bounded renewal during active use.
+- Preserved the correct session type through password and verified-email changes, and capped legacy 180-day sessions at 30 days on their next successful validation.
+
+### Verification
+
+- TypeScript, diff checks, local production build and Vercel production build passed; all 58 static pages generated.
+- UI detector returned no findings for the login surface.
+- Local and production visual checks confirmed the email and password fields appear together and the 180-day message is absent.
+- Production `/member/login` and `/api/status` returned HTTP 200.
+- Supabase reported `qcu-attendance` version 40 as **ACTIVE**.
+- Authenticated session-expiry headers were not exercised because no member credentials were used during deployment verification; the compiled cookie and gateway duration paths were statically verified.
+- Unrelated local changes, migrations, and artifacts were excluded from the deployment snapshot.
+
 ## 2026-09-04 — Page-only loading screen
 
 - Source commit: `4b0a0e7` (`Limit loader to page transitions`).
