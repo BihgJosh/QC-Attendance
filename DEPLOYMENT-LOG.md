@@ -2,6 +2,33 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-07 — Privacy policy and cookie consent
+
+- Source commit: `5562cd0` (`Add privacy policy and cookie consent`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_8wpp1BodfRXCUUT26vxfx8zdLgJH`.
+- Vercel status: **READY**; all production aliases confirmed.
+- Live verification completed: **2026-09-07 17:35:01 WAT**.
+- Database/API migrations: none required.
+
+### Changes
+
+- Added a public Privacy Policy describing processed data, role-based access, service providers, retention, safeguards, data-subject rights, cookies and device storage.
+- Added an explicit credential agreement prohibiting credential disclosure, lending accounts and giving another person authenticated platform access.
+- Made acceptance mandatory on member login and enforced it again in the login API.
+- Added a global necessary-cookie/device-storage consent banner and stated that the platform does not use advertising or analytics cookies.
+- Added a persistent Privacy Policy link to the homepage footer.
+
+### Verification
+
+- Local and Vercel production builds passed; all 60 routes generated or compiled.
+- Production Privacy Policy returned and exposed the full agreement through accessible headings and lists.
+- Production member login displayed the required unchecked agreement and kept Sign in disabled until acceptance.
+- A direct login request without acceptance returned HTTP 400 with the expected policy error.
+- Production cookie banner displayed its explanation, Accept and continue action, and Privacy Policy link.
+- Impeccable warnings introduced by the new privacy surface were corrected; remaining advisories belong to pre-existing homepage typography.
+- Unrelated local changes and artifacts were excluded from the deployment snapshot.
+
 ## 2026-09-07 — Sunday-only attendance audit
 
 - Source commit: `773e639` (`Limit attendance audit to live Sundays`).
