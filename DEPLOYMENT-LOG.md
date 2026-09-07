@@ -2,6 +2,35 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-07 — Role privacy and replace-in-place attendance override
+
+- Source commit: `2a9815e` (`Enforce member privacy and attendance overrides`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_F3GX9dsbLo4RDNAEVopN1u8y9v4c`.
+- Vercel status: **READY**; `qcsoja.com`, `www.qcsoja.com`, and `qcunit.vercel.app` aliases confirmed.
+- Live verification completed: **2026-09-07 16:12:43 WAT**.
+- Supabase Edge Function: `qcu-attendance` version 41, **ACTIVE**, JWT verification enabled.
+- Database migrations: none required.
+
+### Changes
+
+- Administrators and Super Admins can select a Team Data member and sign attendance using the administrator's device and location; the selected member does not need a phone.
+- Phone numbers and email addresses are returned and displayed only to Service Managers, HODs, Admins, and Super Admins. General users receive redacted contact data and see only profile pictures or a neutral placeholder.
+- Emergency polling, on-page alerts, and emergency push delivery are restricted to Service Managers, HODs, Admins, and Super Admins.
+- Attendance replacement is authorized only for Service Managers, Admins, and Super Admins. It replaces the prior approved record instead of adding another active record, and documents the actor and replaced member in the new record's reason.
+- Attendance remains subject to the open window and geofence during an override.
+
+### Verification
+
+- Local and Vercel production builds passed; all 59 routes generated or compiled.
+- Impeccable UI scan reported only pre-existing typography advisories and no blocking finding in the changed flows.
+- Production access checks returned HTTP 401 for unauthenticated attendance-member selection, emergency polling, posting identities, and homepage content APIs.
+- Vercel confirmed deployment **READY** and all production aliases.
+- Supabase confirmed `qcu-attendance` version 41 **ACTIVE**.
+- No attendance record or emergency notification was created during verification.
+- Authenticated role behavior and a real replacement were not exercised in production because no member credentials were used and destructive test attendance was avoided.
+- Unrelated local changes and artifacts were excluded from the release snapshot.
+
 ## 2026-09-07 — Combined member login and session-duration policy
 
 - Source commit: `41824a6` (`Streamline member login and session duration`).
