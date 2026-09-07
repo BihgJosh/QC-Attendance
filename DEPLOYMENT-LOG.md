@@ -2,6 +2,29 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-07 — Latest-login-wins session hotfix
+
+- Source commit: `5329e07` (`Allow latest member login to replace prior session`).
+- Production: https://qcsoja.com
+- Vercel deployment: unchanged; this was a Supabase authentication-function-only hotfix.
+- Supabase Edge Function: `qcu-attendance` version 43, **ACTIVE**, JWT verification enabled.
+- Live verification completed: **2026-09-07 20:19:50 WAT**.
+- Database migrations: none required; the existing one-session-per-email constraint remains active.
+
+### Changes
+
+- Replaced the lockout behavior that rejected a valid login whenever an older session existed.
+- A successful login now atomically replaces the account's previous session token.
+- The newest device remains signed in and the older device is immediately invalidated, preserving the one-active-session security rule without trapping members outside their accounts.
+
+### Verification
+
+- Supabase confirmed `qcu-attendance` version 43 **ACTIVE**.
+- A rolled-back synthetic database test created an initial session and replaced it using the production upsert path; the result was exactly 1 session row and `latest_token_won=true`.
+- The synthetic credential and session were rolled back, so no test account or token was retained.
+- A real member password was not used during verification.
+- Unrelated local changes and artifacts were excluded.
+
 ## 2026-09-07 — Single-account sessions and visible posting identities
 
 - Source commit: `e1e29a7` (`Enforce single member sessions and restore posting identities`).
