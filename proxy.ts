@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMemberSession, MemberStoreError } from "@/lib/member-store";
-import { MEMBER_SESSION_COOKIE, MEMBER_SESSION_MAX_AGE } from "@/lib/member-auth";
+import { MEMBER_SESSION_COOKIE, memberSessionMaxAge } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { isPrivilegedAdminEmail } from "@/lib/roles";
 
@@ -23,7 +23,7 @@ export async function proxy(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: MEMBER_SESSION_MAX_AGE,
+      maxAge: memberSessionMaxAge(session.rememberMe === true),
     });
     return response;
   } catch (error) {
@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
       return response;
     }
     // A temporary gateway, database, or mobile-network failure must not destroy
-    // an otherwise valid 180-day login. The destination can show its own
+    // an otherwise valid login. The destination can show its own
     // recoverable service error and the next request can validate the session.
     return NextResponse.next();
   }

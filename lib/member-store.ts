@@ -140,7 +140,7 @@ export function getMemberSession(token: string) {
 }
 
 export function changeMemberPassword(token: string, password: string) {
-  return callMemberGateway<{ token: string; mustChangePassword: false }>("member.change-password", { token, password });
+  return callMemberGateway<{ token: string; rememberMe?: boolean; mustChangePassword: false }>("member.change-password", { token, password });
 }
 
 export function logoutMember(token: string) {
@@ -179,7 +179,7 @@ export function requestMemberEmailChange(token: string, newEmail: string) {
 }
 
 export function confirmMemberEmailChange(token: string, code: string) {
-  return callMemberGateway<{ success: boolean; email: string; token: string }>("profile.email-change-confirm", { token, code });
+  return callMemberGateway<{ success: boolean; email: string; token: string; rememberMe?: boolean }>("profile.email-change-confirm", { token, code });
 }
 
 export function uploadMemberProfileImage(token: string, base64: string, mimeType: "image/webp", requestId: string) {

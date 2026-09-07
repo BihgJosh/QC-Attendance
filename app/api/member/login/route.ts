@@ -9,7 +9,8 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request." }, { status: 400 });
     const email = String(body.email || "").trim().toLowerCase();
-    const action = String(body.action || "identify");
+    const action = String(body.action || "login");
+    const rememberMe = body.isPwa === true;
     if (!email) return NextResponse.json({ error: "Enter your team email." }, { status: 400 });
     if (!(await isAdminEmail(email))) {
       if (!(await getTeamMemberByEmail(email))) return NextResponse.json({ error: "This email is not registered with the QC team." }, { status: 401 });
@@ -20,15 +21,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ nextStep: "setup" });
     }
     if (action === "setup") {
-      const session = await completeMemberSetup(email, String(body.password || ""), true);
-      await setMemberSession(session.token);
+      const session = await completeMemberSetup(email, String(body.password || ""), rememberMe);
+      await setMemberSession(session.token, rememberMe);
       return NextResponse.json({ success: true });
     }
     if (action !== "login") return NextResponse.json({ error: "Invalid sign-in step." }, { status: 400 });
+    const passwordStatus = await getMemberPasswordStatus(email);
+    if (!passwordStatus.hasPrivatePassword) return NextResponse.json({ nextStep: "setup" });
     const password = String(body.password || "");
     if (!password || password.length > 256) return NextResponse.json({ error: "Enter your private password." }, { status: 400 });
-    const session = await authenticateMember(email, password, true);
-    await setMemberSession(session.token);
+    const session = await authenticateMember(email, password, rememberMe);
+    await setMemberSession(session.token, rememberMe);
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof TeamDataError) return NextResponse.json({ error: error.message }, { status: 503 });

@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request." }, { status: 400 });
     const { password } = body;
     const result = await changeMemberPassword(token, String(password || ""));
-    await setMemberSession(result.token);
+    await setMemberSession(result.token, result.rememberMe === true);
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message || "Password could not be changed." }, { status: (error as { status?: number }).status || 500 });

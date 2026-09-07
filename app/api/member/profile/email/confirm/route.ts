@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   try {
     const { code } = await request.json();
     const result = await confirmMemberEmailChange(session.token, String(code || ""));
-    await setMemberSession(result.token);
+    await setMemberSession(result.token, result.rememberMe === true);
     return NextResponse.json({ success: true, email: result.email });
   } catch (error) {
     const status = error instanceof MemberStoreError ? error.status : 500;
