@@ -7,12 +7,6 @@ ROOT = os.environ.get("TEST_BASE_URL", "http://localhost:3000")
 OUT = Path("artifacts/member-auth")
 OUT.mkdir(parents=True, exist_ok=True)
 
-def read_admin_password():
-    for line in Path(".env.local").read_text(encoding="utf-8").splitlines():
-        if line.startswith("ADMIN_PASSWORD="):
-            return line.split("=", 1)[1].strip().strip('"')
-    return ""
-
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
     for name, width, height in [("desktop", 1440, 1000), ("mobile", 390, 844)]:
@@ -52,19 +46,11 @@ with sync_playwright() as playwright:
     page.goto(f"{ROOT}/member/change-password", wait_until="networkidle")
     assert "/member/login" in page.url
 
-    admin_password = read_admin_password()
-    if admin_password:
-        response = page.request.post(f"{ROOT}/api/admin/login", data={"password": admin_password})
-        assert response.ok
-        access_response = page.request.get(f"{ROOT}/api/admin/member-passwords")
-        assert access_response.ok, f"{access_response.status}: {access_response.text()}"
-        payload = access_response.json()
-        assert any(member["email"] == "joshuaagusa001@gmail.com" for member in payload["members"])
-        page.goto(f"{ROOT}/admin/dashboard", wait_until="networkidle")
-        page.get_by_role("tab", name="Password resets").click()
-        assert page.get_by_role("heading", name="Member password resets").is_visible()
-        page.get_by_text("joshuaagusa001@gmail.com").wait_for(state="visible")
-        page.screenshot(path=str(OUT / "admin-password-resets.png"), full_page=True)
+    removed_shared_login = page.request.post(f"{ROOT}/api/admin/login", data={"password": "obsolete"})
+    assert removed_shared_login.status == 404
+    page.goto(f"{ROOT}/admin/dashboard", wait_until="networkidle")
+    assert "/member/login" in page.url
+    assert "next=%2Fadmin%2Fdashboard" in page.url or "next=/admin/dashboard" in page.url
     browser.close()
 
 print("member auth UI and protected-route checks passed")

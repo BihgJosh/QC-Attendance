@@ -29,9 +29,7 @@ type MemberOperation =
   | "roles.upsert"
   | "roles.remove"
   | "assignments.upsert"
-  | "assignments.remove"
-  | "admin.login-check"
-  | "admin.login-record";
+  | "assignments.remove";
 
 export type MemberStatus = {
   email: string;
@@ -79,7 +77,7 @@ function retryDelay(attempt: number) {
 async function callMemberGateway<T>(operation: MemberOperation, payload: Record<string, unknown> = {}) {
   const { endpoint, anonKey, gatewaySecret } = gatewayConfiguration();
 
-  const maximumAttempts = operation === "admin.login-record" ? 1 : GATEWAY_ATTEMPTS;
+  const maximumAttempts = GATEWAY_ATTEMPTS;
   for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
     try {
       const response = await fetch(endpoint, {
@@ -261,14 +259,4 @@ export function upsertServiceAssignment(input: { id?: string; serviceDate: strin
 
 export function removeServiceAssignment(id: string) {
   return callMemberGateway<{ success: boolean }>("assignments.remove", { id });
-}
-
-export type AdminLoginAttempt = { allowed: boolean; lockedUntil: string | null; attemptsRemaining?: number };
-
-export function checkAdminLoginAttempt(clientKey: string) {
-  return callMemberGateway<AdminLoginAttempt>("admin.login-check", { clientKey });
-}
-
-export function recordAdminLoginAttempt(clientKey: string, succeeded: boolean, maximumFailures: number) {
-  return callMemberGateway<AdminLoginAttempt>("admin.login-record", { clientKey, succeeded, maximumFailures });
 }

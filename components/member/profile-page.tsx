@@ -3,7 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, BadgeCheck, Camera, Check, Loader2, MailCheck, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Camera, Check, LayoutDashboard, Loader2, MailCheck, Save, ShieldCheck, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { MemberLogoutButton } from "@/components/member/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -302,6 +302,7 @@ export function ProfilePage() {
             <p className="mt-3 text-xs leading-5 text-white/55">Your role is assigned by an administrator and cannot be changed here.</p>
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,.heic,.heif,.avif" aria-label="Choose profile picture" className="sr-only" onChange={changePhoto} />
             <div className="mt-6 grid gap-2">
+              {(profile.role === "admin" || profile.role === "super_admin") && <Button asChild className="bg-cyan-600 text-white hover:bg-cyan-500"><Link href="/admin/dashboard"><LayoutDashboard className="mr-2 h-4 w-4" />Admin dashboard</Link></Button>}
               <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()} disabled={photoBusy}><Camera className="mr-2 h-4 w-4" />{photoCandidate ? "Choose another" : profile.avatarUrl ? "Replace picture" : "Add profile picture"}</Button>
               {photoCandidate ? <div className="rounded-xl bg-white/10 p-3">
                 <p className="truncate text-xs font-semibold text-white/80">Ready: {photoCandidate.originalName}</p>

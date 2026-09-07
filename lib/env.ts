@@ -36,7 +36,6 @@ export function getSupabaseEnv() {
 
 export function getAttendanceEnvConfig() {
   return {
-    adminPassword: getEnv("ADMIN_PASSWORD"),
     sharedPassword: getEnv("SHARED_PASSWORD"),
     churchLat: getOptionalEnv("CHURCH_LATITUDE"),
     churchLng: getOptionalEnv("CHURCH_LONGITUDE"),

@@ -5,7 +5,7 @@ const allowedOperations = new Set([
   "member.status", "member.setup-complete", "member.authenticate", "member.session", "member.change-password", "member.logout",
   "profile.get", "profile.update", "profile.email-change-request", "profile.email-change-confirm", "profile.image-upload", "profile.image-delete", "profile.image-stage-create", "profile.image-stage-read", "profile.image-stage-delete", "profile.identities",
   "member.list", "member.reset", "admin.list", "admin.add", "admin.remove",
-  "roles.list", "roles.resolve", "roles.upsert", "roles.remove", "assignments.upsert", "assignments.remove", "admin.login-check", "admin.login-record",
+  "roles.list", "roles.resolve", "roles.upsert", "roles.remove", "assignments.upsert", "assignments.remove",
   "push.subscribe", "push.unsubscribe", "push.list", "push.deactivate",
 ]);
 
@@ -392,19 +392,6 @@ Deno.serve(async (request) => {
         role: roles[0]?.is_active === false ? "general_user" : String(roles[0]?.role || "general_user"),
         profileComplete: Boolean(profile.profile_completed_at && address && team["Church Join Year"]),
       } });
-    }
-    if (operation === "admin.login-check") {
-      const clientKey = String(body.clientKey || "");
-      if (!/^[a-f0-9]{64}$/.test(clientKey)) return json({ error: "Invalid login fingerprint." }, 400);
-      const result = await rest("rpc/qcu_check_admin_login_attempt", { method: "POST", body: JSON.stringify({ p_client_key: clientKey }) }) as Json;
-      return json({ allowed: result.allowed === true, lockedUntil: result.locked_until || null });
-    }
-    if (operation === "admin.login-record") {
-      const clientKey = String(body.clientKey || "");
-      const maximumFailures = Number(body.maximumFailures);
-      if (!/^[a-f0-9]{64}$/.test(clientKey) || typeof body.succeeded !== "boolean" || !Number.isInteger(maximumFailures) || maximumFailures < 5 || maximumFailures > 100) return json({ error: "Invalid login attempt." }, 400);
-      const result = await rest("rpc/qcu_record_admin_login_attempt", { method: "POST", body: JSON.stringify({ p_client_key: clientKey, p_succeeded: body.succeeded, p_maximum_failures: maximumFailures }) }) as Json;
-      return json({ allowed: result.allowed === true, lockedUntil: result.locked_until || null, attemptsRemaining: Number(result.attempts_remaining ?? 0) });
     }
     if (operation === "profile.identities") {
       const session = await resolveMemberSession(body.token);

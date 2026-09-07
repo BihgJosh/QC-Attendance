@@ -7,7 +7,6 @@ ROUTES = {
     "home": "/",
     "attendance": "/attendance",
     "member-login": "/member/login",
-    "admin-login": "/admin/login",
 }
 VIEWPORTS = {"desktop": (1440, 1000), "mobile": (390, 844)}
 

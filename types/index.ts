@@ -3,7 +3,6 @@ export interface AppConfig {
   churchLng: string;
   allowedRadius: string;
   sharedPassword: string;
-  adminPassword: string;
   isOpen: string; // "true" | "false"
 }
 
@@ -31,7 +30,6 @@ export interface AttendanceRequest {
   device: string;
   service: string;
   deviceId: string;
-  adminPassword?: string;
 }
 
 export const ALLOWED_SERVICES = ["Sunday", "Thursday", "Other"] as const;

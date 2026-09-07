@@ -3,7 +3,7 @@ import { readMemberSession } from "@/lib/member-auth";
 import { isPrivilegedAdminEmail } from "@/lib/roles";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
 import { resolveUserAccess } from "@/lib/member-store";
-import { canOverrideAttendance, canSignAttendanceForOthers, canViewEmergencyAlerts, canViewMemberDetails } from "@/lib/member-permissions";
+import { canAccessAdmin, canOverrideAttendance, canSignAttendanceForOthers, canViewEmergencyAlerts, canViewMemberDetails } from "@/lib/member-permissions";
 
 export async function GET() {
   const session = await readMemberSession();
@@ -15,6 +15,7 @@ export async function GET() {
     email: session.email,
     name: member?.name || session.email,
     role: access.role,
+    canAccessAdmin: canAccessAdmin(access.role),
     mustChangePassword: session.mustChangePassword,
     canViewMemberDetails: canViewMemberDetails(access.role),
     canViewEmergencyAlerts: canViewEmergencyAlerts(access.role),

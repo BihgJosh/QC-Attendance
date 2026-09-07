@@ -57,7 +57,7 @@ export default function HomePage() {
   const [birthdays, setBirthdays] = useState<BirthdayNoticeEntry[]>([]);
   const [postingIdentities, setPostingIdentities] = useState<Record<string, MemberIdentity>>({});
   const [postingIdentitiesLoading, setPostingIdentitiesLoading] = useState(true);
-  const [permissions, setPermissions] = useState({ canViewMemberDetails: false, canViewEmergencyAlerts: false });
+  const [permissions, setPermissions] = useState({ canViewMemberDetails: false, canViewEmergencyAlerts: false, canAccessAdmin: false });
 
   useEffect(() => {
     const updateTime = () => {
@@ -100,7 +100,11 @@ export default function HomePage() {
         const response = await fetch("/api/member/session", { cache: "no-store" });
         if (response.ok) {
           const data = await response.json();
-          setPermissions({ canViewMemberDetails: data.canViewMemberDetails === true, canViewEmergencyAlerts: data.canViewEmergencyAlerts === true });
+          setPermissions({
+            canViewMemberDetails: data.canViewMemberDetails === true,
+            canViewEmergencyAlerts: data.canViewEmergencyAlerts === true,
+            canAccessAdmin: data.canAccessAdmin === true,
+          });
         }
       } catch {
         // Sensitive details and emergency alerts remain hidden when access cannot be confirmed.
@@ -147,11 +151,9 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Button asChild variant="ghost" size="sm" className="hidden gap-2 text-white/70 hover:bg-white/10 hover:text-white sm:flex">
-              <Link href="/admin">
-                <Lock className="h-4 w-4" /> Admin
-              </Link>
-            </Button>
+            {permissions.canAccessAdmin && <Button asChild variant="ghost" size="sm" className="hidden gap-2 text-white/70 hover:bg-white/10 hover:text-white sm:flex">
+              <Link href="/admin"><Lock className="h-4 w-4" /> Admin</Link>
+            </Button>}
             <ThemeToggle />
             <Button asChild variant="ghost" size="icon" className="hidden text-white/70 hover:bg-white/10 hover:text-white sm:inline-flex"><Link href="/member/profile" aria-label="Open my profile"><UserRound className="h-4 w-4" /></Link></Button>
             <span className="hidden sm:inline-flex"><MemberLogoutButton compact /></span>
@@ -176,9 +178,9 @@ export default function HomePage() {
                 <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white">{item.label}<ChevronRight className="h-4 w-4 text-cyan-100/50" /></a>
               )
             ))}
-            <Link href="/admin" className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white">
-              Admin login <Lock className="h-4 w-4 text-cyan-100/50" />
-            </Link>
+            {permissions.canAccessAdmin && <Link href="/admin" className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white">
+              Admin dashboard <Lock className="h-4 w-4 text-cyan-100/50" />
+            </Link>}
             <div className="px-1 py-1"><MemberLogoutButton /></div>
           </div>
         )}
