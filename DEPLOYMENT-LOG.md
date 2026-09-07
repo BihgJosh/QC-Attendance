@@ -2,6 +2,35 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-07 — Role-only administrator access
+
+- Source commit: `9f221e4` (`Replace shared admin password with role access`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_5Ue4xc6JB8Lf5XVfCSFNxSUtpa71`.
+- Vercel status: **READY**, `qcsoja.com` alias confirmed.
+- Live verification completed: **2026-09-07 22:00:58 WAT**.
+- Supabase Edge Function: `qcu-attendance` version 44, **ACTIVE**, JWT verification enabled.
+- Database migration: not applied; the legacy login-attempt objects remain locked down and unreachable after their only gateway operations were removed.
+
+### Changes
+
+- Removed the shared administrator password form, API routes, signed admin cookie, and password verification code.
+- Restricted the admin dashboard and all admin APIs to authenticated member sessions whose active role is `admin` or `super_admin`.
+- Hid Admin navigation on desktop and mobile for every other role; Admin and Super Admin accounts see the dashboard link on both Home and My Profile.
+- Removed the obsolete shared-admin gateway operations and deleted `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` from Vercel.
+- Updated environment templates, documentation source, and authentication checks so the removed pathway is not reintroduced accidentally.
+
+### Verification
+
+- Local and Vercel production builds passed; all 58 static pages generated.
+- Production shared login endpoint returns HTTP 404, and its former password form is absent.
+- Production `/admin/login` points unauthenticated visitors to member login; anonymous admin API access returns HTTP 401.
+- The removed Supabase gateway operation returns HTTP 401; Edge Function version 44 is **ACTIVE**.
+- Vercel environment listing confirms `ADMIN_PASSWORD` and `ADMIN_SESSION_SECRET` are absent.
+- Supabase security advisors reported no warnings before deployment.
+- A real Admin and general-user browser session were not used, so role-specific live rendering was verified in code and build output rather than with production credentials.
+- Unrelated local changes and artifacts were excluded from the release archive.
+
 ## 2026-09-07 — Latest-login-wins session hotfix
 
 - Source commit: `5329e07` (`Allow latest member login to replace prior session`).
