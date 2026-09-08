@@ -76,6 +76,7 @@ async function dashboard(date: string, service: string) {
   ]);
   const areas = new Map<string, { adults: number; children: number }>();
   for (const row of posts) {
+    if (row.headcount_replaced_by) continue;
     const area = String(row.area || "Unspecified");
     const current = areas.get(area) || { adults: 0, children: 0 };
     current.adults += Number(row.adults_headcount || 0);
@@ -101,7 +102,7 @@ async function dashboard(date: string, service: string) {
     const email = String(row.submitted_by_email || row.reporter_email || "").toLowerCase();
     return [email || name.toLowerCase(), { name, email }];
   })).values()];
-  return { headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), postReporters, timer, observer, emergencies: emergencies.map((row) => ({ id: row.id, service: row.service, location: row.location, description: row.description, reportedBy: row.reported_by, reporterEmail: row.reporter_email, submittedAt: row.submitted_at, status: row.status })) };
+  return { headcountAudits: posts.filter((row) => Object.keys((row.headcount_audit || {}) as Json).length > 0), headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), postReporters, timer, observer, emergencies: emergencies.map((row) => ({ id: row.id, service: row.service, location: row.location, description: row.description, reportedBy: row.reported_by, reporterEmail: row.reporter_email, submittedAt: row.submitted_at, status: row.status })) };
 }
 
 async function dailyReport(date: string) {
@@ -202,7 +203,7 @@ Deno.serve(async (request) => {
       const existing = await rest(`service_post_reports?select=id&id=eq.${id}&limit=1`) as Json[];
       if (existing.length) return json({ success: true, created: false, row: existing[0] });
       const rows = await rest("service_post_reports", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(row) }) as Json[];
-      return json({ success: true, created: true, row: rows[0] || null });
+      return json({ success: true, created: rows.length > 0, row: rows[0] || null });
     }
     const table = ({ "timer.insert": "service_timer_logs", "observer.insert": "service_observer_reports", "emergency.insert": "service_emergency_flags", "document.insert": "service_generated_documents", "activity.insert": "service_activity_log", "email.insert": "service_email_log" } as Record<string, string>)[operation];
     const conflictKey = String((body.row as Json)?.source_fingerprint || "") ? "source_fingerprint" : "id";

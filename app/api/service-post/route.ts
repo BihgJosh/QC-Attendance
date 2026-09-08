@@ -6,7 +6,8 @@ import { appendServicePostReport } from "@/lib/service-post-sheet";
 import { callServiceReportGateway } from "@/lib/service-report-store";
 import { isIsoCalendarDate } from "@/lib/validation";
 import { isValidServiceReportName, namedServiceReport } from "@/lib/service-report-services";
-import { isServicePostLocation } from "@/lib/service-post-locations";
+import { canOverrideHeadcount } from "@/lib/headcount-override";
+import { SERVICE_POST_LOCATIONS, normalizeServicePostLocation, isServicePostLocation } from "@/lib/service-post-locations";
 
 const RATINGS = new Set(["Excellent", "Good", "Needs Improvement", "Poor"]);
 const RATING_SCORES: Record<string, number> = { Excellent: 4, Good: 3, "Needs Improvement": 2, Poor: 1 };
@@ -16,6 +17,7 @@ function text(value: unknown, max = 2_000) {
 }
 
 function count(value: unknown) {
+  if ((typeof value !== "number" && typeof value !== "string") || (typeof value === "string" && !value.trim())) return null;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed >= 0 && parsed <= 100_000 ? parsed : null;
 }
@@ -35,11 +37,12 @@ export async function POST(request: Request) {
     if (!body) return NextResponse.json({ ok: false, message: "Invalid report." }, { status: 400 });
 
     const access = await resolveUserAccess(session.email);
-    const canOverride = ["service_manager", "admin", "super_admin"].includes(access.role);
+    const canOverride = canOverrideHeadcount(access.role);
     const assignmentOverride = body.assignmentOverride === true;
-    if (assignmentOverride && !canOverride) return NextResponse.json({ ok: false, message: "Only a Service Manager, Admin or Super Admin can override an existing location report." }, { status: 403 });
+    const headcountOnly = assignmentOverride;
+    if (assignmentOverride && !canOverride) return NextResponse.json({ ok: false, message: "Only a Service Manager, HOD, Admin or Super Admin can override an existing location report." }, { status: 403 });
 
-    const reportFor = text(body.reportFor, 20) || "Me";
+    const reportFor = headcountOnly ? "Me" : text(body.reportFor, 20) || "Me";
     const requestedName = text(body.reportForName, 160);
     let reportForName = member.name;
     if (reportFor === "Someone else") {
@@ -53,7 +56,8 @@ export async function POST(request: Request) {
     const service = namedServiceReport(text(body.service, 100), text(body.specialServiceName, 80));
     const submissionId = text(body.submissionId, 36);
     const date = text(body.date, 10);
-    const area = text(body.area, 160);
+    const requestedArea = text(body.area, 160);
+    const area = SERVICE_POST_LOCATIONS.find((item) => normalizeServicePostLocation(item) === normalizeServicePostLocation(requestedArea)) || requestedArea;
     const adultsHeadcount = count(body.adultsHeadcount);
     const childrenHeadcount = count(body.childrenHeadcount);
     const observationFields = ["preparedness", "neatness", "orderliness", "conduct", "compliance", "coordination"] as const;
@@ -61,7 +65,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: "Complete the date, service, area and headcounts correctly." }, { status: 400 });
     }
     const selectedRatings = observationFields.map((field) => text(body[field], 30)).filter(Boolean);
-    if (selectedRatings.length === 0) {
+    if (!headcountOnly && selectedRatings.length === 0) {
       return NextResponse.json({ ok: false, message: "Select and rate at least one observation before submitting." }, { status: 400 });
     }
     if (selectedRatings.some((rating) => !RATINGS.has(rating))) {
@@ -72,13 +76,13 @@ export async function POST(request: Request) {
     const whatWentWell = text(body.whatWentWell);
     const areasForImprovement = text(body.areasForImprovement);
     const recommendations = text(body.recommendations);
-    if (selectedRatings.includes("Excellent") && !whatWentWell) {
+    if (!headcountOnly && selectedRatings.includes("Excellent") && !whatWentWell) {
       return NextResponse.json({ ok: false, message: "Describe what went well when an observation is rated Excellent." }, { status: 400 });
     }
-    if (selectedRatings.some((rating) => rating === "Poor" || rating === "Needs Improvement") && !areasForImprovement) {
+    if (!headcountOnly && selectedRatings.some((rating) => rating === "Poor" || rating === "Needs Improvement") && !areasForImprovement) {
       return NextResponse.json({ ok: false, message: "Describe the areas that need improvement when an observation is rated Poor or Needs Improvement." }, { status: 400 });
     }
-    const incidentFlag = text(body.incidentFlag, 10);
+    const incidentFlag = headcountOnly ? "No" : text(body.incidentFlag, 10);
     const incidentDescribe = text(body.incidentDescribe);
     if (!new Set(["No", "Yes"]).has(incidentFlag)) {
       return NextResponse.json({ ok: false, message: "Choose whether the incident requires leadership attention." }, { status: 400 });
@@ -89,17 +93,6 @@ export async function POST(request: Request) {
     if (body.confirmAccurate !== true) {
       return NextResponse.json({ ok: false, message: "Confirm that the report is accurate." }, { status: 400 });
     }
-    const areaResult = await callServiceReportGateway<{ areas?: string[] }>("report.areas", { date, service });
-    const areaOccupied = areaResult.areas?.some((occupiedArea) => occupiedArea.toLocaleLowerCase() === area.toLocaleLowerCase()) === true;
-    if (areaOccupied && !assignmentOverride) {
-      return NextResponse.json({ ok: false, message: "This location already has a report for the selected date and service. Choose another location or ask a Service Manager or administrator to override it." }, { status: 409 });
-    }
-    if (assignmentOverride) {
-      if (!areaOccupied) {
-        return NextResponse.json({ ok: false, message: "This location no longer needs an override. Refresh the form and submit normally." }, { status: 409 });
-      }
-    }
-
     await appendServicePostReport({
       submissionId, date, service, area, adultsHeadcount, childrenHeadcount,
       name: reportForName, email: member.email, submittedByName: member.name, submittedByEmail: member.email,
@@ -111,8 +104,9 @@ export async function POST(request: Request) {
       incidentFlag, incidentDescribe,
       ma: stringRecord(body.ma), teens: stringRecord(body.teens),
       additionalComments: text(body.additionalComments), confirmAccurate: true, assignmentOverride,
+      overrideActorRole: access.role, headcountOnly, headcountSource: body.headcountSource === "Observation" ? "Observation" : "Service Post",
     });
-    return NextResponse.json({ ok: true, message: "Service Post report saved successfully." });
+    return NextResponse.json({ ok: true, message: assignmentOverride ? "Adult and children headcounts replaced. Previous counts and replacement details are recorded in the service report." : "Service Post report saved successfully." });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[service-post] Report save failed", message);
@@ -135,5 +129,5 @@ export async function GET(request: Request) {
     const result = await callServiceReportGateway<{ areas?: string[] }>("report.areas", { date, service });
     occupiedAreas = Array.isArray(result.areas) ? result.areas : [];
   }
-  return NextResponse.json({ ok: true, name: member.name, canDelegate: ["service_manager", "hod", "admin", "super_admin"].includes(access.role), canOverride: ["service_manager", "admin", "super_admin"].includes(access.role), occupiedAreas }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, name: member.name, canDelegate: ["service_manager", "hod", "admin", "super_admin"].includes(access.role), canOverride: canOverrideHeadcount(access.role), occupiedAreas }, { headers: { "Cache-Control": "no-store" } });
 }

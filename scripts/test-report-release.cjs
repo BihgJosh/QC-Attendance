@@ -23,6 +23,7 @@ async function main() {
   let generated = 0;
   const calls = [];
   const route = load('app/api/service-manager/route.ts', {
+    '@/lib/final-report-layout': load('lib/final-report-layout.ts', {}),
     '@/lib/brevo-email': { EmailConfigurationError: class extends Error {}, sendBrevoEmail: () => { throw Error('No email expected'); } },
     '@/lib/service-report-workbook': { appendGeneratedDocumentLog: async (p) => { calls.push(p); return { recordId: 'test', workbookUrl: 'https://example.invalid' }; } },
     '@/lib/final-report-sheet': { syncFinalReportForDate: async () => { generated++; return { url: 'https://example.invalid/final', title: 'Test' }; } },

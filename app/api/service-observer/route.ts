@@ -1,3 +1,4 @@
+import { canOverrideHeadcount } from "@/lib/headcount-override";
 import { NextResponse } from "next/server";
 import { readMemberSession } from "@/lib/member-auth";
 import { getTeamMemberByEmail } from "@/lib/team-data-store";
@@ -104,5 +105,5 @@ export async function GET() {
   const member = await getTeamMemberByEmail(session.email);
   if (!member) return NextResponse.json({ ok: false, message: "Your email is not registered in Team Data." }, { status: 403 });
   const access = await resolveUserAccess(session.email);
-  return NextResponse.json({ ok: true, name: member.name, role: ROLE_LABELS[access.role] }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ ok: true, name: member.name, role: ROLE_LABELS[access.role], canOverrideHeadcount: canOverrideHeadcount(access.role) }, { headers: { "Cache-Control": "no-store" } });
 }

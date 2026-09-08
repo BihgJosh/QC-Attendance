@@ -48,6 +48,9 @@ export type ServicePostReport = {
   additionalComments: string;
   confirmAccurate: boolean;
   assignmentOverride: boolean;
+  overrideActorRole: string;
+  headcountOnly: boolean;
+  headcountSource: string;
 };
 
 function escapeTitle(title: string) {
@@ -55,6 +58,7 @@ function escapeTitle(title: string) {
 }
 
 export async function appendServicePostReport(report: ServicePostReport) {
+  if (report.headcountOnly) report = { ...report, name: report.submittedByName, preparedness: "", neatness: "", orderliness: "", conduct: "", compliance: "", coordination: "", overallRating: "", whatWentWell: "", areasForImprovement: "", recommendations: "", incidentFlag: "No", incidentDescribe: "", ma: {}, teens: {}, additionalComments: "" };
   const submittedAt = new Date().toISOString();
   const recordId = report.submissionId;
   const inserted = await callServiceReportGateway<{ created?: boolean }>("report.insert", {
@@ -82,8 +86,15 @@ export async function appendServicePostReport(report: ServicePostReport) {
     source_fingerprint: `live:${recordId}`,
     assignment_enforced: true,
     assignment_override: report.assignmentOverride,
+    override_actor_role: report.overrideActorRole,
+    headcount_only: report.headcountOnly,
+    headcount_source: report.headcountSource,
   });
   if (inserted.created === false) return;
+  if (report.headcountOnly) {
+    await syncFinalReportForDate(report.date).catch((error) => console.error("[service-post] Final daily report refresh failed", error));
+    return;
+  }
   try {
   const env = getGoogleEnv();
   const auth = new google.auth.JWT({

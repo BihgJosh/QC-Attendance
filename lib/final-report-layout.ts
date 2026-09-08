@@ -164,8 +164,15 @@ export function buildFinalReportRows(input: DailyReport, refreshedAt = new Date(
     paragraph(`Reporting approach: This section presents the ${serviceHeading(service).toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())} findings as the collective assessment of the Quality Assurance team.`, "meta");
     paragraph(`Attendance: ${(adults + children).toLocaleString()} worshippers (${adults.toLocaleString()} adults, ${children.toLocaleString()} children). Reports received: ${posts.length} area, ${timers.length} timer, ${observers.length} observer.`, "meta");
 
+    const auditLines = headcountAuditLines(posts);
+    if (auditLines.length) {
+      section("HEADCOUNT OVERRIDE AUDIT");
+      auditLines.forEach((line) => paragraph(line, "meta"));
+    }
+
     let itemNumber = 0;
     for (const row of posts) {
+      if (row.headcount_only) continue;
       section(`${++itemNumber}. ${display(row.area || "Unspecified Area")}`);
       narrative("OBSERVATIONS", [row.what_went_well, row.additional_comments, row.mighty_arrows, row.teens]);
       narrative("AREAS REQUIRING ATTENTION", [row.areas_for_improvement]);
@@ -211,4 +218,16 @@ export function buildFinalReportRows(input: DailyReport, refreshedAt = new Date(
   add([]);
   paragraph(`Generated from the authoritative QC report store • Refreshed ${timestamp(refreshedAt)}`, "date");
   return { rows, styles, merges };
+}
+
+export function headcountAuditLines(posts: Record<string, unknown>[]) {
+  return posts.flatMap((post) => {
+    const audit = post.headcount_audit as Record<string, unknown> | undefined;
+    if (!audit || !Array.isArray(audit.removed)) return [];
+    const replacement = audit.replacement as Record<string, unknown>;
+    return audit.removed.map((raw) => {
+      const old = raw as Record<string, unknown>;
+      return `${post.area}: Deleted headcount from ${old.name || "Unknown reporter"} (record ${old.id}): ${old.adults} adults, ${old.children} children. Replaced with ${replacement.adults} adults, ${replacement.children} children by ${audit.actor_name} (${audit.actor_role}) via ${audit.source} at ${audit.replaced_at}. Replacement record: ${post.id}.`;
+    });
+  });
 }
