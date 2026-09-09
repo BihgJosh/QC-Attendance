@@ -2,6 +2,37 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-09 — Audited headcount replacement
+
+- Source commit: `1eb4eab` (`Replace headcounts atomically with an audited leadership override`).
+- Source commit time: **2026-09-09 00:13:17 WAT**.
+- Production: https://qcsoja.com
+- Deployment: `dpl_48ixooS7Ksiv83jmNukrHLCSWojo`.
+- Deployment completed: **2026-09-09 00:20:59 WAT**; Vercel **READY**, production aliases confirmed.
+- Supabase migration: `20260908082522_headcount_override_replacement.sql`, applied successfully.
+- Supabase Edge Function: `qcu-service-reports` version 14, **ACTIVE**, existing custom gateway authentication retained.
+
+### Changes
+
+- Service Manager, HOD, Admin and Super Admin can replace both adult and children headcounts through Service Post or Observation. General users cannot override.
+- A database transaction locks the location, saves the original counts in an audit, clears the old active counts, and inserts the replacement. Failed inserts roll back the entire operation; retries cannot restore superseded counts.
+- Headcount-only corrections retain original narrative observations and incidents. Audit entries identify the old record/counts, replacement record/counts, correcting user, role, entry point and time.
+- Both the compiled service report and full-report email content include the audit. No email was sent during this release.
+- Repaired seven explicit historical overrides across 23 August, 30 August, 6 September and 8 September. Unmarked duplicate reports were not inferred to be overrides. Legacy audit entries explicitly state when the exact historical role was not recorded.
+- The screenshot's test service now has one active headcount: **400 adults + 80 children = 480**; the original **500 adults / 30 children** is preserved in the audit.
+
+### Verification
+
+- Local and production builds passed; Vercel confirmed production aliases including `qcsoja.com` and `qcunit.vercel.app`.
+- API regression tests passed for all four roles, forged-role denial, invalid and zero counts, source normalization, authentication and report audit output.
+- Transactional database tests passed for duplicate blocking, unauthorized overrides, rollback on invalid replacement, repeated overrides, idempotent retries and date isolation. All synthetic records were rolled back.
+- Existing final-report and report-release regression tests passed.
+- Live dashboard and daily-report gateway returned the corrected 480 total and original/replacement audit.
+- Refreshed all four affected Google service-report tabs and read them back to verify all seven audit entries.
+- Anonymous production headcount access returns HTTP 401.
+- Supabase security advisors returned no warning/error findings; existing service-only RLS tables retain informational no-policy notices.
+- The exact-commit release excluded unrelated local changes. One incomplete deployment request was rejected by automatic review; the reviewed release payload was subsequently accepted. A packaging attempt missed `types/index.ts` and failed before promotion; the complete replacement deployment passed.
+
 ## 2026-09-07 — Attendance override removal
 
 - Source commit: `a28bcab` (`Remove attendance override flow`).
