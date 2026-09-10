@@ -37,13 +37,11 @@ async function main() {
   session = null;
   assert.equal((await post({})).status, 401);
   const layout = load('lib/final-report-layout.ts');
-  const posts = [{ id: 'original', service: '1st Service', area: 'Location', adults_headcount: 0, children_headcount: 0, what_went_well: 'Original observation survives' }, { id: 'replacement', service: '1st Service', area: 'Location', adults_headcount: 400, children_headcount: 80, headcount_only: true, headcount_audit: { removed: [{ id: 'original', name: 'Original reporter', adults: 500, children: 30 }], replacement: { adults: 400, children: 80 }, actor_name: 'Corrector', actor_role: 'hod', source: 'Observation', replaced_at: '2099-12-31T12:00:00Z' } }];
+  const posts = [{ id: 'replacement', service: '1st Service', area: 'Location', adults_headcount: 400, children_headcount: 80, headcount_only: true, what_went_well: 'Original observation survives' }];
   const output = layout.buildFinalReportRows({ date: '2099-12-31', posts }).rows.flat().join('\n');
   assert.match(output, /480 worshippers/);
-  assert.match(output, /Original observation survives/);
-  assert.match(output, /Deleted headcount from Original reporter.*500 adults, 30 children/);
-  assert.match(output, /Replaced with 400 adults, 80 children by Corrector \(hod\) via Observation/);
+  assert.doesNotMatch(output, /override audit|deleted headcount|original reporter|500 adults|30 children/i);
   assert.doesNotMatch(output, /1,010 worshippers/);
-  console.log(JSON.stringify({ ok: true, roles: 4, forgedRoleDenied: true, invalidCountsDenied: true, zeroCountsAccepted: true, auditAndTotalsCorrect: true }));
+  console.log(JSON.stringify({ ok: true, roles: 4, forgedRoleDenied: true, invalidCountsDenied: true, zeroCountsAccepted: true, overriddenDataAbsentFromReport: true }));
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

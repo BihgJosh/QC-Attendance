@@ -76,7 +76,6 @@ async function dashboard(date: string, service: string) {
   ]);
   const areas = new Map<string, { adults: number; children: number }>();
   for (const row of posts) {
-    if (row.headcount_replaced_by) continue;
     const area = String(row.area || "Unspecified");
     const current = areas.get(area) || { adults: 0, children: 0 };
     current.adults += Number(row.adults_headcount || 0);
@@ -102,7 +101,7 @@ async function dashboard(date: string, service: string) {
     const email = String(row.submitted_by_email || row.reporter_email || "").toLowerCase();
     return [email || name.toLowerCase(), { name, email }];
   })).values()];
-  return { headcountAudits: posts.filter((row) => Object.keys((row.headcount_audit || {}) as Json).length > 0), headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), postReporters, timer, observer, emergencies: emergencies.map((row) => ({ id: row.id, service: row.service, location: row.location, description: row.description, reportedBy: row.reported_by, reporterEmail: row.reporter_email, submittedAt: row.submitted_at, status: row.status })) };
+  return { headcount: { byDepartment, grandTotal: byDepartment.reduce((sum, row) => sum + row.total, 0) }, incidentCount: posts.filter((row) => /yes|true|incident/i.test(String(row.incident_flag || ""))).length, ratings: ratingSummary(posts), postReporters, timer, observer, emergencies: emergencies.map((row) => ({ id: row.id, service: row.service, location: row.location, description: row.description, reportedBy: row.reported_by, reporterEmail: row.reporter_email, submittedAt: row.submitted_at, status: row.status })) };
 }
 
 async function dailyReport(date: string) {

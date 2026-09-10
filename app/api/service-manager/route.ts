@@ -1,4 +1,3 @@
-import { headcountAuditLines } from "@/lib/final-report-layout";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { EmailConfigurationError, sendBrevoEmail } from "@/lib/brevo-email";
@@ -88,7 +87,6 @@ function reportEmailHtml(input: {
     section("Worshipper headcount", departments.length
       ? rows(departments.map((item) => row(item.department || "Unspecified", `${numberValue(item.adults)} adults · ${numberValue(item.children)} children · ${numberValue(item.total)} total`)).join(""))
       : "<p style=\"color:#64748b\">No department headcount was submitted.</p>"),
-    ...(Array.isArray(data.headcountAudits) && data.headcountAudits.length ? [section("Headcount override audit", headcountAuditLines(data.headcountAudits as Record<string, unknown>[]).map((line) => `<p>${escapeHtml(line)}</p>`).join(""))] : []),
     section("Post ratings", Object.keys(ratings).length
       ? rows(Object.entries(ratings).map(([label, value]) => row(label, value)).join(""))
       : "<p style=\"color:#64748b\">No post ratings were submitted.</p>"),

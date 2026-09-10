@@ -106,7 +106,7 @@ export async function POST(request: Request) {
       additionalComments: text(body.additionalComments), confirmAccurate: true, assignmentOverride,
       overrideActorRole: access.role, headcountOnly, headcountSource: body.headcountSource === "Observation" ? "Observation" : "Service Post",
     });
-    return NextResponse.json({ ok: true, message: assignmentOverride ? "Adult and children headcounts replaced. Previous counts and replacement details are recorded in the service report." : "Service Post report saved successfully." });
+    return NextResponse.json({ ok: true, message: assignmentOverride ? "Adult and children headcounts replaced. The previous record was permanently deleted." : "Service Post report saved successfully." });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[service-post] Report save failed", message);
