@@ -183,6 +183,10 @@ export function buildFinalReportRows(input: DailyReport, refreshedAt = new Date(
 
     for (const row of observers) {
       section(`${++itemNumber}. ${display(row.reporting_location || row.posted_location || "GENERAL SERVICE OPERATIONS")}`);
+      const locationObservations = row.location_observations && typeof row.location_observations === "object" ? row.location_observations as ReportRow : {};
+      for (const [location, observation] of Object.entries(locationObservations)) {
+        narrative(`${humanize(location)} — OBSERVATION`, [observation]);
+      }
       narrative("OBSERVATIONS", [row.general_observations]);
       const unitReports = row.unit_reports && typeof row.unit_reports === "object" ? row.unit_reports as ReportRow : {};
       for (const [unit, report] of Object.entries(unitReports)) narrative(`${humanize(unit)} — OBSERVATION`, [report]);

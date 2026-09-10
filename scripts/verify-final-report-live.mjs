@@ -31,14 +31,41 @@ assert.ok(payload?.data, "Daily report gateway returned no data.");
 const data = payload.data;
 const built = buildFinalReportRows(data, new Date().toISOString());
 const text = built.rows.flat().map(String).join("\n").toLowerCase();
+const normalizedText = text.replace(/\s+/g, " ").trim();
 const rows = (key) => Array.isArray(data[key]) ? data[key] : [];
 const services = new Set([...rows("posts"), ...rows("timers"), ...rows("observers"), ...rows("emergencies")].map((row) => String(row.service || "").trim()).filter(Boolean));
 
 const serviceHeading = (service) => ({ "1st Service": "first service", "2nd Service": "second service", "3rd Service": "third service", "4th Service": "fourth service" }[service] || service.toLowerCase());
+const meaningfulLeaves = (value) => {
+  if (Array.isArray(value)) return value.flatMap(meaningfulLeaves);
+  if (value && typeof value === "object") return Object.values(value).flatMap(meaningfulLeaves);
+  const leaf = String(value ?? "").trim();
+  return leaf && !/^(?:—|-|n\/?a|nil|none!?|no(?:thing)?(?: for now)?|not applicable|null|undefined)$/i.test(leaf) ? [leaf] : [];
+};
+const assertRendered = (label, value) => {
+  for (const leaf of meaningfulLeaves(value)) {
+    const normalizedLeaf = leaf.toLowerCase().replace(/\s+/g, " ").trim();
+    assert.ok(normalizedText.includes(normalizedLeaf), `Missing ${label}: ${leaf.slice(0, 80)}`);
+  }
+};
 for (const service of services) assert.ok(text.includes(serviceHeading(service)), `Missing service section: ${service}`);
-for (const post of rows("posts")) assert.ok(text.includes(String(post.area || "Unspecified Area").toLowerCase()), `Missing post area: ${post.area}`);
+for (const post of rows("posts")) {
+  assert.ok(text.includes(String(post.area || "Unspecified Area").toLowerCase()), `Missing post area: ${post.area}`);
+  if (!post.headcount_only) {
+    assertRendered(`post observation for ${post.area}`, [post.what_went_well, post.additional_comments, post.mighty_arrows, post.teens]);
+    assertRendered(`post attention point for ${post.area}`, post.areas_for_improvement);
+    assertRendered(`post recommendation for ${post.area}`, post.recommendations);
+  }
+}
 for (const timer of rows("timers")) assert.ok(text.includes(String(timer.service_start || "—").toLowerCase()), `Missing timer start for ${timer.service}`);
-for (const observer of rows("observers")) assert.ok(text.includes(String(observer.reporting_location || observer.posted_location || "GENERAL SERVICE OPERATIONS").toLowerCase()), `Missing observer location for ${observer.service}`);
+for (const observer of rows("observers")) {
+  assert.ok(text.includes(String(observer.reporting_location || observer.posted_location || "GENERAL SERVICE OPERATIONS").toLowerCase()), `Missing observer location for ${observer.service}`);
+  assertRendered(`observer location observation for ${observer.service}`, observer.location_observations);
+  assertRendered(`observer general observation for ${observer.service}`, observer.general_observations);
+  assertRendered(`observer unit observation for ${observer.service}`, observer.unit_reports);
+  assertRendered(`observer recommendation for ${observer.service}`, observer.recommendations);
+  assertRendered(`observer conclusion for ${observer.service}`, observer.conclusion);
+}
 for (const emergency of rows("emergencies")) assert.ok(text.includes(String(emergency.location || "—").toLowerCase()), `Missing emergency location for ${emergency.service || "unassigned"}`);
 assert.ok(built.rows.every((row) => row.length === 10), "Generated rows do not consistently contain ten document-layout columns.");
 

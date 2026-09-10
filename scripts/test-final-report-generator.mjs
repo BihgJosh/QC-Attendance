@@ -32,6 +32,18 @@ const report = buildFinalReportRows({
     unit_reports: { protocol: "Protocol coordinated movement" },
     recommendations: "Maintain active supervision",
     conclusion: "Service was well coordinated",
+  }, {
+    service: "Thursday Service",
+    reporting_location: "Main Auditorium, Overflow Area",
+    locations_reported: ["Main Auditorium", "Overflow Area"],
+    location_observations: {
+      "Main Auditorium": "Thursday auditorium observation was retained",
+      "Overflow Area": "Thursday overflow observation was retained",
+    },
+    general_observations: "Thursday general observation was retained",
+    unit_reports: {},
+    recommendations: "Thursday observer recommendation was retained",
+    conclusion: "Thursday observer conclusion was retained",
   }],
   emergencies: [
     { service: "4th Service", location: "Main Entrance", description: "Medical response required", status: "Resolved", reported_by: "QC Lead" },
@@ -53,6 +65,8 @@ assert.match(text, /UNASSIGNED EMERGENCY FLAGS/);
 assert.match(text, /Praise And Worship: Overshot • Planned 20 • Actual 25 • Variance 5 min/);
 assert.match(text, /Topic Taught: Stand Strong/);
 assert.match(text, /Protocol — OBSERVATION/);
+assert.match(text, /Main Auditorium — OBSERVATION\nThursday auditorium observation was retained/);
+assert.match(text, /Overflow Area — OBSERVATION\nThursday overflow observation was retained/);
 assert.match(text, /Medical response required/);
 assert.doesNotMatch(text, /AREAS REQUIRING ATTENTION\nNone/i);
 assert.doesNotMatch(text, /\{\s*"/);
