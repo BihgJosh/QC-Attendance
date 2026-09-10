@@ -2,6 +2,32 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-10 — Remove overridden headcount data
+
+- Source commit: `b1c9490` (`Delete superseded headcount records`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_Bat3eugU3ebyMrEH4AzXsD2RJyzr`.
+- Deployment completed: **2026-09-10 10:28:55 WAT**; Vercel **READY**, production aliases confirmed.
+- Supabase migration: `20260910085227_stop_recording_overridden_headcounts.sql`, applied successfully.
+- Supabase Edge Function: `qcu-service-reports` version 15, **ACTIVE**, existing custom gateway authentication retained.
+
+### Changes
+
+- Headcount overrides now permanently delete the earlier Service Post record and retain only the authorized replacement.
+- The database no longer stores the old adult/children values or a headcount-override audit copy.
+- Non-headcount observations and incident details are transferred to the replacement before the old row is deleted.
+- Service reports, manager emails and the override form no longer show or describe the deleted values.
+- Removed 8 historical superseded rows and 8 audit copies, then refreshed the four affected service-report tabs.
+
+### Verification
+
+- Local production build passed; all 58 pages generated.
+- API and transactional database regressions passed for Service Manager, HOD, Admin and Super Admin, including general-user denial, invalid-count rollback, permanent deletion, observation preservation and idempotent retry.
+- The deprecated audit columns are absent and active assigned areas have no duplicates.
+- All four affected Google report tabs were read back and contain no override-audit or deleted-headcount text.
+- Production `/api/status` returned HTTP 200; unauthenticated `/api/service-post` returned HTTP 401.
+- Supabase advisors reported no new warning or error findings; existing informational RLS and index notices remain.
+
 ## 2026-09-09 — Audited headcount replacement
 
 - Source commit: `1eb4eab` (`Replace headcounts atomically with an audited leadership override`).
