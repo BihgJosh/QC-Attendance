@@ -35,6 +35,20 @@ function adjustedTotal(value: number) {
   return Math.ceil(value * 1.02);
 }
 
+function marginOfError(value: number) {
+  return Math.round(value * 0.02);
+}
+
+function formatNumber(value: number) {
+  return value.toLocaleString("en-US");
+}
+
+function longServiceDate(value: string) {
+  const parsed = new Date(`${value}T12:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
 function normalize(value: unknown) {
   return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -65,28 +79,25 @@ function serviceText(input: HeadcountService) {
 }
 
 function summaryText(services: HeadcountService[]) {
-  const areas = new Map<string, { adults: number; children: number }>();
-  let total = 0;
-  for (const service of services) {
+  const summaries = services.map((service) => {
     const organized = organizeHeadcount(Array.isArray(service.headcount.byDepartment) ? service.headcount.byDepartment : []);
-    total += organized.grandTotal || numberValue(service.headcount.grandTotal);
-    for (const section of organized.sections) {
-      const label = section.title === "MAIN CHURCH" ? "MAIN AUDITORIUM" : section.title;
-      const current = areas.get(label) || { adults: 0, children: 0 };
-      current.adults += section.rows.reduce((sum, row) => sum + row.adults, 0);
-      current.children += section.rows.reduce((sum, row) => sum + row.children, 0);
-      areas.set(label, current);
-    }
-  }
-  const areaSummary = [...areas.entries()].map(([label, counts]) => `${label}\nAdult = ${counts.adults}  |  Children = ${counts.children}`).join("\n\n");
-  const adults = [...areas.values()].reduce((sum, counts) => sum + counts.adults, 0);
-  const children = [...areas.values()].reduce((sum, counts) => sum + counts.children, 0);
-  return `ALL SERVICES HEADCOUNT SUMMARY\n\n${areaSummary}\n\nSubtotal — Adult: ${adults}  |  Children: ${children}\nTotal = ${total}\nTotal (+2%) = ${adjustedTotal(total)}`;
+    const adults = organized.totals.adults;
+    const children = organized.totals.children;
+    const total = organized.grandTotal || numberValue(service.headcount.grandTotal);
+    const margin = marginOfError(total);
+    return {
+      text: `${service.service}\nAdults: ${formatNumber(adults)}\nChildren: ${formatNumber(children)}\n\nTotal: ${formatNumber(total)}\n2% Margin: ${formatNumber(margin)}\nAdjusted Total: ${formatNumber(total + margin)}`,
+      total,
+    };
+  });
+  const originalTotal = summaries.reduce((sum, service) => sum + service.total, 0);
+  const grandMargin = marginOfError(originalTotal);
+  return `${summaries.map((service) => service.text).join("\n\n")}\n\nGrand Total\n\nOriginal Total: ${formatNumber(originalTotal)}\n2% Margin of Error: ${formatNumber(grandMargin)}\nAdjusted Grand Total: ${formatNumber(originalTotal + grandMargin)} ✅`;
 }
 
 function documentText(date: string, services: HeadcountService[], summaryOnly: boolean) {
   if (summaryOnly) {
-    return `QC SERVICE HEADCOUNT\nService date: ${date}  ·  Updated: ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n${summaryText(services)}\n`;
+    return `QUALITY CONTROL SOJA Attendance for ${longServiceDate(date)}\n\nMain Auditorium, Children’s, Youth Churches, Overflow and Outside\n\n${summaryText(services)}\n`;
   }
   const combined = services.reduce((sum, service) => {
     const organized = organizeHeadcount(Array.isArray(service.headcount.byDepartment) ? service.headcount.byDepartment : []);
@@ -94,6 +105,10 @@ function documentText(date: string, services: HeadcountService[], summaryOnly: b
   }, { adults: 0, children: 0, total: 0 });
   const summary = services.length > 1 ? `ALL SERVICES COMBINED\nSubtotal — Adult: ${combined.adults}  |  Children: ${combined.children}\nTotal = ${combined.total}\nTotal (+2%) = ${adjustedTotal(combined.total)}\n\n` : "";
   return `QC SERVICE HEADCOUNT\nService date: ${date}  ·  Updated: ${new Date().toLocaleString("en-NG", { timeZone: "Africa/Lagos" })}\n\n${summary}${services.map(serviceText).join("\n\n────────────────────────────────────────\n\n")}\n`;
+}
+
+export function buildHeadcountDocumentText(date: string, services: HeadcountService[], options: { summaryOnly?: boolean } = {}) {
+  return documentText(date, services, options.summaryOnly === true);
 }
 
 function docsClient() {
