@@ -2,6 +2,29 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-10 — All-services headcount summary format
+
+- Source commit: `92ca386` (`Format all-services headcount summary`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_BEWCfTSjsFux9US9MayXuMGHebaW`.
+- Deployment completed: **2026-09-10 11:14:22 WAT**; Vercel **READY**, production aliases confirmed.
+- Database and Edge Functions: no changes required.
+
+### Changes
+
+- “Generate all headcounts” now produces the requested service-by-service attendance format with adults, children, original totals, rounded 2% margins and adjusted totals.
+- The document title uses the full Sunday date, followed by the requested coverage line and a final combined summary.
+- Numbers use thousands separators and the adjusted grand total ends with the confirmation check mark.
+- Single-service detailed headcount documents remain unchanged.
+
+### Verification
+
+- Exact sample regression reproduced all supplied figures, including **17,458 + 349 = 17,807**.
+- Headcount override and report-release regressions passed.
+- Local production build passed; all 58 pages generated.
+- Generated the live 6 September document and read it back through Google Docs; all four service figures and the grand-total summary matched exactly.
+- Production `/api/status` returned HTTP 200.
+
 ## 2026-09-10 — Remove overridden headcount data
 
 - Source commit: `b1c9490` (`Delete superseded headcount records`).
