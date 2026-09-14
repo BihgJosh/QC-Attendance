@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isSuperAdminAuthenticated } from "@/lib/auth";
 import { addAdminAccess, listAdminAccess, removeAdminAccess } from "@/lib/member-store";
 
 function normalizeEmail(value: unknown) {
@@ -7,7 +7,7 @@ function normalizeEmail(value: unknown) {
 }
 
 export async function GET() {
-  if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await isSuperAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
     return NextResponse.json({ admins: await listAdminAccess() });
   } catch (error) {
@@ -16,7 +16,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await isSuperAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
     const body = await request.json().catch(() => null);
     const email = normalizeEmail(body && typeof body === "object" ? (body as { email?: unknown }).email : "");
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await isSuperAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
     const body = await request.json().catch(() => null);
     const email = normalizeEmail(body && typeof body === "object" ? (body as { email?: unknown }).email : "");

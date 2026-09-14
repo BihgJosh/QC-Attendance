@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isContentAdminAuthenticated } from "@/lib/auth";
 import { deleteUniformImage, UniformImageStoreError, uploadUniformImage } from "@/lib/uniform-image-store";
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
@@ -14,7 +14,7 @@ function hasValidSignature(type: string, bytes: Uint8Array) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isContentAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const form = await request.formData();
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE() {
-  if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isContentAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     return NextResponse.json(await deleteUniformImage());

@@ -1,8 +1,8 @@
 import type { AppRole } from "@/lib/member-store";
 
 const DETAIL_ROLES = new Set<AppRole>(["service_manager", "hod", "admin", "super_admin"]);
-const SIGN_FOR_OTHERS_ROLES = new Set<AppRole>(["admin", "super_admin"]);
-const ADMIN_ROLES = new Set<AppRole>(["admin", "super_admin"]);
+const SIGN_FOR_OTHERS_ROLES = new Set<AppRole>(["operations", "admin", "super_admin"]);
+const ADMIN_ROLES = new Set<AppRole>(["operations", "admin", "super_admin"]);
 
 export function canAccessAdmin(role: AppRole) {
   return ADMIN_ROLES.has(role);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isContentAdminAuthenticated } from "@/lib/auth";
 import { getConfig, updateConfig } from "@/lib/google-sheets";
 import { DEFAULT_HOMEPAGE_CONTENT, normalizeHomepageContent } from "@/lib/homepage-content";
 import { readMemberSession } from "@/lib/member-auth";
@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const config = await getConfig();
     const content = config[CONTENT_CONFIG_KEY] ? normalizeHomepageContent(JSON.parse(config[CONTENT_CONFIG_KEY])) : DEFAULT_HOMEPAGE_CONTENT;
-    if (await isAdminAuthenticated()) return NextResponse.json(content, { headers: { "Cache-Control": "private, no-store" } });
+    if (await isContentAdminAuthenticated()) return NextResponse.json(content, { headers: { "Cache-Control": "private, no-store" } });
     const session = await readMemberSession();
     if (!session) return NextResponse.json({ error: "Unauthenticated." }, { status: 401 });
     const access = await resolveUserAccess(session.email);
@@ -25,7 +25,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAdminAuthenticated())) {
+  if (!(await isContentAdminAuthenticated())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isSuperAdminAuthenticated } from "@/lib/auth";
 import { listMemberStatuses, resetMemberPassword } from "@/lib/member-store";
 import { getPrivilegedAdminEmails, isPrivilegedAdminEmail } from "@/lib/roles";
 import { getTeamMemberByEmail, listTeamMembers, TeamDataError } from "@/lib/team-data-store";
 
 async function requireAdmin() {
-  return isAdminAuthenticated();
+  return isSuperAdminAuthenticated();
 }
 
 export async function GET() {

@@ -83,10 +83,10 @@ export async function POST(request: Request) {
       deviceId,
     };
 
-    await appendAttendance(record);
     if (!isInside) {
       return NextResponse.json({ error: "Attendance rejected: You are outside the church geofence." }, { status: 403 });
     }
+    await appendAttendance(record);
     return NextResponse.json({
       success: true,
       message: "Attendance signed successfully!",

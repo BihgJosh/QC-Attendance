@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isContentAdminAuthenticated } from "@/lib/auth";
 import { listTeamMembers } from "@/lib/team-data-store";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  if (!(await isAdminAuthenticated())) {
+  if (!(await isContentAdminAuthenticated())) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 

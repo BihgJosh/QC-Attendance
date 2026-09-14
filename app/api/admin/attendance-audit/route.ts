@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isContentAdminAuthenticated } from "@/lib/auth";
 import { buildAttendanceAudit, validateAuditFilters, writeAttendanceAudit, type AuditFilters } from "@/lib/attendance-audit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function GET() {
-  if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await isContentAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
     const filters: AuditFilters = {};
     validateAuditFilters(filters);
@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST() {
-  if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!(await isContentAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
     const filters: AuditFilters = {};
     validateAuditFilters(filters);

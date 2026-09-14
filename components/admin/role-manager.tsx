@@ -10,11 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CustomSelect } from "@/components/ui/custom-select";
 
-type Role = "general_user" | "service_manager" | "hod" | "admin" | "super_admin";
+type Role = "general_user" | "service_manager" | "hod" | "operations" | "admin" | "super_admin";
 type RoleRow = { email: string; role: Role; department: string | null; isActive: boolean; updatedAt: string };
 type Assignment = { id: string; serviceDate: string; service: string; managerEmail: string; accessStartsAt: string; accessEndsAt: string; status: string };
 type TeamMember = { email: string; name: string };
-const roleLabels: Record<Role, string> = { general_user: "General User", service_manager: "Service Manager", hod: "HOD", admin: "Admin", super_admin: "Super Admin" };
+const roleLabels: Record<Role, string> = { general_user: "General User", service_manager: "Service Manager", hod: "HOD", operations: "Operations", admin: "Admin", super_admin: "Super Admin" };
 const roleOptions = Object.entries(roleLabels).map(([value, label]) => ({ value, label }));
 
 export function RoleManager() {

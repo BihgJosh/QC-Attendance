@@ -16,9 +16,9 @@ import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { toast } from "sonner";
 import {
-  CheckCircle2, XCircle, Lock, Unlock, Settings,
+  CheckCircle2, Lock, Unlock, Settings,
   Search, Loader2, ShieldCheck, Clock, MapPin, Users,
-  TrendingUp, ChevronLeft, ChevronRight, ArrowUp, ArrowDown,
+  ChevronLeft, ChevronRight, ArrowUp, ArrowDown,
   Download, CalendarIcon, SlidersHorizontal,
   KeyRound, LayoutDashboard, UserCog, FileSpreadsheet,
 } from "lucide-react";
@@ -28,6 +28,7 @@ import { MemberPasswordManager } from "@/components/admin/member-password-manage
 import { AdminAccessManager } from "@/components/admin/admin-access-manager";
 import { RoleManager } from "@/components/admin/role-manager";
 import { AttendanceAudit } from "@/components/admin/attendance-audit";
+import type { AdminRole } from "@/lib/auth";
 
 interface Settings {
   churchLat: string;
@@ -80,7 +81,9 @@ function formatCloseTime(value: string) {
   }).format(new Date(value));
 }
 
-export function Dashboard() {
+export function Dashboard({ role }: { role: AdminRole }) {
+  const isContentAdmin = role === "admin" || role === "super_admin";
+  const isSuperAdmin = role === "super_admin";
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [closesAt, setClosesAt] = useState<string | null>(null);
@@ -88,9 +91,7 @@ export function Dashboard() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [searchApproved, setSearchApproved] = useState("");
-  const [searchRejected, setSearchRejected] = useState("");
   const [pageApproved, setPageApproved] = useState(1);
-  const [pageRejected, setPageRejected] = useState(1);
   const [togglingStatus, setTogglingStatus] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [confirmToggle, setConfirmToggle] = useState(false);
@@ -113,7 +114,7 @@ export function Dashboard() {
       const [statusRes, recordsRes, settingsRes] = await Promise.all([
         fetch("/api/admin/status"),
         fetch("/api/admin/attendance"),
-        fetch("/api/admin/settings"),
+        isSuperAdmin ? fetch("/api/admin/settings") : Promise.resolve(null),
       ]);
 
       if (statusRes.ok) {
@@ -123,13 +124,13 @@ export function Dashboard() {
         setScheduledClose(status.closesAt ? toLocalDateTime(status.closesAt) : "");
       }
       if (recordsRes.ok) setRecords(await recordsRes.json());
-      if (settingsRes.ok) setSettings(await settingsRes.json());
+      if (settingsRes?.ok) setSettings(await settingsRes.json());
     } catch {
       toast.error("Failed to load dashboard data.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     fetchData();
@@ -258,43 +259,28 @@ export function Dashboard() {
 
   /* ---------- Data processing ---------- */
   let approved = records.filter((r) => r.status === "Approved");
-  let rejected = records.filter((r) => r.status === "Rejected");
 
   /* Service filter */
   if (serviceFilter !== "All") {
     const matchesService = (value: string) => serviceFilter === "Other" ? value === "Other" || value.startsWith("Other — ") : value === serviceFilter;
     approved = approved.filter((r) => matchesService(r.service));
-    rejected = rejected.filter((r) => matchesService(r.service));
   }
 
   approved = invalidDateRange ? [] : filterByDate(approved);
-  rejected = invalidDateRange ? [] : filterByDate(rejected);
-
-  const approvalRate = (approved.length + rejected.length) > 0
-    ? Math.round((approved.length / (approved.length + rejected.length)) * 100)
-    : 0;
 
   /* Search */
   const filteredApproved = approved.filter((r) =>
     r.memberName.toLowerCase().includes(searchApproved.toLowerCase())
   );
-  const filteredRejected = rejected.filter((r) =>
-    r.memberName.toLowerCase().includes(searchRejected.toLowerCase())
-  );
 
   /* Sort */
   const sortedApproved = sortRecords(filteredApproved);
-  const sortedRejected = sortRecords(filteredRejected);
 
   /* Pagination */
   const itemsPerPage = 6;
   const paginatedApproved = sortedApproved.slice(
     (pageApproved - 1) * itemsPerPage,
     pageApproved * itemsPerPage
-  );
-  const paginatedRejected = sortedRejected.slice(
-    (pageRejected - 1) * itemsPerPage,
-    pageRejected * itemsPerPage
   );
 
   /* ---------- Export CSV ---------- */
@@ -322,8 +308,6 @@ export function Dashboard() {
   };
 
   const exportApproved = () => downloadCSV(sortedApproved, "Approved");
-  const exportRejected = () => downloadCSV(sortedRejected, "Rejected");
-  const exportAll = () => downloadCSV([...sortedApproved, ...sortedRejected], "All");
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -367,17 +351,17 @@ export function Dashboard() {
       <div className="border-b border-border/40 bg-background/75 backdrop-blur">
         <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-4 py-3 sm:px-6 lg:px-8" role="tablist" aria-label="Admin sections">
           <Button type="button" size="sm" variant={adminView === "operations" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "operations"} onClick={() => setAdminView("operations")}><LayoutDashboard className="mr-2 h-4 w-4" />Operations</Button>
-          <Button type="button" size="sm" variant={adminView === "audit" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "audit"} onClick={() => setAdminView("audit")}><FileSpreadsheet className="mr-2 h-4 w-4" />Attendance audit</Button>
-          <Button type="button" size="sm" variant={adminView === "passwords" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "passwords"} onClick={() => setAdminView("passwords")}><KeyRound className="mr-2 h-4 w-4" />Password resets</Button>
-          <Button type="button" size="sm" variant={adminView === "access" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "access"} onClick={() => setAdminView("access")}><UserCog className="mr-2 h-4 w-4" />Admin access</Button>
-          <Button type="button" size="sm" variant={adminView === "roles" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "roles"} onClick={() => setAdminView("roles")}><ShieldCheck className="mr-2 h-4 w-4" />Role manager</Button>
+          {isContentAdmin && <Button type="button" size="sm" variant={adminView === "audit" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "audit"} onClick={() => setAdminView("audit")}><FileSpreadsheet className="mr-2 h-4 w-4" />Attendance audit</Button>}
+          {isSuperAdmin && <Button type="button" size="sm" variant={adminView === "passwords" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "passwords"} onClick={() => setAdminView("passwords")}><KeyRound className="mr-2 h-4 w-4" />Password resets</Button>}
+          {isSuperAdmin && <Button type="button" size="sm" variant={adminView === "access" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "access"} onClick={() => setAdminView("access")}><UserCog className="mr-2 h-4 w-4" />Admin access</Button>}
+          {isSuperAdmin && <Button type="button" size="sm" variant={adminView === "roles" ? "gradient" : "ghost"} role="tab" aria-selected={adminView === "roles"} onClick={() => setAdminView("roles")}><ShieldCheck className="mr-2 h-4 w-4" />Role manager</Button>}
         </div>
       </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {adminView === "audit" ? <AttendanceAudit /> : adminView === "passwords" ? <MemberPasswordManager /> : adminView === "access" ? <AdminAccessManager /> : adminView === "roles" ? <RoleManager /> : <>
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <Card variant="glass" className="h-full">
               <CardContent className="pt-6 flex items-center justify-between">
@@ -412,41 +396,10 @@ export function Dashboard() {
             </Card>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            <Card variant="glass" className="h-full">
-              <CardContent className="pt-6 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Rejected</p>
-                  <h3 className="text-3xl font-bold font-display">
-                    <AnimatedCounter value={rejected.length} />
-                  </h3>
-                </div>
-                <div className="p-3 rounded-2xl bg-destructive/10">
-                  <XCircle className="w-6 h-6 text-destructive" />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-            <Card variant="glass" className="h-full">
-              <CardContent className="pt-6 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Approval Rate</p>
-                  <h3 className="text-3xl font-bold font-display">
-                    <AnimatedCounter value={approvalRate} />%
-                  </h3>
-                </div>
-                <div className="p-3 rounded-2xl bg-primary/10">
-                  <TrendingUp className="w-6 h-6 text-primary" />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
         </div>
 
         {/* Control & Settings */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className={`grid grid-cols-1 gap-6 ${isSuperAdmin ? "lg:grid-cols-3" : ""}`}>
           {/* Attendance Control */}
           <Card variant="glass">
             <CardHeader>
@@ -535,7 +488,7 @@ export function Dashboard() {
           </Card>
 
           {/* Settings Form */}
-          <Card variant="glass" className="lg:col-span-2" id="settings">
+          {isSuperAdmin && <Card variant="glass" className="lg:col-span-2" id="settings">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="w-5 h-5 text-accent" />
@@ -582,18 +535,14 @@ export function Dashboard() {
                       {savingSettings ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                       Save Settings
                     </Button>
-                    <Button type="button" variant="glass" className="h-12" onClick={exportAll}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Export All
-                    </Button>
                   </div>
                 </form>
               )}
             </CardContent>
-          </Card>
+          </Card>}
         </div>
 
-        <ContentManager />
+        {isContentAdmin && <ContentManager />}
 
         {/* Filters — Service + Date Range */}
         <Card variant="glass">
@@ -618,7 +567,7 @@ export function Dashboard() {
                     { value: "Other", label: "Other" },
                   ]}
                   value={serviceFilter}
-                  onChange={(v) => { setServiceFilter(v); setPageApproved(1); setPageRejected(1); }}
+                  onChange={(v) => { setServiceFilter(v); setPageApproved(1); }}
                   placeholder="All Services"
                   size="sm"
                 />
@@ -631,7 +580,7 @@ export function Dashboard() {
                   value={dateFrom}
                   max={dateTo || undefined}
                   aria-invalid={invalidDateRange}
-                  onChange={(e) => { setDateFrom(e.target.value); setPageApproved(1); setPageRejected(1); }}
+                  onChange={(e) => { setDateFrom(e.target.value); setPageApproved(1); }}
                   className="h-9 text-xs w-40"
                 />
               </div>
@@ -643,7 +592,7 @@ export function Dashboard() {
                   value={dateTo}
                   min={dateFrom || undefined}
                   aria-invalid={invalidDateRange}
-                  onChange={(e) => { setDateTo(e.target.value); setPageApproved(1); setPageRejected(1); }}
+                  onChange={(e) => { setDateTo(e.target.value); setPageApproved(1); }}
                   className="h-9 text-xs w-40"
                 />
               </div>
@@ -652,7 +601,7 @@ export function Dashboard() {
                   variant="ghost"
                   size="sm"
                   className="h-9 text-xs"
-                  onClick={() => { setServiceFilter("All"); setDateFrom(""); setDateTo(""); setPageApproved(1); setPageRejected(1); }}
+                  onClick={() => { setServiceFilter("All"); setDateFrom(""); setDateTo(""); setPageApproved(1); }}
                 >
                   Clear filters
                 </Button>
@@ -667,7 +616,7 @@ export function Dashboard() {
         </Card>
 
         {/* Tables */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
           {/* Approved Table */}
           <Card variant="glass">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -755,94 +704,6 @@ export function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Rejected Table */}
-          <Card variant="glass">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <XCircle className="w-4 h-4" />
-                  Rejected Attendance
-                </CardTitle>
-                <CardDescription className="mt-1">Members outside geofence or invalid</CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="glass"
-                  size="sm"
-                  className="h-9 gap-2 text-destructive shrink-0"
-                  onClick={exportRejected}
-                  disabled={sortedRejected.length === 0}
-                >
-                  <Download className="w-4 h-4" />
-                  <span className="hidden sm:inline">Export</span>
-                </Button>
-                <div className="relative w-28 sm:w-40">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground/50" />
-                  <Input
-                    placeholder="Search..."
-                    className="pl-9 h-9 text-xs"
-                    value={searchRejected}
-                    onChange={e => { setSearchRejected(e.target.value); setPageRejected(1); }}
-                  />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort("memberName")}>
-                      Name <SortIcon field="memberName" />
-                    </TableHead>
-                    <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort("time")}>
-                      Time <SortIcon field="time" />
-                    </TableHead>
-                    <TableHead className="cursor-pointer select-none hover:text-foreground transition-colors" onClick={() => toggleSort("distance")}>
-                      Distance <SortIcon field="distance" />
-                    </TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedRejected.length > 0 ? paginatedRejected.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium">{r.memberName}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center text-muted-foreground">
-                          <Clock className="w-3 h-3 mr-1" />{r.time}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center text-muted-foreground">
-                          <MapPin className="w-3 h-3 mr-1" />{r.distance}m
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground max-w-[120px] truncate" title={r.reason}>{r.reason}</TableCell>
-                      <TableCell>
-                        <Badge variant="destructive" className="text-xs">Rejected</Badge>
-                      </TableCell>
-                    </TableRow>
-                  )) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="p-0">
-                        <EmptyState
-                          icon={XCircle}
-                          title="No rejected attendance"
-                          description="No out-of-bounds check-in attempts have been recorded. The geofence is working correctly."
-                          actionLabel="Review Settings"
-                          actionHref="#settings"
-                          action={() => document.getElementById("settings")?.scrollIntoView({ behavior: "smooth" })}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-              <Pagination page={pageRejected} setPage={setPageRejected} total={filteredRejected.length} itemsPerPage={itemsPerPage} />
-            </CardContent>
-          </Card>
         </div>
         </>}
       </main>

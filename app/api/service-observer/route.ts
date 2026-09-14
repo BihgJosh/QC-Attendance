@@ -23,6 +23,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
   general_user: "General User",
   service_manager: "Service Manager",
   hod: "HOD",
+  operations: "Operations",
   admin: "Admin",
   super_admin: "Super Admin",
 };

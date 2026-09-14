@@ -1,7 +1,7 @@
 const GATEWAY_SECRET_HASH = "e961e32016c41f358eac3f9e1546b93d78bae0b9b30a446ccceecea47533fa41";
 const allowedOperations = new Set([
   "status.get", "status.update", "settings.get", "settings.update", "members.list",
-  "attendance.device-check", "attendance.insert", "attendance.list", "migration.import",
+  "attendance.device-check", "attendance.insert", "attendance.list", "attendance.delete-rejected", "migration.import",
   "member.status", "member.setup-complete", "member.authenticate", "member.session", "member.change-password", "member.logout",
   "profile.get", "profile.update", "profile.email-change-request", "profile.email-change-confirm", "profile.image-upload", "profile.image-delete", "profile.image-stage-create", "profile.image-stage-read", "profile.image-stage-delete", "profile.identities",
   "member.list", "member.reset", "admin.list", "admin.add", "admin.remove",
@@ -265,6 +265,7 @@ Deno.serve(async (request) => {
         return json({ error: "Attendance is closed.", code: "ATTENDANCE_CLOSED" }, 409);
       }
       const record = body.record as Json;
+      if (String(record.status || "") !== "Approved") return json({ success: true, recorded: false });
       const dateParts = String(record.date || "").split("/");
       const dateKey = dateParts.length === 3
         ? `${dateParts[2]}-${dateParts[1].padStart(2, "0")}-${dateParts[0].padStart(2, "0")}`
@@ -377,6 +378,12 @@ Deno.serve(async (request) => {
         role: roles[0]?.is_active === false ? "general_user" : String(roles[0]?.role || "general_user"),
         profileComplete: Boolean(profile.profile_completed_at && address && team["Church Join Year"]),
       } });
+    }
+    if (operation === "attendance.delete-rejected") {
+      const rows = await rest("attendance_records?select=id&status=eq.Rejected") as Json[];
+      if (rows.length) await rest("attendance_records?status=eq.Rejected", { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      const remaining = await rest("attendance_records?select=id&status=eq.Rejected") as Json[];
+      return json({ deleted: rows.length, remaining: remaining.length });
     }
     if (operation === "profile.identities") {
       const session = await resolveMemberSession(body.token);
@@ -623,7 +630,7 @@ Deno.serve(async (request) => {
       const email = normalizeEmail(body.email);
       const role = String(body.role || "");
       const department = String(body.department || "").trim() || null;
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["general_user", "service_manager", "hod", "admin", "super_admin"].includes(role)) return json({ error: "Choose a valid user and role." }, 400);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["general_user", "service_manager", "hod", "operations", "admin", "super_admin"].includes(role)) return json({ error: "Choose a valid user and role." }, 400);
       await rest("user_roles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, role, department, is_active: true, updated_at: new Date().toISOString() }) });
       return json({ success: true });
     }

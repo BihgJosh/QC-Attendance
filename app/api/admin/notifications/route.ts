@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isContentAdminAuthenticated } from "@/lib/auth";
 import { getConfig } from "@/lib/google-sheets";
 import { DEFAULT_HOMEPAGE_CONTENT, normalizeHomepageContent } from "@/lib/homepage-content";
 import { notifyTeam } from "@/lib/web-push";
@@ -7,7 +7,7 @@ import { notifyTeam } from "@/lib/web-push";
 const CONTENT_CONFIG_KEY = "homepageContent";
 
 export async function POST(request: Request) {
-  if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isContentAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await request.json().catch(() => null) as Record<string, unknown> | null;
     const section = body?.section;

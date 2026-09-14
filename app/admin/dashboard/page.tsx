@@ -1,17 +1,18 @@
 import { redirect } from "next/navigation";
 import { Dashboard } from "@/components/admin/dashboard";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { getAuthenticatedAdminRole } from "@/lib/auth";
 import { readMemberSession } from "@/lib/member-auth";
 
 export default async function AdminDashboardPage() {
-  if (!(await isAdminAuthenticated())) {
+  const role = await getAuthenticatedAdminRole();
+  if (!role) {
     if (await readMemberSession()) redirect("/");
     redirect("/member/login?next=/admin/dashboard");
   }
 
   return (
     <div className="min-h-screen relative">
-      <Dashboard />
+      <Dashboard role={role} />
     </div>
   );
 }

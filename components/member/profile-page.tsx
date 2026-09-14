@@ -11,10 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Role = "general_user" | "service_manager" | "hod" | "admin" | "super_admin";
+type Role = "general_user" | "service_manager" | "hod" | "operations" | "admin" | "super_admin";
 type Profile = { email: string; firstName: string; middleName: string; lastName: string; phone: string; address: string; birthMonth: number | null; birthDay: number | null; churchJoinYear: number | null; avatarUrl: string | null; role: Role; profileComplete: boolean };
 
-const roleLabels: Record<Role, string> = { general_user: "General User", service_manager: "Service Manager", hod: "HOD", admin: "Admin", super_admin: "Super Admin" };
+const roleLabels: Record<Role, string> = { general_user: "General User", service_manager: "Service Manager", hod: "HOD", operations: "Operations", admin: "Admin", super_admin: "Super Admin" };
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function initials(profile: Profile | null) {
@@ -302,7 +302,7 @@ export function ProfilePage() {
             <p className="mt-3 text-xs leading-5 text-white/55">Your role is assigned by an administrator and cannot be changed here.</p>
             <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,image/gif,.heic,.heif,.avif" aria-label="Choose profile picture" className="sr-only" onChange={changePhoto} />
             <div className="mt-6 grid gap-2">
-              {(profile.role === "admin" || profile.role === "super_admin") && <Button asChild className="bg-cyan-600 text-white hover:bg-cyan-500"><Link href="/admin/dashboard"><LayoutDashboard className="mr-2 h-4 w-4" />Admin dashboard</Link></Button>}
+              {(["operations", "admin", "super_admin"] as Role[]).includes(profile.role) && <Button asChild className="bg-cyan-600 text-white hover:bg-cyan-500"><Link href="/admin/dashboard"><LayoutDashboard className="mr-2 h-4 w-4" />Admin dashboard</Link></Button>}
               <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()} disabled={photoBusy}><Camera className="mr-2 h-4 w-4" />{photoCandidate ? "Choose another" : profile.avatarUrl ? "Replace picture" : "Add profile picture"}</Button>
               {photoCandidate ? <div className="rounded-xl bg-white/10 p-3">
                 <p className="truncate text-xs font-semibold text-white/80">Ready: {photoCandidate.originalName}</p>

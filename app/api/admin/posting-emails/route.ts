@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isContentAdminAuthenticated } from "@/lib/auth";
 import { EmailConfigurationError, sendBrevoEmail } from "@/lib/brevo-email";
 import { getOptionalEnv } from "@/lib/env";
 import { getConfig } from "@/lib/google-sheets";
@@ -10,7 +10,7 @@ import { getSiteUrl } from "@/lib/site-url";
 const CONTENT_CONFIG_KEY = "homepageContent";
 
 export async function POST(request: Request) {
-  if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isContentAdminAuthenticated())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await request.json().catch(() => null) as { day?: unknown } | null;
     if (body?.day !== "Sunday" && body?.day !== "Thursday") return NextResponse.json({ error: "Select Sunday or Thursday postings." }, { status: 400 });

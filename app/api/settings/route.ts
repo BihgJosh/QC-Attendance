@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAttendanceSettings, updateAttendanceSettings } from "@/lib/attendance-store";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isSuperAdminAuthenticated } from "@/lib/auth";
 import { getLocationEnvConfig } from "@/lib/env";
 
 export async function GET() {
-  if (!(await isAdminAuthenticated())) {
+  if (!(await isSuperAdminAuthenticated())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   
@@ -25,7 +25,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  if (!(await isAdminAuthenticated())) {
+  if (!(await isSuperAdminAuthenticated())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

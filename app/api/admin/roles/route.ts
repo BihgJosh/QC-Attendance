@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { isSuperAdminAuthenticated } from "@/lib/auth";
 import { listRoleManagerData, removeRole, removeServiceAssignment, upsertRole, upsertServiceAssignment, type AppRole } from "@/lib/member-store";
 import { listTeamMembers, TeamDataError } from "@/lib/team-data-store";
 
-async function authorized() { return isAdminAuthenticated(); }
+async function authorized() { return isSuperAdminAuthenticated(); }
 
 export async function GET() {
   if (!(await authorized())) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });

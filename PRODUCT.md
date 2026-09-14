@@ -16,7 +16,7 @@ The product gives the Quality Control Unit one secure workspace for member acces
 
 ## Operating Context
 
-Members authenticate with an email address tied to the official team register. The same identity is used for sessions, role assignments, service assignments, and report attribution. Administrators manage access roles; members manage their own profile details.
+Members authenticate with an email address tied to the official team register. The same identity is used for sessions, role assignments, service assignments, and report attribution. Super Admins manage access roles; members manage their own profile details. Operations users handle attendance control, approved records, exports, and assisted filing. Admins additionally manage content and reports, while password resets, access management, role management, and geofence settings remain Super Admin-only.
 
 ## Capabilities and Constraints
 
