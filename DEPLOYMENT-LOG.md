@@ -2,6 +2,31 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-14 — Complaince role and HOD-only defaulter review
+
+- Source commit: `6a1d26d` (`Add Complaince role and restrict defaulter access`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_CsGc8MdyBBqLwxYQfEUn6U5VCCYx`.
+- Deployment completed: **2026-09-14 15:18:39 WAT**; Vercel **READY**, all production aliases confirmed.
+- Supabase migration: `20260914135124_add_complaince_role.sql`, applied successfully.
+- Supabase Edge Function: `qcu-attendance`, deployed successfully.
+
+### Changes
+
+- Added the exact role name **Complaince** to the Super Admin role manager and member profile display.
+- Restricted defaulter feature access to Complaince, Service Manager, HOD and Super Admin.
+- HOD alone can list, review and resolve defaulter records.
+- Complaince, Service Manager and Super Admin are reporter-only; Admin and Operations have no access to the feature.
+- Centralized the permission matrix so the page and API enforce the same rules.
+
+### Verification
+
+- Permission-matrix test passed for every application role, including HOD-only review.
+- Local and Vercel production builds passed; all 59 pages generated.
+- Production `/api/status` returned HTTP 200; unauthenticated defaulter access returned the expected sign-in error.
+- Read-only production role and report gateway checks passed; both existing defaulter records remain preserved.
+- Impeccable found only pre-existing advisory type steps; no blocking finding.
+
 ## 2026-09-14 — Simplified member-default form
 
 - Source commit: `f5cf3be` (`Simplify member default form`).
