@@ -2,6 +2,14 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-14 — Damilola attendance audit roster correction
+
+- Source commit: `fb8f217` (`Add Damilola to attendance audit roster`).
+- Production migration: `20260914161841_add_damilola_to_attendance_roster.sql`, applied successfully at **2026-09-14 17:19 WAT**.
+- Canonical name: **Odubanjo Damilola Uche Lynda**.
+- Verification: 11 attendance records, one active audit-roster entry and one matching Team Data member; no test record created.
+- Vercel and Edge Functions: no deployment required.
+
 ## 2026-09-14 — Canonical attendance member names
 
 - Source commit: `4be2d84` (`Canonicalize attendance member names`).
