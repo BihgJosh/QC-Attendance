@@ -2,6 +2,22 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-14 — Attendance audit frozen-column generation fix
+
+- Source commit: `20fa40f` (`Fix attendance audit frozen-column merge`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_C7X2sRuuFw85wmkfdC7giniE8L7K`.
+- Deployment created: **2026-09-14 17:28:05 WAT**; Vercel **READY**, all production aliases confirmed.
+- Database and Edge Functions: no changes required.
+
+### Changes and verification
+
+- The audit title now begins after the frozen member-name column, so its merged range no longer crosses the Google Sheets frozen-column boundary.
+- Handles zero or one service column without issuing an invalid one-cell merge.
+- Local and Vercel production builds passed; all 59 pages generated.
+- Production `/api/status` returned HTTP 200.
+- Authenticated live generation was not run automatically because no reusable browser session was available; the failing Google Sheets request boundary was corrected directly.
+
 ## 2026-09-14 — Damilola attendance audit roster correction
 
 - Source commit: `fb8f217` (`Add Damilola to attendance audit roster`).
