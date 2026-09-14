@@ -2,6 +2,29 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-14 — Simplified member-default form
+
+- Source commit: `f5cf3be` (`Simplify member default form`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_BfojKgksQgv1mD7jHEow794qQdWU`.
+- Deployment completed: **2026-09-14 14:44:41 WAT**; Vercel **READY**, all production aliases confirmed.
+- Supabase migration: `20260914133713_simplify_member_default_reports.sql`, applied successfully.
+
+### Changes
+
+- Service is now a dropdown containing the standard four Sunday services and Thursday Service.
+- Service date is automatically fixed to the current Africa/Lagos date by both the form and server.
+- Member is now typed manually with Team Data name suggestions; the API still requires one exact, unambiguous Team Data match.
+- Location and Specific default were removed from the form, validation and new database writes.
+- Existing values in those two retired columns remain preserved for historical records.
+
+### Verification
+
+- Local and Vercel production builds passed; all 59 pages generated.
+- Production `/api/status` returned HTTP 200; deployment status and all aliases were confirmed.
+- Read-only production gateway query succeeded and confirmed 2 existing records remained available; no test record was created.
+- Impeccable reported only the established brand-color warning and pre-existing advisory type steps; no blocking finding.
+
 ## 2026-09-14 — Member default reporting
 
 - Source commit: `362cbe1` (`Add member default reporting workflow`).
