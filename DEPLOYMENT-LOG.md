@@ -2,6 +2,29 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-14 — Canonical attendance member names
+
+- Source commit: `4be2d84` (`Canonicalize attendance member names`).
+- Production data migration completed: **2026-09-14 16:57 WAT**.
+- Supabase migrations: `20260914154914_normalize_attendance_member_names.sql`, `20260914155416_sync_attendance_names_with_team_data.sql`, and `20260914155758_consolidate_attendance_team_data_aliases.sql`, applied successfully.
+- Supabase Edge Function: `qcu-attendance`, deployed successfully to project `jmhofvchmwnrwvpvlcpy`.
+- Vercel: no deployment required; the website application bundle did not change.
+
+### Changes
+
+- Consolidated casing, punctuation, whitespace, reversed-order, shortened and fuller-name variants into one canonical attendance name.
+- Team Data spelling now takes priority for current members; historical-only members retain one established audit spelling.
+- Added a protected alias registry and database trigger so future attendance writes automatically reuse the canonical spelling.
+- Attendance member suggestions now return preserved display names instead of lowercase storage keys.
+
+### Verification
+
+- All 630 production attendance records were preserved.
+- Distinct stored spellings reduced from 220 to 113 canonical names.
+- Live crosscheck found zero duplicate token groups, zero duplicate Team Data keys, zero direct spelling mismatches and zero remaining uniquely resolvable Team Data aliases.
+- Local production build passed; all 59 pages generated.
+- No test attendance record was created.
+
 ## 2026-09-14 — Complaince role and HOD-only defaulter review
 
 - Source commit: `6a1d26d` (`Add Complaince role and restrict defaulter access`).
