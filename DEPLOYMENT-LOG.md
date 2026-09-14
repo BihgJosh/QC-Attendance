@@ -2,6 +2,31 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-14 — Operations role and rejected-attendance removal
+
+- Source commit: `81ae3c0` (`Add Operations role and remove rejected attendance`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_DSqSyv5DW5782fdystHJMWuujKQX`.
+- Deployment completed: **2026-09-14 10:25:20 WAT**; Vercel **READY**, production aliases confirmed.
+- Supabase migration: `20260914090953_add_operations_role.sql`, applied successfully.
+- Supabase Edge Function: `qcu-attendance`, deployed successfully.
+
+### Changes
+
+- Added the exact role name **Operations** for attendance control, approved-record viewing/export, and assisted attendance filing.
+- Admin retains attendance, content and attendance-audit work; password resets, admin access, role management and geofence settings are now Super Admin-only.
+- Removed the rejected-record KPI, approval-rate KPI, rejected table, rejected search and rejected exports from the dashboard.
+- Rejected geofence attempts are still denied but are no longer written to the attendance database.
+- Permanently deleted all 73 existing records whose status was `Rejected`.
+
+### Verification
+
+- Local and Vercel production builds passed; all 58 pages generated.
+- Permission-boundary checks passed for Operations, Admin and Super Admin routes and UI sections.
+- Exact deletion predicate was `public.attendance_records.status = 'Rejected'`: 73 before, 73 deleted, 0 remaining.
+- Production `/api/status` returned HTTP 200 with attendance closed and no scheduled close.
+- Impeccable UI scan found only pre-existing advisory font-size steps; no blocking finding.
+
 ## 2026-09-10 — All-services headcount summary format
 
 - Source commit: `92ca386` (`Format all-services headcount summary`).
