@@ -2,6 +2,32 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-14 — Member default reporting
+
+- Source commit: `362cbe1` (`Add member default reporting workflow`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_Ar7fQ33xZ6CXgvPLRcxa7P7t8gN5`.
+- Deployment completed: **2026-09-14 12:28:22 WAT**; Vercel **READY**, all production aliases confirmed.
+- Supabase migration: `20260914111650_member_default_reports.sql`, applied successfully.
+- Supabase Edge Function: `qcu-service-reports`, deployed successfully.
+- Delivery: direct Vercel deployment of a clean commit archive. The Git remote push was blocked by the environment's remote-trust safeguard.
+
+### Changes
+
+- Added a Member Default form for Service Manager, Operations, Admin and Super Admin roles.
+- Member selection comes from Team Data; the signed-in reporter's name, email and role are recorded automatically.
+- Added conditional Uniform, Behaviour and Duty defaults plus service, location, time, factual description, notification, response, action, severity, witnesses, repeat status and follow-up fields.
+- Added an Admin and Super Admin-only review ledger with Reviewed and Resolved states and review notes.
+- Added a protected, RLS-enabled database table with service-role-only access and idempotent request identifiers.
+
+### Verification
+
+- Local and Vercel production builds passed; all 59 pages generated.
+- Production database migration and protected Edge Function deployment succeeded.
+- Read-only production gateway verification succeeded with zero existing member-default records; no test disciplinary record was created.
+- Production `/api/status` returned HTTP 200 and unauthenticated `/api/member-defaults` returned the expected sign-in error.
+- Impeccable found one intentional existing-brand cyan/purple warning and pre-existing advisory type steps; no blocking accessibility or structural finding.
+
 ## 2026-09-14 — Operations team-report viewing
 
 - Source commit: `d9a65fc` (`Give Operations view-only access to team reports`).
