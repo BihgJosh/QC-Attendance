@@ -138,8 +138,10 @@ export async function writeAttendanceAudit(matrix: AttendanceAuditMatrix) {
   const rowCount = Math.max(4, matrix.rows.length + 3);
   const title = `'${sheetTitle.replace(/'/g, "''")}'`;
   const generated = new Intl.DateTimeFormat("en-NG", { timeZone: "Africa/Lagos", dateStyle: "medium", timeStyle: "short" }).format(new Date(matrix.generatedAt));
+  const heading = `${sheetTitle} · Generated ${generated}`;
+  const titleStartColumn = columnCount > 1 ? 1 : 0;
   const values = [
-    [`${sheetTitle} · Generated ${generated}`, ...matrix.columns.map(() => "")],
+    columnCount > 1 ? ["", heading, ...matrix.columns.slice(1).map(() => "")] : [heading],
     ["Member name", ...matrix.columns.map((column) => column.label)],
     ["Service", ...matrix.columns.map((column) => column.service)],
     ...matrix.rows.map((row) => [row.memberName, ...row.times]),
@@ -152,8 +154,8 @@ export async function writeAttendanceAudit(matrix: AttendanceAuditMatrix) {
   await sheets.spreadsheets.values.clear({ spreadsheetId, range: title });
   await sheets.spreadsheets.values.update({ spreadsheetId, range: `${title}!A1`, valueInputOption: "RAW", requestBody: { values } });
   await sheets.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [
-    { mergeCells: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: columnCount }, mergeType: "MERGE_ALL" } },
-    { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: columnCount }, cell: { userEnteredFormat: { backgroundColor: { red: 0.04, green: 0.12, blue: 0.28 }, textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true, fontSize: 14 }, verticalAlignment: "MIDDLE" } }, fields: "userEnteredFormat" } },
+    ...(columnCount > 2 ? [{ mergeCells: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 1, endColumnIndex: columnCount }, mergeType: "MERGE_ALL" as const } }] : []),
+    { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: titleStartColumn, endColumnIndex: columnCount }, cell: { userEnteredFormat: { backgroundColor: { red: 0.04, green: 0.12, blue: 0.28 }, textFormat: { foregroundColor: { red: 1, green: 1, blue: 1 }, bold: true, fontSize: 14 }, verticalAlignment: "MIDDLE" } }, fields: "userEnteredFormat" } },
     { repeatCell: { range: { sheetId, startRowIndex: 1, endRowIndex: 3, startColumnIndex: 0, endColumnIndex: columnCount }, cell: { userEnteredFormat: { backgroundColor: { red: 0.86, green: 0.97, blue: 0.99 }, textFormat: { foregroundColor: { red: 0.03, green: 0.18, blue: 0.28 }, bold: true }, horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE", wrapStrategy: "WRAP" } }, fields: "userEnteredFormat" } },
     { repeatCell: { range: { sheetId, startRowIndex: 3, endRowIndex: rowCount, startColumnIndex: 0, endColumnIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.96, green: 0.98, blue: 1 } } }, fields: "userEnteredFormat" } },
     { repeatCell: { range: { sheetId, startRowIndex: 3, endRowIndex: rowCount, startColumnIndex: 1, endColumnIndex: columnCount }, cell: { userEnteredFormat: { horizontalAlignment: "CENTER", verticalAlignment: "MIDDLE" } }, fields: "userEnteredFormat(horizontalAlignment,verticalAlignment)" } },
