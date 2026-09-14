@@ -25,10 +25,12 @@ export default async function ServiceToolsPage() {
   const canViewServiceManager = ["service_manager", "operations", "admin", "super_admin"].includes(access.role);
   const canManageServiceReports = ["service_manager", "admin", "super_admin"].includes(access.role);
   const canViewReportActivity = ["admin", "super_admin"].includes(access.role);
+  const canSubmitMemberDefaults = ["service_manager", "operations", "admin", "super_admin"].includes(access.role);
+  const canReviewMemberDefaults = ["admin", "super_admin"].includes(access.role);
   return (
     <>
       {canViewEmergencyAlerts(access.role) && <EmergencyAlertLoader />}
-      <ServiceToolsHub canViewServiceManager={canViewServiceManager} canManageServiceReports={canManageServiceReports} canViewReportActivity={canViewReportActivity} memberIdentity={memberIdentity} />
+      <ServiceToolsHub canViewServiceManager={canViewServiceManager} canManageServiceReports={canManageServiceReports} canViewReportActivity={canViewReportActivity} canSubmitMemberDefaults={canSubmitMemberDefaults} canReviewMemberDefaults={canReviewMemberDefaults} memberIdentity={memberIdentity} />
     </>
   );
 }

@@ -12,6 +12,7 @@ import {
   BarChart3,
   ChevronRight,
   ClipboardCheck,
+  ClipboardPenLine,
   Clock3,
   Eye,
   Menu,
@@ -23,10 +24,23 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { ServiceManagerDashboard } from "@/components/public/service-manager-dashboard";
 import { ServiceToolForm } from "@/components/public/service-tool-forms";
 import { ReportActivityDashboard } from "@/components/public/report-activity-dashboard";
+import { MemberDefaultReport } from "@/components/public/member-default-report";
 import { IdentityAvatar } from "@/components/member/member-identity";
 import type { MemberIdentity } from "@/lib/member-store";
 
 const tools = [
+  {
+    id: "member-default",
+    eyebrow: "Standards and conduct · restricted",
+    title: "Member Default",
+    shortTitle: "Member default",
+    description: "Record a factual uniform, behaviour or duty default against an official Team Data member.",
+    icon: ClipboardPenLine,
+    href: "/service-tools?tool=member-default#workflow",
+    tone: "amber",
+    details: ["Official Team Data member selection", "Uniform, behaviour and duty categories", "Observation, response and immediate action", "Severity, repeat status and follow-up", "Automatic reporter attribution", "Admin and Super Admin review workflow"],
+    outcome: "Creates a traceable accountability record for fair follow-up.",
+  },
   {
     id: "post-report",
     eyebrow: "Post-level reporting",
@@ -152,17 +166,18 @@ const toneClasses = {
   red: "border-red-200 bg-red-50 text-red-700",
   slate: "border-slate-200 bg-slate-100 text-slate-700",
   emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  amber: "border-amber-200 bg-amber-50 text-amber-800",
 };
 
-export function ServiceToolsHub({ canViewServiceManager, canManageServiceReports, canViewReportActivity, memberIdentity }: { canViewServiceManager: boolean; canManageServiceReports: boolean; canViewReportActivity: boolean; memberIdentity: MemberIdentity }) {
+export function ServiceToolsHub({ canViewServiceManager, canManageServiceReports, canViewReportActivity, canSubmitMemberDefaults, canReviewMemberDefaults, memberIdentity }: { canViewServiceManager: boolean; canManageServiceReports: boolean; canViewReportActivity: boolean; canSubmitMemberDefaults: boolean; canReviewMemberDefaults: boolean; memberIdentity: MemberIdentity }) {
   const [activeId, setActiveId] = useState<ToolId | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const availableTools = tools.filter((tool) => (tool.id !== "manager" || canViewServiceManager) && (tool.id !== "report-activity" || canViewReportActivity));
+  const availableTools = tools.filter((tool) => (tool.id !== "manager" || canViewServiceManager) && (tool.id !== "report-activity" || canViewReportActivity) && (tool.id !== "member-default" || canSubmitMemberDefaults));
   const activeTool = availableTools.find((tool) => tool.id === activeId);
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("tool") as ToolId | null;
     if (requested && availableTools.some((tool) => tool.id === requested)) setActiveId(requested);
-  }, [canViewServiceManager, canViewReportActivity]);
+  }, [canViewServiceManager, canViewReportActivity, canSubmitMemberDefaults]);
 
   const showManager = () => {
     setActiveId("manager");
@@ -266,7 +281,7 @@ export function ServiceToolsHub({ canViewServiceManager, canManageServiceReports
                   <p className="mt-2 text-sm leading-6 text-slate-600">Choose a tool from the workflow menu to view its guide and open the form.</p>
                 </div>
               </div>
-            ) : activeTool.id === "manager" ? <motion.div key="manager" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceManagerDashboard canManageReports={canManageServiceReports} /></motion.div> : activeTool.id === "report-activity" ? <motion.div key="report-activity" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0 p-3 sm:p-5"><ReportActivityDashboard /></motion.div> : <motion.div key={activeTool.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceToolForm tool={activeTool.id} /></motion.div>}
+            ) : activeTool.id === "manager" ? <motion.div key="manager" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceManagerDashboard canManageReports={canManageServiceReports} /></motion.div> : activeTool.id === "report-activity" ? <motion.div key="report-activity" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0 p-3 sm:p-5"><ReportActivityDashboard /></motion.div> : activeTool.id === "member-default" ? <motion.div key="member-default" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><MemberDefaultReport canReview={canReviewMemberDefaults} /></motion.div> : <motion.div key={activeTool.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} className="min-w-0"><ServiceToolForm tool={activeTool.id} /></motion.div>}
           </div>
         </div>
       </section>

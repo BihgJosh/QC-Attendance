@@ -14,6 +14,9 @@ type ServiceReportOperation =
   | "manager.daily-report"
   | "manager.finalize"
   | "admin.report-activity"
+  | "default-report.insert"
+  | "default-report.list"
+  | "default-report.update"
   | "document.find"
   | "document.insert"
   | "activity.insert"
@@ -42,7 +45,7 @@ export async function callServiceReportGateway<T>(
           Authorization: `Bearer ${anonKey}`,
           "x-qcu-operation-secret": gatewaySecret,
         },
-        body: JSON.stringify(operation === "manager.dashboard" || operation === "manager.daily-report" || operation === "manager.finalize" || operation === "admin.report-activity" || operation === "report.areas" || operation === "document.find" || operation === "emergency.list" || operation === "emergency.update"
+        body: JSON.stringify(operation === "manager.dashboard" || operation === "manager.daily-report" || operation === "manager.finalize" || operation === "admin.report-activity" || operation === "default-report.list" || operation === "default-report.update" || operation === "report.areas" || operation === "document.find" || operation === "emergency.list" || operation === "emergency.update"
           ? { operation, ...payload }
           : { operation, row: payload }),
       });

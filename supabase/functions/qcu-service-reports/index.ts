@@ -1,5 +1,5 @@
 const GATEWAY_SECRET_HASH = "e961e32016c41f358eac3f9e1546b93d78bae0b9b30a446ccceecea47533fa41";
-const allowedOperations = new Set(["migration.import", "report.insert", "report.areas", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "manager.finalize", "admin.report-activity", "document.find", "document.insert", "activity.insert", "email.insert"]);
+const allowedOperations = new Set(["migration.import", "report.insert", "report.areas", "timer.insert", "observer.insert", "emergency.insert", "emergency.list", "emergency.update", "manager.dashboard", "manager.daily-report", "manager.finalize", "admin.report-activity", "default-report.insert", "default-report.list", "default-report.update", "document.find", "document.insert", "activity.insert", "email.insert"]);
 type Json = Record<string, unknown>;
 
 function json(body: unknown, status = 200) {
@@ -164,6 +164,18 @@ Deno.serve(async (request) => {
     }
     if (operation === "manager.daily-report") return json({ ok: true, data: await dailyReport(String(body.date || "")) });
     if (operation === "admin.report-activity") return json({ ok: true, users: await reportActivity(String(body.from || ""), String(body.to || "")) });
+    if (operation === "default-report.list") {
+      const rows = await rest("member_default_reports?select=*&order=created_at.desc&limit=500") as Json[];
+      return json({ ok: true, rows });
+    }
+    if (operation === "default-report.update") {
+      const id = encodeURIComponent(String(body.id || ""));
+      const status = String(body.status || "");
+      if (!id || !["Open", "Reviewed", "Resolved"].includes(status)) return json({ error: "Invalid review update." }, 400);
+      const rows = await rest(`member_default_reports?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ status, review_notes: body.reviewNotes || null, reviewed_by: body.reviewedBy, reviewed_at: new Date().toISOString(), updated_at: new Date().toISOString() }) }) as Json[];
+      if (!rows.length) return json({ error: "Member default report not found." }, 404);
+      return json({ ok: true, row: rows[0] });
+    }
     if (operation === "manager.finalize") {
       const date = String(body.date || "");
       const service = String(body.service || "");
@@ -204,7 +216,7 @@ Deno.serve(async (request) => {
       const rows = await rest("service_post_reports", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(row) }) as Json[];
       return json({ success: true, created: rows.length > 0, row: rows[0] || null });
     }
-    const table = ({ "timer.insert": "service_timer_logs", "observer.insert": "service_observer_reports", "emergency.insert": "service_emergency_flags", "document.insert": "service_generated_documents", "activity.insert": "service_activity_log", "email.insert": "service_email_log" } as Record<string, string>)[operation];
+    const table = ({ "timer.insert": "service_timer_logs", "observer.insert": "service_observer_reports", "emergency.insert": "service_emergency_flags", "default-report.insert": "member_default_reports", "document.insert": "service_generated_documents", "activity.insert": "service_activity_log", "email.insert": "service_email_log" } as Record<string, string>)[operation];
     const conflictKey = String((body.row as Json)?.source_fingerprint || "") ? "source_fingerprint" : "id";
     const rows = await rest(`${table}?on_conflict=${conflictKey}`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" }, body: JSON.stringify(body.row) }) as Json[];
     return json({ success: true, created: rows.length > 0, row: rows[0] || null });
