@@ -245,8 +245,8 @@ Deno.serve(async (request) => {
       return json({ success: true });
     }
     if (operation === "members.list") {
-      const rows = await rest("attendance_members?select=normalized_name&is_active=eq.true&order=normalized_name.asc") as Json[];
-      return json({ names: rows.map((row) => String(row.normalized_name)) });
+      const rows = await rest("attendance_members?select=full_name&is_active=eq.true&order=full_name.asc") as Json[];
+      return json({ names: rows.map((row) => String(row.full_name).trim()).filter(Boolean) });
     }
     if (operation === "attendance.device-check") {
       const date = encodeURIComponent(String(body.date || ""));
