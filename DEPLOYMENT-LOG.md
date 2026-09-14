@@ -2,6 +2,27 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-14 — Admin password-reset access
+
+- Source commit: `80cef21` (`Allow admins to reset member passwords`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_Ad1aYtKSyXRDApYRuAWRSaJW2ZwT`.
+- Deployment completed: **2026-09-14 10:33:13 WAT**; Vercel **READY**, production aliases confirmed.
+- Database and Edge Functions: no changes required.
+
+### Changes
+
+- Admin can now see and use the Password resets section.
+- Operations remains excluded from password resets.
+- Admin access management, role management and geofence settings remain Super Admin-only.
+
+### Verification
+
+- Server authorization and dashboard visibility checks passed.
+- Local and Vercel production builds passed; all 58 pages generated.
+- Production `/api/status` returned HTTP 200.
+- Impeccable reported only the existing advisory typography steps; no blocking finding.
+
 ## 2026-09-14 — Operations role and rejected-attendance removal
 
 - Source commit: `81ae3c0` (`Add Operations role and remove rejected attendance`).
