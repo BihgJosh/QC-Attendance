@@ -159,7 +159,7 @@ function normalizeDashboardData(value: unknown): DashboardData | null {
   };
 }
 
-export function ServiceManagerDashboard() {
+export function ServiceManagerDashboard({ canManageReports = true }: { canManageReports?: boolean }) {
   const token = "role-session";
   const [date, setDate] = useState(abujaToday);
   const [loading, setLoading] = useState(false);
@@ -389,7 +389,7 @@ export function ServiceManagerDashboard() {
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600">Full detailed report · {date}</p>
             <h3 className="mt-2 text-3xl font-black tracking-tight text-slate-950">{selectedService}</h3>
           </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {canManageReports && <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <button type="button" onClick={() => { setShareOpen((open) => !open); setShareMessage(null); }} aria-expanded={shareOpen} aria-controls="service-report-email-form" className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-cyan-100 px-5 text-sm font-black text-cyan-900 transition hover:bg-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 sm:w-auto">
               <Mail className="h-4 w-4" /> Share by email
             </button>
@@ -399,12 +399,12 @@ export function ServiceManagerDashboard() {
             <button type="button" onClick={() => generateReport(selectedService)} disabled={reportLoading === selectedService} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-5 text-sm font-black text-slate-950 disabled:opacity-60 sm:w-auto">
               {reportLoading === selectedService ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Generate document
             </button>
-          </div>
+          </div>}
         </div>
 
         {error && <p role="alert" className="mt-5 rounded-2xl bg-red-50 p-4 text-sm font-semibold text-red-800 ring-1 ring-inset ring-red-200">{error}</p>}
         {headcountDocument?.scope === selectedService && <HeadcountDocumentNotice document={headcountDocument} />}
-        {shareOpen && <form id="service-report-email-form" onSubmit={(event) => shareReport(event, selectedService)} className="mt-5 rounded-2xl bg-cyan-50 p-4 ring-1 ring-inset ring-cyan-200 sm:p-5">
+        {canManageReports && shareOpen && <form id="service-report-email-form" onSubmit={(event) => shareReport(event, selectedService)} className="mt-5 rounded-2xl bg-cyan-50 p-4 ring-1 ring-inset ring-cyan-200 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
             <div className="min-w-0 flex-1">
               <label htmlFor="report-recipient" className="text-xs font-black uppercase tracking-[0.12em] text-cyan-900">Recipient email</label>
@@ -426,7 +426,7 @@ export function ServiceManagerDashboard() {
           <Metric label="Today's emergency flags" value={emergencies.length} icon={ShieldCheck} />
         </div>
 
-        <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} />
+        <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} canManage={canManageReports} />
 
         <ReportSection title="Worshipper headcount" icon={Users}>
           <div className="mb-4 flex flex-col gap-3 rounded-xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-200 sm:flex-row sm:items-center sm:justify-between">
@@ -463,9 +463,9 @@ export function ServiceManagerDashboard() {
         </div>
         <div className="flex w-full flex-col gap-3 sm:w-auto">
           <label className="min-w-48 text-xs font-bold text-slate-700"><span className="mb-2 flex items-center gap-2"><CalendarDays className="h-4 w-4 text-cyan-700" /> Report date</span><input type="date" value={date} onChange={(event) => { setDate(event.target.value); setHeadcountDocument(null); if (event.target.value) void loadAllServices(token, event.target.value); }} className="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-200" /></label>
-          <button type="button" onClick={() => generateHeadcount("All services")} disabled={headcountLoading !== null || summary.loaded === 0} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 text-sm font-black text-white transition hover:bg-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600">
+          {canManageReports && <button type="button" onClick={() => generateHeadcount("All services")} disabled={headcountLoading !== null || summary.loaded === 0} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 text-sm font-black text-white transition hover:bg-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-600">
             {headcountLoading === "All services" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Generate all headcounts
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -481,7 +481,7 @@ export function ServiceManagerDashboard() {
 
       <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold"><span className="rounded-full bg-cyan-50 px-3 py-1.5 text-cyan-900 ring-1 ring-inset ring-cyan-200">Timer logs {summary.timerLogs}/{serviceNames.length}</span><span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-900 ring-1 ring-inset ring-violet-200">Observer logs {summary.observerLogs}/{serviceNames.length}</span><span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 ring-1 ring-inset ring-slate-200">Headcounts include a 2% adjustment</span></div>
 
-      <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} />
+      <EmergencyActionQueue emergencies={emergencies} loading={emergenciesLoading} updatingId={emergencyUpdating} message={emergencyMessage} onUpdate={updateEmergency} canManage={canManageReports} />
 
       {loading ? <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-cyan-700" /><span className="ml-3 text-sm font-semibold text-slate-600">Compiling every service…</span></div> : (
         <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -495,9 +495,9 @@ export function ServiceManagerDashboard() {
               <p className="mt-1 text-xs font-semibold text-slate-600">{date}</p>
               <div className="mt-5 grid grid-cols-2 gap-3"><MiniMetric label="Worshippers +2%" value={adjustedHeadcount(data?.headcount?.grandTotal)} /><MiniMetric label="Incidents" value={numberValue(data?.incidentCount)} /><MiniMetric label="Emergency" value={data?.emergencies?.length || 0} /><MiniMetric label="Coverage" value={`${coverage}/3`} /></div>
               <div className="mt-auto grid gap-2 pt-5">
-                <button type="button" disabled={!data || headcountLoading !== null} onClick={() => generateHeadcount(service)} className="flex min-h-10 items-center justify-center gap-2 rounded-xl bg-violet-100 px-3 text-xs font-black text-violet-950 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
+                {canManageReports && <button type="button" disabled={!data || headcountLoading !== null} onClick={() => generateHeadcount(service)} className="flex min-h-10 items-center justify-center gap-2 rounded-xl bg-violet-100 px-3 text-xs font-black text-violet-950 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500">
                   {headcountLoading === service ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />} Headcount doc
-                </button>
+                </button>}
                 <button type="button" disabled={!data} onClick={() => setSelectedService(service)} className="flex min-h-11 items-center justify-between rounded-xl bg-blue-700 px-4 text-sm font-black text-white shadow-[0_6px_16px_rgba(29,78,216,0.24)] transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-white disabled:text-slate-600 disabled:ring-1 disabled:ring-inset disabled:ring-slate-300 disabled:shadow-none">View report <ChevronRight className="h-4 w-4" /></button>
               </div>
               {!data && result?.message && <p className="mt-2 text-[10px] font-medium leading-4 text-slate-600">{result.message}</p>}
@@ -509,7 +509,7 @@ export function ServiceManagerDashboard() {
   );
 }
 
-function EmergencyActionQueue({ emergencies, loading, updatingId, message, onUpdate }: { emergencies: Emergency[]; loading: boolean; updatingId: { id: string; status: "Resolved" | "Escalated" } | null; message: { kind: "success" | "error"; text: string } | null; onUpdate: (emergency: Emergency, status: "Resolved" | "Escalated") => void }) {
+function EmergencyActionQueue({ emergencies, loading, updatingId, message, onUpdate, canManage }: { emergencies: Emergency[]; loading: boolean; updatingId: { id: string; status: "Resolved" | "Escalated" } | null; message: { kind: "success" | "error"; text: string } | null; onUpdate: (emergency: Emergency, status: "Resolved" | "Escalated") => void; canManage: boolean }) {
   const ordered = [...emergencies].sort((left, right) => Number(right.status === "Active") - Number(left.status === "Active"));
   return <section className="mt-6 rounded-2xl bg-rose-50 p-4 ring-1 ring-inset ring-rose-200 sm:p-5" aria-labelledby="emergency-action-title">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h4 id="emergency-action-title" className="flex items-center gap-2 text-sm font-black text-rose-950"><AlertTriangle className="h-4 w-4" /> Today&apos;s emergency actions</h4><p className="mt-1 text-xs leading-5 text-rose-800">Account for emergencies flagged today. Previous-day flags are not shown.</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-rose-900 ring-1 ring-inset ring-rose-200">{emergencies.length} flagged</span></div>
@@ -518,7 +518,7 @@ function EmergencyActionQueue({ emergencies, loading, updatingId, message, onUpd
       const active = !emergency.status || emergency.status === "Active" || emergency.status === "Open";
       const busy = emergency.id === updatingId?.id;
       const statusTone = emergency.status === "Resolved" ? "bg-emerald-100 text-emerald-900" : emergency.status === "Escalated" ? "bg-amber-100 text-amber-950" : "bg-rose-100 text-rose-900";
-      return <article key={emergency.id || `${emergency.location}-${index}`} className="rounded-xl bg-white p-4 shadow-[0_6px_18px_rgba(127,29,29,0.08)]"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><p className="font-black text-slate-950">{emergency.location || "Location not provided"}</p><p className="mt-1 text-sm leading-5 text-slate-700">{emergency.description || "No description provided."}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${statusTone}`}>{emergency.status || "Active"}</span></div><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><MemberIdentityCard identity={emergency.identity} fallbackName={emergency.reportedBy || "Unknown reporter"} fallbackEmail={emergency.reporterEmail} compact />{emergency.submittedAt && <span className="text-xs font-semibold text-slate-500">{new Date(emergency.submittedAt).toLocaleString()}</span>}</div>{active && emergency.id && <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Resolved")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Resolved" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} {busy && updatingId?.status === "Resolved" ? "Resolving" : "Mark resolved"}</button><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Escalated")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-black text-amber-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Escalated" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />} {busy && updatingId?.status === "Escalated" ? "Escalating" : "Escalate"}</button></div>}</article>;
+      return <article key={emergency.id || `${emergency.location}-${index}`} className="rounded-xl bg-white p-4 shadow-[0_6px_18px_rgba(127,29,29,0.08)]"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0 flex-1 [overflow-wrap:anywhere]"><p className="font-black text-slate-950">{emergency.location || "Location not provided"}</p><p className="mt-1 text-sm leading-5 text-slate-700">{emergency.description || "No description provided."}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${statusTone}`}>{emergency.status || "Active"}</span></div><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><MemberIdentityCard identity={emergency.identity} fallbackName={emergency.reportedBy || "Unknown reporter"} fallbackEmail={emergency.reporterEmail} compact />{emergency.submittedAt && <span className="text-xs font-semibold text-slate-500">{new Date(emergency.submittedAt).toLocaleString()}</span>}</div>{canManage && active && emergency.id && <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Resolved")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-xs font-black text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Resolved" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} {busy && updatingId?.status === "Resolved" ? "Resolving" : "Mark resolved"}</button><button type="button" disabled={busy} onClick={() => onUpdate(emergency, "Escalated")} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-black text-amber-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60">{busy && updatingId?.status === "Escalated" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertTriangle className="h-4 w-4" />} {busy && updatingId?.status === "Escalated" ? "Escalating" : "Escalate"}</button></div>}</article>;
     })}</div> : <p className="mt-4 rounded-xl bg-white p-3 text-sm font-semibold text-slate-700">No emergency has been flagged today.</p>}
   </section>;
 }

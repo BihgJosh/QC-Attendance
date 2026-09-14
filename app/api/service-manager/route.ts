@@ -132,8 +132,12 @@ export async function POST(request: Request) {
     const session = await readMemberSession();
     if (!session) return NextResponse.json({ ok: false, message: "Sign in with your member account first." }, { status: 401 });
     const access = await resolveUserAccess(session.email);
-    const elevated = access.role === "admin" || access.role === "super_admin";
-    if (!elevated && access.role !== "service_manager") return NextResponse.json({ ok: false, message: "Service Manager access is required." }, { status: 403 });
+    const canManageReports = ["service_manager", "admin", "super_admin"].includes(access.role);
+    const canViewReports = canManageReports || access.role === "operations";
+    if (!canViewReports) return NextResponse.json({ ok: false, message: "Report access is required." }, { status: 403 });
+    if (!canManageReports && ["updateEmergency", "generateReport", "generateHeadcount", "sendEmail"].includes(action)) {
+      return NextResponse.json({ ok: false, message: "Operations access is view-only for team reports." }, { status: 403 });
+    }
     if (action === "checkPassword") return NextResponse.json({ ok: true, data: { assignments: access.assignments } }, { headers: { "Cache-Control": "no-store, max-age=0" } });
     if (action === "getServices") {
       if (!isIsoCalendarDate(date)) return NextResponse.json({ ok: false, message: "Choose a valid report date." }, { status: 400 });

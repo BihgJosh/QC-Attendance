@@ -22,12 +22,13 @@ export default async function ServiceToolsPage() {
     phone: profile?.phone || "",
     avatarUrl: profile?.avatarUrl || null,
   };
-  const canViewServiceManager = ["service_manager", "admin", "super_admin"].includes(access.role);
+  const canViewServiceManager = ["service_manager", "operations", "admin", "super_admin"].includes(access.role);
+  const canManageServiceReports = ["service_manager", "admin", "super_admin"].includes(access.role);
   const canViewReportActivity = ["admin", "super_admin"].includes(access.role);
   return (
     <>
       {canViewEmergencyAlerts(access.role) && <EmergencyAlertLoader />}
-      <ServiceToolsHub canViewServiceManager={canViewServiceManager} canViewReportActivity={canViewReportActivity} memberIdentity={memberIdentity} />
+      <ServiceToolsHub canViewServiceManager={canViewServiceManager} canManageServiceReports={canManageServiceReports} canViewReportActivity={canViewReportActivity} memberIdentity={memberIdentity} />
     </>
   );
 }
