@@ -2,6 +2,26 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-14 — Operations team-report viewing
+
+- Source commit: `d9a65fc` (`Give Operations view-only access to team reports`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_BSPPfiUm7t3AKMHpVzvbEb39dHrH`.
+- Deployment completed: **2026-09-14 12:10:00 WAT**; Vercel **READY**, production aliases confirmed.
+- Database and Edge Functions: no changes required.
+
+### Changes
+
+- Operations can open the all-services dashboard and view every available team report.
+- Operations report access is view-only: document generation, headcount generation, email sharing and emergency-status changes remain unavailable.
+- Service Manager, Admin and Super Admin retain report-management actions; report activity remains Admin and Super Admin-only.
+
+### Verification
+
+- UI entry-point, server authorization and Operations write-denial checks passed.
+- Local and Vercel production builds passed; all 58 pages generated.
+- Production `/api/status` returned HTTP 200.
+
 ## 2026-09-14 — Admin password-reset access
 
 - Source commit: `80cef21` (`Allow admins to reset member passwords`).
