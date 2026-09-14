@@ -24,6 +24,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
   service_manager: "Service Manager",
   hod: "HOD",
   operations: "Operations",
+  complaince: "Complaince",
   admin: "Admin",
   super_admin: "Super Admin",
 };

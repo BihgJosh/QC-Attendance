@@ -4,9 +4,8 @@ import { getMemberProfile, resolveUserAccess } from "@/lib/member-store";
 import { getTeamMemberByEmail, listTeamMembers } from "@/lib/team-data-store";
 import { callServiceReportGateway } from "@/lib/service-report-store";
 import { isValidServiceReportName } from "@/lib/service-report-services";
+import { canReviewMemberDefault, canSubmitMemberDefault } from "@/lib/member-default-permissions";
 
-const SUBMIT_ROLES = new Set(["service_manager", "operations", "admin", "super_admin"]);
-const REVIEW_ROLES = new Set(["admin", "super_admin"]);
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const clean = (value: unknown, max: number) => typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, max) : "";
@@ -16,9 +15,9 @@ export async function GET() {
   const session = await readMemberSession();
   if (!session) return NextResponse.json({ error: "Sign in with your member account." }, { status: 401 });
   const access = await resolveUserAccess(session.email);
-  if (!SUBMIT_ROLES.has(access.role)) return NextResponse.json({ error: "This reporting tool is restricted." }, { status: 403 });
+  if (!canSubmitMemberDefault(access.role)) return NextResponse.json({ error: "This reporting tool is restricted." }, { status: 403 });
   const members = await listTeamMembers();
-  if (!REVIEW_ROLES.has(access.role)) return NextResponse.json({ members });
+  if (!canReviewMemberDefault(access.role)) return NextResponse.json({ members });
   const result = await callServiceReportGateway<{ rows?: unknown[] }>("default-report.list", {});
   return NextResponse.json({ members, reports: result.rows || [] }, { headers: { "Cache-Control": "no-store" } });
 }
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
   const session = await readMemberSession();
   if (!session) return NextResponse.json({ error: "Sign in with your member account." }, { status: 401 });
   const access = await resolveUserAccess(session.email);
-  if (!SUBMIT_ROLES.has(access.role)) return NextResponse.json({ error: "Service Manager, Operations or Admin access is required." }, { status: 403 });
+  if (!canSubmitMemberDefault(access.role)) return NextResponse.json({ error: "Complaince, Service Manager, HOD or Super Admin access is required." }, { status: 403 });
   const reporter = await getTeamMemberByEmail(session.email);
   if (!reporter) return NextResponse.json({ error: "Your email is not registered in Team Data." }, { status: 403 });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
@@ -62,7 +61,7 @@ export async function PATCH(request: Request) {
   const session = await readMemberSession();
   if (!session) return NextResponse.json({ error: "Sign in with your member account." }, { status: 401 });
   const access = await resolveUserAccess(session.email);
-  if (!REVIEW_ROLES.has(access.role)) return NextResponse.json({ error: "Admin or Super Admin access is required." }, { status: 403 });
+  if (!canReviewMemberDefault(access.role)) return NextResponse.json({ error: "HOD access is required to review records." }, { status: 403 });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const id = clean(body?.id, 36), status = clean(body?.status, 20), reviewNotes = clean(body?.reviewNotes, 2000);
   if (!id || !["Open", "Reviewed", "Resolved"].includes(status)) return NextResponse.json({ error: "Choose a valid report status." }, { status: 400 });

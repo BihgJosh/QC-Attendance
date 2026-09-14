@@ -38,7 +38,7 @@ const tools = [
     icon: ClipboardPenLine,
     href: "/service-tools?tool=member-default#workflow",
     tone: "amber",
-    details: ["Typed member name with Team Data suggestions", "Automatically selected service date", "Uniform, behaviour and duty categories", "Observation, response and immediate action", "Automatic reporter attribution", "Admin and Super Admin review workflow"],
+    details: ["Typed member name with Team Data suggestions", "Automatically selected service date", "Uniform, behaviour and duty categories", "Observation, response and immediate action", "Automatic reporter attribution", "HOD-only review and resolution workflow"],
     outcome: "Creates a traceable accountability record for fair follow-up.",
   },
   {

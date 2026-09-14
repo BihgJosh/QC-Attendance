@@ -5,6 +5,7 @@ import { readMemberSession } from "@/lib/member-auth";
 import { redirect } from "next/navigation";
 import { getMemberProfile, resolveUserAccess } from "@/lib/member-store";
 import { canViewEmergencyAlerts } from "@/lib/member-permissions";
+import { canReviewMemberDefault, canSubmitMemberDefault } from "@/lib/member-default-permissions";
 
 export const metadata: Metadata = {
   title: "Service Tools | Quality Control Unit",
@@ -25,8 +26,8 @@ export default async function ServiceToolsPage() {
   const canViewServiceManager = ["service_manager", "operations", "admin", "super_admin"].includes(access.role);
   const canManageServiceReports = ["service_manager", "admin", "super_admin"].includes(access.role);
   const canViewReportActivity = ["admin", "super_admin"].includes(access.role);
-  const canSubmitMemberDefaults = ["service_manager", "operations", "admin", "super_admin"].includes(access.role);
-  const canReviewMemberDefaults = ["admin", "super_admin"].includes(access.role);
+  const canSubmitMemberDefaults = canSubmitMemberDefault(access.role);
+  const canReviewMemberDefaults = canReviewMemberDefault(access.role);
   return (
     <>
       {canViewEmergencyAlerts(access.role) && <EmergencyAlertLoader />}

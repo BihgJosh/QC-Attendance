@@ -233,7 +233,7 @@ export function removeAdminAccess(email: string) {
   return callMemberGateway<{ success: boolean }>("admin.remove", { email });
 }
 
-export type AppRole = "general_user" | "service_manager" | "hod" | "operations" | "admin" | "super_admin";
+export type AppRole = "general_user" | "service_manager" | "hod" | "operations" | "complaince" | "admin" | "super_admin";
 export type RoleRecord = { email: string; role: AppRole; department: string | null; isActive: boolean; updatedAt: string };
 export type ServiceAssignment = { id: string; serviceDate: string; service: string; managerEmail: string; accessStartsAt: string; accessEndsAt: string; status: string };
 

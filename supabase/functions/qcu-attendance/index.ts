@@ -630,7 +630,7 @@ Deno.serve(async (request) => {
       const email = normalizeEmail(body.email);
       const role = String(body.role || "");
       const department = String(body.department || "").trim() || null;
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["general_user", "service_manager", "hod", "operations", "admin", "super_admin"].includes(role)) return json({ error: "Choose a valid user and role." }, 400);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !["general_user", "service_manager", "hod", "operations", "complaince", "admin", "super_admin"].includes(role)) return json({ error: "Choose a valid user and role." }, 400);
       await rest("user_roles?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify({ email, role, department, is_active: true, updated_at: new Date().toISOString() }) });
       return json({ success: true });
     }

@@ -11,10 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Role = "general_user" | "service_manager" | "hod" | "operations" | "admin" | "super_admin";
+type Role = "general_user" | "service_manager" | "hod" | "operations" | "complaince" | "admin" | "super_admin";
 type Profile = { email: string; firstName: string; middleName: string; lastName: string; phone: string; address: string; birthMonth: number | null; birthDay: number | null; churchJoinYear: number | null; avatarUrl: string | null; role: Role; profileComplete: boolean };
 
-const roleLabels: Record<Role, string> = { general_user: "General User", service_manager: "Service Manager", hod: "HOD", operations: "Operations", admin: "Admin", super_admin: "Super Admin" };
+const roleLabels: Record<Role, string> = { general_user: "General User", service_manager: "Service Manager", hod: "HOD", operations: "Operations", complaince: "Complaince", admin: "Admin", super_admin: "Super Admin" };
 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 function initials(profile: Profile | null) {

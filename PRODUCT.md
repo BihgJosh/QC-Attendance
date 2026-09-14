@@ -27,8 +27,8 @@ Members authenticate with an email address tied to the official team register. T
 - The member's current role is shown on the profile but remains read-only and administrator-controlled.
 - Email changes require confirmation of the new address before it replaces the current login email. The system must keep authentication, roles, assignments, and reporting identity synchronized when the change completes.
 - Profile images must be size-limited and optimized to minimize storage and bandwidth use on the free hosting stack. Persistent user uploads must not rely on Vercel's filesystem.
-- Existing role vocabulary is General User, Service Manager, HOD, Operations, Admin, and Super Admin.
-- Service Managers, Operations, Admins, and Super Admins can file factual member-default reports for uniform, behaviour, or duty issues. Admins and Super Admins alone can review and resolve those records.
+- Existing role vocabulary is General User, Service Manager, HOD, Operations, Complaince, Admin, and Super Admin.
+- Complaince, Service Managers, HODs, and Super Admins can file factual member-default reports for uniform, behaviour, or duty issues. HOD alone can review and resolve those records; every other permitted role is reporter-only.
 
 ## Brand Commitments
 
