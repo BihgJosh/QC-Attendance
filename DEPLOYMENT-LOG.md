@@ -2,6 +2,26 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-16 — Durable member sessions across browsers and PWA
+
+- Source commit: `485651e` (`Keep member sessions active across service`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_FBLsfM5DGRme3SBV8C8FN84vLxBs`.
+- Deployment created: **2026-09-16 10:44:20 WAT**; verified **READY** with all production aliases at **10:47 WAT**.
+- Supabase migration: `20260916090000_allow_multiple_durable_member_sessions.sql`, applied and recorded successfully.
+- Supabase Edge Function: `qcu-attendance` version 49, **ACTIVE**.
+
+### Changes and verification
+
+- Browser and installed-PWA logins now share one 30-day rolling session policy.
+- Each browser or PWA installation keeps an independent revocable session, so signing in on one no longer invalidates another.
+- Active legacy browser sessions are promoted to the 30-day policy on their next successful validation.
+- Explicit logout revokes the current token; password changes, password resets, email changes and access removal retain their existing revocation controls.
+- Session-policy regression checks and the local production build passed; all 59 pages generated.
+- Production confirmed the former one-session-per-email index is absent and the migration histories match.
+- Production login returned HTTP 200, `/api/status` returned HTTP 200, and the deployed authentication function is active.
+- No member credentials were used and no test member session was created during verification.
+
 ## 2026-09-16 — Required Service Timer categories and variance duration
 
 - Source commit: `a233c27` (`Require complete service timing entries`).
