@@ -2,6 +2,24 @@
 
 Times are Africa/Lagos (WAT, UTC+01:00). Deployment confirmation is distinct from source commit time. This log starts with the verified release below; earlier deployment history has not yet been reconstructed here.
 
+## 2026-09-16 — Required Service Timer categories and variance duration
+
+- Source commit: `a233c27` (`Require complete service timing entries`).
+- Production: https://qcsoja.com
+- Deployment: `dpl_AXGWho41w2XaZukmJTARUBYWTbku`.
+- Deployment completed: **2026-09-16 10:06:09 WAT**; Vercel **READY**, all production aliases confirmed.
+- Database and Edge Functions: no changes required.
+
+### Changes and verification
+
+- Opening Prayer, Praise & Worship, Speaking into the Week, Solo Ministration, Declaration, Choir Ministration, Pastor's Ministration, and Offering & Announcement now require a status.
+- Testimony Introduction and First through Fifth Testimony remain optional.
+- Selecting Overshot or Finished Early requires entered minutes and seconds with a duration above zero, including an optional testimony or extra segment when selected.
+- Browser validation and server validation enforce the same rules.
+- Regression tests passed for missing required categories, missing variance duration, optional testimonies, and valid seconds-only variance.
+- Local production build passed; all 59 pages generated.
+- Production `/api/status` returned HTTP 200; unauthenticated timer submission returned HTTP 401.
+
 ## 2026-09-14 — Attendance audit frozen-column generation fix
 
 - Source commit: `20fa40f` (`Fix attendance audit frozen-column merge`).
