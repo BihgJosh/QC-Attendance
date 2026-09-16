@@ -10,6 +10,7 @@ import { isClockTime, isIsoCalendarDate } from "@/lib/validation";
 import { isValidServiceReportName, namedServiceReport } from "@/lib/service-report-services";
 
 const STATUSES = new Set(["", "On Time", "Overshot", "Finished Early"]);
+const OPTIONAL_SEGMENTS = new Set(["testimonyIntroduction", "firstTestimony", "secondTestimony", "thirdTestimony", "fourthTestimony", "fifthTestimony"]);
 
 function text(value: unknown, max = 2_000) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -27,7 +28,11 @@ function timing(value: unknown): TimerSegment | null {
   const min = integer(record.min, 1_440);
   const sec = integer(record.sec, 59);
   if (!STATUSES.has(status) || min === null || sec === null) return null;
-  return status === "On Time" || !status ? { status, min: 0, sec: 0 } : { status, min, sec };
+  if (status === "Overshot" || status === "Finished Early") {
+    if (min === 0 && sec === 0) return null;
+    return { status, min, sec };
+  }
+  return { status, min: 0, sec: 0 };
 }
 
 export async function POST(request: Request) {
@@ -57,14 +62,15 @@ export async function POST(request: Request) {
     const segments: Record<string, TimerSegment> = {};
     for (const [id] of SERVICE_TIMER_SEGMENTS) {
       const segment = timing(rawSegments[id]);
-      if (!segment) return NextResponse.json({ ok: false, message: "Enter valid segment timing values." }, { status: 400 });
+      if (!segment) return NextResponse.json({ ok: false, message: "Enter minutes and seconds when a category is Overshot or Finished Early." }, { status: 400 });
+      if (!OPTIONAL_SEGMENTS.has(id) && !segment.status) return NextResponse.json({ ok: false, message: "Complete every timing category except testimonies." }, { status: 400 });
       segments[id] = segment;
     }
     const rawExtra = body.extra && typeof body.extra === "object" && !Array.isArray(body.extra)
       ? body.extra as Record<string, unknown>
       : {};
     const extraTiming = timing(rawExtra);
-    if (!extraTiming) return NextResponse.json({ ok: false, message: "Enter valid extra-segment timing values." }, { status: 400 });
+    if (!extraTiming) return NextResponse.json({ ok: false, message: "Enter minutes and seconds when the extra segment is Overshot or Finished Early." }, { status: 400 });
     const hasTimingEntry = Boolean(serviceStart || serviceEnd || Object.values(segments).some((segment) => segment.status) || extraTiming.status);
     if (!hasTimingEntry) {
       return NextResponse.json({ ok: false, message: "Record the service start or end time, or at least one segment status." }, { status: 400 });
