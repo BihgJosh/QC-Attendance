@@ -10,7 +10,9 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request." }, { status: 400 });
     const email = String(body.email || "").trim().toLowerCase();
     const action = String(body.action || "login");
-    const rememberMe = body.isPwa === true;
+    // Every installed PWA and browser receives the same durable rolling session.
+    // The server still keeps each token revocable through member_sessions.
+    const rememberMe = true;
     if (body.privacyAccepted !== true) return NextResponse.json({ error: "Accept the Privacy Policy before signing in." }, { status: 400 });
     if (!email) return NextResponse.json({ error: "Enter your team email." }, { status: 400 });
     if (!(await isAdminEmail(email))) {

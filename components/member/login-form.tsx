@@ -36,10 +36,8 @@ export function MemberLoginForm() {
     try {
       if (step === "setup" && password !== confirm) throw new Error("The passwords do not match.");
       if (step === "setup" && !passwordReady) throw new Error("Use at least 10 characters with uppercase, lowercase and a number.");
-      const standaloneNavigator = navigator as Navigator & { standalone?: boolean };
-      const isPwa = window.matchMedia("(display-mode: standalone)").matches || standaloneNavigator.standalone === true;
       if (!privacyAccepted) throw new Error("Accept the Privacy Policy before signing in.");
-      const response = await fetch("/api/member/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: step, email, password, isPwa, privacyAccepted }) });
+      const response = await fetch("/api/member/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: step, email, password, privacyAccepted }) });
       const data = await response.json().catch(() => ({ error: "The sign-in service returned an invalid response." }));
       if (!response.ok) throw new Error(data.error || "Sign-in failed.");
       if (data.nextStep === "setup") {

@@ -4,11 +4,10 @@ import { cookies } from "next/headers";
 import { getMemberSession } from "@/lib/member-store";
 
 export const MEMBER_SESSION_COOKIE = "qcu_member_session";
-export const MEMBER_WEB_SESSION_MAX_AGE = 60 * 60 * 24;
-export const MEMBER_PWA_SESSION_MAX_AGE = 60 * 60 * 24 * 30;
+export const MEMBER_SESSION_MAX_AGE = 60 * 60 * 24 * 30;
 
-export function memberSessionMaxAge(rememberMe = false) {
-  return rememberMe ? MEMBER_PWA_SESSION_MAX_AGE : MEMBER_WEB_SESSION_MAX_AGE;
+export function memberSessionMaxAge(_rememberMe = true) {
+  return MEMBER_SESSION_MAX_AGE;
 }
 
 export async function setMemberSession(token: string, rememberMe = false) {

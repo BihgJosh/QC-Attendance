@@ -98,8 +98,7 @@ function validProfileStagePath(emailHash: string, objectPath: string) {
 
 const PROTECTED_BOOTSTRAP_EMAILS = new Set(["joshuaagusa001@gmail.com"]);
 const PASSWORD_ITERATIONS = 210_000;
-const WEB_SESSION_DAYS = 1;
-const PWA_SESSION_DAYS = 30;
+const MEMBER_SESSION_DAYS = 30;
 
 function normalizeEmail(value: unknown) {
   return String(value || "").trim().toLowerCase();
@@ -148,12 +147,14 @@ async function verifyPassword(password: string, stored: string) {
 async function createMemberSession(email: string, rememberMe = false) {
   const token = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash = await sha256(token);
-  const sessionDays = rememberMe ? PWA_SESSION_DAYS : WEB_SESSION_DAYS;
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + sessionDays * 24 * 60 * 60 * 1000).toISOString();
-  await rest("member_sessions?on_conflict=email", {
-    method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify({ email, token_hash: tokenHash, expires_at: expiresAt, remember_me: rememberMe, created_at: now.toISOString(), last_seen_at: now.toISOString() }),
+  const expiresAt = new Date(now.getTime() + MEMBER_SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  await rest(`member_sessions?expires_at=lte.${encodeURIComponent(now.toISOString())}`, {
+    method: "DELETE", headers: { Prefer: "return=minimal" },
+  });
+  await rest("member_sessions", {
+    method: "POST", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ email, token_hash: tokenHash, expires_at: expiresAt, remember_me: true, created_at: now.toISOString(), last_seen_at: now.toISOString() }),
   });
   return token;
 }
@@ -168,10 +169,9 @@ async function resolveMemberSession(tokenValue: unknown) {
   const email = String(sessions[0].email);
   const credentials = await rest(`member_credentials?select=email,must_change_password&email=eq.${encodeURIComponent(email)}&limit=1`) as Json[];
   if (!credentials[0]) return null;
-  const rememberMe = sessions[0].remember_me === true;
-  const sessionDays = rememberMe ? PWA_SESSION_DAYS : WEB_SESSION_DAYS;
-  const sessionDuration = sessionDays * 24 * 60 * 60 * 1000;
-  const renewalWindow = (rememberMe ? 7 : 0.25) * 24 * 60 * 60 * 1000;
+  const rememberMe = true;
+  const sessionDuration = MEMBER_SESSION_DAYS * 24 * 60 * 60 * 1000;
+  const renewalWindow = 7 * 24 * 60 * 60 * 1000;
   const remaining = new Date(String(sessions[0].expires_at)).getTime() - Date.now();
   const rollingExpiry = remaining < renewalWindow || remaining > sessionDuration
     ? new Date(Date.now() + sessionDuration).toISOString()
