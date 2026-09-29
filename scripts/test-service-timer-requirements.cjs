@@ -34,6 +34,8 @@ const post = (body) => exportsObject.POST(new Request('https://example.invalid/a
   assert.equal((await post({ ...base, segments: { ...baseSegments, openingPrayer: { status: '', min: '', sec: '' } } })).status, 400);
   assert.equal((await post({ ...base, segments: { ...baseSegments, openingPrayer: { status: 'Overshot', min: 0, sec: 0 } } })).status, 400);
   assert.equal((await post({ ...base, segments: { ...baseSegments, firstTestimony: { status: 'Finished Early', min: 0, sec: 0 } } })).status, 400);
+  assert.equal((await post({ ...base, extra: { name: 'Special prayer', status: '', min: '', sec: '' } })).status, 400);
+  assert.equal((await post({ ...base, extra: { name: '', status: 'On Time', min: '', sec: '' } })).status, 400);
   const validResponse = await post({ ...base, segments: { ...baseSegments, openingPrayer: { status: 'Overshot', min: 0, sec: 15 } } });
   assert.equal(validResponse.status, 200, await validResponse.text());
   assert.equal(saved.segments.openingPrayer.sec, 15);

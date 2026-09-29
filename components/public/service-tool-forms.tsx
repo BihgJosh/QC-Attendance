@@ -63,9 +63,90 @@ export function ServicePostForm({ overrideOnly = false }: { overrideOnly?: boole
 }
 
 export function ServiceTimerForm() {
-  type Timing = { status: string; min: string; sec: string }; const [times, setTimes] = useState<Record<string, Timing>>({}); const [busy, setBusy] = useState(false); const [result, setResult] = useState<Result>(null); const id = useRef(crypto.randomUUID()); const get = (key: string) => times[key] || { status: "", min: "", sec: "" }; const change = (key: string, patch: Partial<Timing>) => setTimes((current) => ({ ...current, [key]: { ...get(key), ...patch } }));
-  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setBusy(true); setResult(null); const formElement = event.currentTarget; const form = new FormData(formElement); try { const data = await submitJson("/api/service-timer", { submissionId: id.current, date: value(form, "date"), service: value(form, "service"), serviceStart: value(form, "serviceStart"), serviceEnd: value(form, "serviceEnd"), segments: Object.fromEntries(SEGMENTS.map(([key]) => [key, get(key)])), extra: { name: value(form, "extraName"), ...get("extra") }, generalObservation: value(form, "generalObservation") }); formElement?.reset(); setTimes({}); id.current = crypto.randomUUID(); setResult({ kind: "success", text: data.message || "Timer log saved." }); } catch (error) { setResult({ kind: "error", text: (error as Error).message }); } finally { setBusy(false); } }
-  return <Shell title="Service Timer" description="Capture the service timeline segment by segment. Your signed-in profile identifies the timer automatically." icon={Clock3}><form onSubmit={submit} className="space-y-7"><Grid><div className="space-y-2"><Label htmlFor="timer-date">Date<RequiredMark /></Label><Input id="timer-date" name="date" type="date" defaultValue={today()} required /></div><Select name="service" label="Service" options={SERVICES} required /><div className="space-y-2"><Label htmlFor="serviceStart">Service start</Label><Input id="serviceStart" name="serviceStart" type="time" /></div><div className="space-y-2"><Label htmlFor="serviceEnd">Service end</Label><Input id="serviceEnd" name="serviceEnd" type="time" /></div></Grid><section><h4 className="font-bold">Timing entries<RequiredMark /></h4><p className="mt-1 text-xs text-muted-foreground">Complete every category except testimonies. Overshot and Finished Early require minutes and seconds.</p><div className="mt-4 grid gap-3 lg:grid-cols-2">{SEGMENTS.map(([key, label]) => { const current = get(key); const optional = OPTIONAL_TIMER_SEGMENTS.has(key); const requiresTime = current.status === "Overshot" || current.status === "Finished Early"; return <div key={key} className="rounded-2xl bg-muted/50 p-4"><p className="font-semibold">{label}{!optional && <RequiredMark />}</p><div className="mt-3 grid grid-cols-[1fr_5rem_5rem] gap-2"><select aria-label={`${label} status`} required={!optional} value={current.status} onChange={(event) => change(key, { status: event.target.value, ...(["Overshot", "Finished Early"].includes(event.target.value) ? {} : { min: "", sec: "" }) })} className="h-10 rounded-xl border bg-background px-2 text-xs"><option value="">{optional ? "Not recorded" : "Select status"}</option>{["On Time", "Overshot", "Finished Early"].map((status) => <option key={status}>{status}</option>)}</select><Input aria-label={`${label} minutes`} type="number" min="0" placeholder="Min" value={current.min} required={requiresTime} disabled={!requiresTime} onChange={(event) => change(key, { min: event.target.value })} /><Input aria-label={`${label} seconds`} type="number" min="0" max="59" placeholder="Sec" value={current.sec} required={requiresTime} disabled={!requiresTime} onChange={(event) => change(key, { sec: event.target.value })} /></div></div>; })}</div></section><div className="rounded-2xl border p-4"><Grid><div className="space-y-2"><Label htmlFor="extraName">Extra segment</Label><Input id="extraName" name="extraName" /></div><Select name="extraStatus" label="Status" options={["On Time", "Overshot", "Finished Early"]} selected={get("extra").status} onSelect={(status) => change("extra", { status, ...(["Overshot", "Finished Early"].includes(status) ? {} : { min: "", sec: "" }) })} /></Grid>{["Overshot", "Finished Early"].includes(get("extra").status) && <div className="mt-4 grid grid-cols-2 gap-3"><Input aria-label="Extra segment minutes" type="number" min="0" placeholder="Minutes" value={get("extra").min} required onChange={(event) => change("extra", { min: event.target.value })} /><Input aria-label="Extra segment seconds" type="number" min="0" max="59" placeholder="Seconds" value={get("extra").sec} required onChange={(event) => change("extra", { sec: event.target.value })} /></div>}</div><Area name="generalObservation" label="General timing observation" /><Notice result={result} onClose={() => setResult(null)} /><Button type="submit" variant="gradient" disabled={busy}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit Timer Log</Button></form></Shell>;
+  type Timing = { status: string; min: string; sec: string };
+  const [times, setTimes] = useState<Record<string, Timing>>({});
+  const [specialServiceName, setSpecialServiceName] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<Result>(null);
+  const id = useRef(crypto.randomUUID());
+  const get = (key: string) => times[key] || { status: "", min: "", sec: "" };
+  const clearError = (key: string) => setErrors((current) => { if (!current[key]) return current; const next = { ...current }; delete next[key]; return next; });
+  const change = (key: string, patch: Partial<Timing>) => {
+    setTimes((current) => ({ ...current, [key]: { ...(current[key] || { status: "", min: "", sec: "" }), ...patch } }));
+    setErrors((current) => { const next = { ...current }; delete next[`${key}-status`]; delete next[`${key}-min`]; delete next[`${key}-sec`]; return next; });
+  };
+  const invalid = (key: string) => Boolean(errors[key]);
+  const fieldClass = (key: string) => invalid(key) ? "border-red-600 bg-red-50/60 ring-2 ring-red-200" : "";
+  const fieldError = (key: string) => errors[key] ? <p id={`${key}-error`} className="mt-1 text-xs font-semibold text-red-700" role="alert">{errors[key]}</p> : null;
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const next: Record<string, string> = {};
+    if (!value(form, "date") || !formElement.querySelector<HTMLInputElement>("#timer-date")?.validity.valid) next["timer-date"] = "Choose a valid date.";
+    if (!value(form, "service")) next.service = "Choose a service.";
+    if (form.get("service") === SPECIAL_SERVICE_REPORT_OPTION && !value(form, "specialServiceName")) next.specialServiceName = "Name the special service.";
+    for (const key of ["serviceStart", "serviceEnd"]) {
+      const control = formElement.elements.namedItem(key) as HTMLInputElement | null;
+      if (control?.value && !control.validity.valid) next[key] = "Enter a valid time.";
+    }
+    const validateTiming = (key: string, timing: Timing, required: boolean) => {
+      if (required && !timing.status) next[`${key}-status`] = "Select a timing status.";
+      if (timing.status === "Overshot" || timing.status === "Finished Early") {
+        const min = Number(timing.min), sec = Number(timing.sec);
+        if (timing.min === "" || !Number.isInteger(min) || min < 0 || min > 1440) next[`${key}-min`] = "Enter minutes from 0 to 1440.";
+        if (timing.sec === "" || !Number.isInteger(sec) || sec < 0 || sec > 59) next[`${key}-sec`] = "Enter seconds from 0 to 59.";
+        if (!next[`${key}-min`] && !next[`${key}-sec`] && min === 0 && sec === 0) next[`${key}-min`] = "Overshot and Finished Early need a time greater than zero.";
+      }
+    };
+    for (const [key] of SEGMENTS) validateTiming(key, get(key), !OPTIONAL_TIMER_SEGMENTS.has(key));
+    const extraName = value(form, "extraName"), extra = get("extra");
+    if (extraName && !extra.status) next["extra-status"] = "Select a status for the extra segment.";
+    if (extra.status && !extraName) next.extraName = "Name the extra segment.";
+    if (extra.status) validateTiming("extra", extra, true);
+    if (Object.keys(next).length) {
+      setErrors(next);
+      setResult(null);
+      requestAnimationFrame(() => document.getElementById(Object.keys(next)[0])?.focus());
+      return;
+    }
+    setErrors({}); setBusy(true); setResult(null);
+    try {
+      const data = await submitJson("/api/service-timer", { submissionId: id.current, date: value(form, "date"), service: value(form, "service"), serviceStart: value(form, "serviceStart"), serviceEnd: value(form, "serviceEnd"), segments: Object.fromEntries(SEGMENTS.map(([key]) => [key, get(key)])), extra: { name: extraName, ...extra }, generalObservation: value(form, "generalObservation") });
+      formElement.reset(); setTimes({}); setSpecialServiceName(""); id.current = crypto.randomUUID(); setResult({ kind: "success", text: data.message || "Timer log saved." });
+    } catch (error) { setResult({ kind: "error", text: (error as Error).message }); } finally { setBusy(false); }
+  }
+
+  return <Shell title="Service Timer" description="Capture the service timeline segment by segment. Your signed-in profile identifies the timer automatically." icon={Clock3}>
+    <form onSubmit={submit} noValidate className="space-y-7">
+      <Grid>
+        <div className="space-y-2"><Label htmlFor="timer-date">Date<RequiredMark /></Label><Input id="timer-date" name="date" type="date" defaultValue={today()} required aria-invalid={invalid("timer-date")} aria-describedby={invalid("timer-date") ? "timer-date-error" : undefined} className={fieldClass("timer-date")} onChange={() => clearError("timer-date")} />{fieldError("timer-date")}</div>
+        <div id="service-field" className={invalid("service") || invalid("specialServiceName") ? "rounded-xl ring-2 ring-red-300" : ""}><Select name="service" label="Service" options={SERVICES} required onSelect={() => clearError("service")} specialServiceName={specialServiceName} onSpecialServiceNameChange={(value) => { setSpecialServiceName(value); clearError("specialServiceName"); }} />{fieldError("service")}{fieldError("specialServiceName")}</div>
+        <div className="space-y-2"><Label htmlFor="serviceStart">Service start</Label><Input id="serviceStart" name="serviceStart" type="time" aria-invalid={invalid("serviceStart")} className={fieldClass("serviceStart")} onChange={() => clearError("serviceStart")} />{fieldError("serviceStart")}</div>
+        <div className="space-y-2"><Label htmlFor="serviceEnd">Service end</Label><Input id="serviceEnd" name="serviceEnd" type="time" aria-invalid={invalid("serviceEnd")} className={fieldClass("serviceEnd")} onChange={() => clearError("serviceEnd")} />{fieldError("serviceEnd")}</div>
+      </Grid>
+      <section><h4 className="font-bold">Timing entries<RequiredMark /></h4><p className="mt-1 text-xs text-muted-foreground">Complete every category except testimonies. Overshot and Finished Early require minutes and seconds.</p>
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">{SEGMENTS.map(([key, label]) => {
+          const current = get(key), optional = OPTIONAL_TIMER_SEGMENTS.has(key), requiresTime = current.status === "Overshot" || current.status === "Finished Early";
+          return <div key={key} className={`rounded-2xl p-4 ${Object.keys(errors).some((item) => item.startsWith(`${key}-`)) ? "bg-red-50 ring-2 ring-red-300" : "bg-muted/50"}`}><p className="font-semibold">{label}{!optional && <RequiredMark />}</p>
+            <div className="mt-3 grid grid-cols-[1fr_5rem_5rem] gap-2"><select id={`${key}-status`} aria-label={`${label} status`} aria-invalid={invalid(`${key}-status`)} required={!optional} value={current.status} onChange={(event) => change(key, { status: event.target.value, ...(["Overshot", "Finished Early"].includes(event.target.value) ? {} : { min: "", sec: "" }) })} className={`h-10 rounded-xl border bg-background px-2 text-xs ${fieldClass(`${key}-status`)}`}><option value="">{optional ? "Not recorded" : "Select status"}</option>{["On Time", "Overshot", "Finished Early"].map((status) => <option key={status}>{status}</option>)}</select>
+              <Input id={`${key}-min`} aria-label={`${label} minutes`} aria-invalid={invalid(`${key}-min`)} className={fieldClass(`${key}-min`)} type="number" min="0" max="1440" placeholder="Min" value={current.min} required={requiresTime} disabled={!requiresTime} onChange={(event) => change(key, { min: event.target.value })} />
+              <Input id={`${key}-sec`} aria-label={`${label} seconds`} aria-invalid={invalid(`${key}-sec`)} className={fieldClass(`${key}-sec`)} type="number" min="0" max="59" placeholder="Sec" value={current.sec} required={requiresTime} disabled={!requiresTime} onChange={(event) => change(key, { sec: event.target.value })} /></div>
+            {fieldError(`${key}-status`)}{fieldError(`${key}-min`)}{fieldError(`${key}-sec`)}
+          </div>;
+        })}</div>
+      </section>
+      <div className={`rounded-2xl border p-4 ${["extraName", "extra-status", "extra-min", "extra-sec"].some(invalid) ? "border-red-500 bg-red-50" : ""}`}><Grid><div className="space-y-2"><Label htmlFor="extraName">Extra segment</Label><Input id="extraName" name="extraName" aria-invalid={invalid("extraName")} className={fieldClass("extraName")} onChange={() => clearError("extraName")} />{fieldError("extraName")}</div><div id="extra-status" className={invalid("extra-status") ? "rounded-xl ring-2 ring-red-300" : ""}><Select name="extraStatus" label="Status" options={["On Time", "Overshot", "Finished Early"]} selected={get("extra").status} onSelect={(status) => change("extra", { status, ...(["Overshot", "Finished Early"].includes(status) ? {} : { min: "", sec: "" }) })} />{fieldError("extra-status")}</div></Grid>
+        {["Overshot", "Finished Early"].includes(get("extra").status) && <div className="mt-4 grid grid-cols-2 gap-3"><div><Input id="extra-min" aria-label="Extra segment minutes" aria-invalid={invalid("extra-min")} className={fieldClass("extra-min")} type="number" min="0" max="1440" placeholder="Minutes" value={get("extra").min} required onChange={(event) => change("extra", { min: event.target.value })} />{fieldError("extra-min")}</div><div><Input id="extra-sec" aria-label="Extra segment seconds" aria-invalid={invalid("extra-sec")} className={fieldClass("extra-sec")} type="number" min="0" max="59" placeholder="Seconds" value={get("extra").sec} required onChange={(event) => change("extra", { sec: event.target.value })} />{fieldError("extra-sec")}</div></div>}
+      </div>
+      <Area name="generalObservation" label="General timing observation" />
+      {Object.keys(errors).length > 0 && <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-800">Review the highlighted fields above, then submit again.</div>}
+      <Notice result={result} onClose={() => setResult(null)} />
+      <Button type="submit" variant="gradient" disabled={busy}>{busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit Timer Log</Button>
+    </form>
+  </Shell>;
 }
 
 export function ObserverReportForm() {

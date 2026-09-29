@@ -69,6 +69,9 @@ export async function POST(request: Request) {
     const rawExtra = body.extra && typeof body.extra === "object" && !Array.isArray(body.extra)
       ? body.extra as Record<string, unknown>
       : {};
+    const extraName = text(rawExtra.name, 160);
+    const extraStatus = text(rawExtra.status, 30);
+    if (Boolean(extraName) !== Boolean(extraStatus)) return NextResponse.json({ ok: false, message: "Name the extra segment and select its status, or leave both blank." }, { status: 400 });
     const extraTiming = timing(rawExtra);
     if (!extraTiming) return NextResponse.json({ ok: false, message: "Enter minutes and seconds when the extra segment is Overshot or Finished Early." }, { status: 400 });
     const hasTimingEntry = Boolean(serviceStart || serviceEnd || Object.values(segments).some((segment) => segment.status) || extraTiming.status);
@@ -78,7 +81,7 @@ export async function POST(request: Request) {
 
     await appendServiceTimerLog({
       submissionId, date, service, name: member.name, reporterEmail: session.email, serviceStart, serviceEnd, segments,
-      extra: { name: text(rawExtra.name, 160), ...extraTiming },
+      extra: { name: extraName, ...extraTiming },
       generalObservation: text(body.generalObservation),
     });
     return NextResponse.json({ ok: true, message: "Service Timer log saved successfully." });
